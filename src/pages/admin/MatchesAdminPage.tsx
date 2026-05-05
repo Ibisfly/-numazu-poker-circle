@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom'
 import { AdminShell } from './AdminDashboardPage'
 import {
   subscribeMatches, createMatch, updateMatch, deleteMatch,
-  settleMatch, settleRingGame, subscribeAllUsers,
+  settleMatch, settleRingGame, subscribeAllUsers, checkAndUnlockAchievements,
 } from '@/lib/firebase/firestore'
 import { useAuth } from '@/lib/hooks/useAuth'
 import type { Match, MatchStatus, User, DistributionRule, MatchCategory } from '@/types'
@@ -171,6 +171,7 @@ export const MatchesAdminPage = () => {
         rankings.map((r) => ({ uid: r.uid, rank: parseInt(r.rank) })),
         adminUser.uid
       )
+      settlingMatch.participants.forEach((uid) => checkAndUnlockAchievements(uid).catch(() => {}))
       setSettlingMatch(null)
     } finally { setSaving(false) }
   }
@@ -190,6 +191,7 @@ export const MatchesAdminPage = () => {
         cashbacks.map((c) => ({ uid: c.uid, amount: parseInt(c.amount) || 0 })),
         adminUser.uid
       )
+      settlingRing.participants.forEach((uid) => checkAndUnlockAchievements(uid).catch(() => {}))
       setSettlingRing(null)
     } finally { setSaving(false) }
   }

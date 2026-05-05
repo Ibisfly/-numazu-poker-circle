@@ -19,7 +19,7 @@ import {
   equipFrame,
   equipOverlay,
 } from '@/lib/firebase/firestore'
-import { FRAME_DEFS, OVERLAY_DEFS } from '@/components/ui/SwanAvatar'
+import { FRAME_DEFS } from '@/components/ui/SwanAvatar'
 import { logOut } from '@/lib/firebase/auth'
 import type { PointLog, UserAchievement, UserItem, Item } from '@/types'
 import { ACHIEVEMENTS } from '@/lib/achievements'
@@ -148,18 +148,31 @@ export const ProfilePage = () => {
   }, {})
   // 重複なしの itemId 一覧
   const uniqueBenefitItemIds = [...new Set(unusedBenefitItems.map((ui) => ui.itemId))]
-  const ownedItemIds = new Set(userItems.map((ui) => ui.itemId))
+  // 購入済みアイテムを Firestore item と突き合わせる
+  const purchasedItems = userItems
+    .map((ui) => allItems.find((i) => i.id === ui.itemId))
+    .filter(Boolean) as typeof allItems
 
-  // 購入済みカラーアイテム
+  // ③ カラー：avatarColor HEX値で照合（item.id ≠ AVATAR_COLORS[].id なので HEX照合が正しい）
+  const ownedColorHexes = new Set(
+    purchasedItems.filter((i) => i.itemSubtype === 'avatar_color' && i.avatarColor).map((i) => i.avatarColor!)
+  )
   const availableColors = [
     { id: 'default', name: 'デフォルト（ピンク）', color: DEFAULT_AVATAR_COLOR, owned: true },
-    ...AVATAR_COLORS.map((c) => ({ ...c, owned: ownedItemIds.has(c.id) })),
+    ...AVATAR_COLORS.map((c) => ({ ...c, owned: ownedColorHexes.has(c.color) })),
+    // ショップに追加されたカスタムカラーも表示（AVATAR_COLORS にない色）
+    ...purchasedItems
+      .filter((i) => i.itemSubtype === 'avatar_color' && i.avatarColor && !AVATAR_COLORS.some((ac) => ac.color === i.avatarColor))
+      .map((i) => ({ id: i.id, name: i.name, color: i.avatarColor!, owned: true })),
   ]
 
-  // 購入済み称号アイテム
-  const ownedTitleItems = allItems.filter(
-    (i) => i.itemSubtype === 'title' && ownedItemIds.has(i.id)
-  )
+  // ② フレーム：decorationType === 'frame' のアイテムで照合
+  const ownedFrameKeys = [...new Set(
+    purchasedItems.filter((i) => i.decorationType === 'frame' && i.frameStyle).map((i) => i.frameStyle!)
+  )].filter((k) => FRAME_DEFS[k])
+
+  // 称号：itemSubtype === 'title' で照合
+  const ownedTitleItems = purchasedItems.filter((i) => i.itemSubtype === 'title')
 
   if (!user) return null
 
@@ -317,54 +330,19 @@ export const ProfilePage = () => {
               )}
             </div>
 
-            {/* フレーム選択 */}
-            <DecoSection
-              label="フレーム"
-              noneLabel="フレームなし"
-              current={editFrame}
-              options={Object.entries(FRAME_DEFS)
-                .filter(([key]) => ownedItemIds.has(`frame_${key}`) || ownedTitleItems.some(i => i.name === key))
-                .concat(
-                  userItems
-                    .filter(ui => {
-                      const item = allItems.find(i => i.id === ui.itemId)
-                      return item?.decorationType === 'frame'
-                    })
-                    .map(ui => {
-                      const item = allItems.find(i => i.id === ui.itemId)!
-                      const key = item.frameStyle ?? ''
-                      return [key, FRAME_DEFS[key] ?? { name: item.name, description: '' }] as [string, typeof FRAME_DEFS[string]]
-                    })
-                    .filter(([k]) => k && FRAME_DEFS[k])
-                )
-                .filter(([, def]) => def)}
-              onSelect={setEditFrame}
-              renderPreview={(key) => (
-                <SwanAvatar color={editColor} size={36} frame={key} />
-              )}
-            />
-
-            {/* オーバーレイ選択 */}
-            <DecoSection
-              label="装飾"
-              noneLabel="装飾なし"
-              current={editOverlay}
-              options={userItems
-                .filter(ui => {
-                  const item = allItems.find(i => i.id === ui.itemId)
-                  return item?.decorationType === 'overlay'
-                })
-                .map(ui => {
-                  const item = allItems.find(i => i.id === ui.itemId)!
-                  const key = item.overlayId ?? ''
-                  return [key, OVERLAY_DEFS[key] ?? { name: item.name, description: '', component: () => null }] as [string, typeof OVERLAY_DEFS[string]]
-                })
-                .filter(([k]) => k && OVERLAY_DEFS[k])}
-              onSelect={setEditOverlay}
-              renderPreview={(key) => (
-                <SwanAvatar color={editColor} size={36} overlay={key} />
-              )}
-            />
+            {/* ② フレーム選択（購入済みフレームのみ表示） */}
+            {ownedFrameKeys.length > 0 && (
+              <DecoSection
+                label="フレーム"
+                noneLabel="フレームなし"
+                current={editFrame}
+                options={ownedFrameKeys.map((k) => [k, FRAME_DEFS[k]] as [string, typeof FRAME_DEFS[string]])}
+                onSelect={setEditFrame}
+                renderPreview={(key) => (
+                  <SwanAvatar color={editColor} size={36} frame={key} />
+                )}
+              />
+            )}
 
             {saveError && <p className="text-red-400 text-xs">{saveError}</p>}
 

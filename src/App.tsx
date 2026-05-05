@@ -1,5 +1,6 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { AuthProvider } from '@/contexts/AuthContext'
+import { AchievementProvider } from '@/contexts/AchievementContext'
 import { RequireAuth } from '@/components/auth/RequireAuth'
 
 // Auth
@@ -29,10 +30,12 @@ import { TournamentPage } from '@/pages/admin/TournamentPage'
 import { MatchesAdminPage } from '@/pages/admin/MatchesAdminPage'
 import { ShopAdminPage } from '@/pages/admin/ShopAdminPage'
 import { PointsPage } from '@/pages/admin/PointsPage'
+import { AchievementsAdminPage } from '@/pages/admin/AchievementsAdminPage'
 
 export const App = () => (
   <BrowserRouter>
     <AuthProvider>
+    <AchievementProvider>
       <Routes>
         {/* ── Public ── */}
         <Route path="/login" element={<LoginPage />} />
@@ -61,10 +64,12 @@ export const App = () => (
         <Route path="/admin/matches" element={<RequireAuth requireAdmin><MatchesAdminPage /></RequireAuth>} />
         <Route path="/admin/shop" element={<RequireAuth requireAdmin><ShopAdminPage /></RequireAuth>} />
         <Route path="/admin/points" element={<RequireAuth requireAdmin><PointsPage /></RequireAuth>} />
+        <Route path="/admin/achievements" element={<RequireAuth requireAdmin><AchievementsAdminPage /></RequireAuth>} />
 
         {/* ── Fallback ── */}
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
+    </AchievementProvider>
     </AuthProvider>
   </BrowserRouter>
 )

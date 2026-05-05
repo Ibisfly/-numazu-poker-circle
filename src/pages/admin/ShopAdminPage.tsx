@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { AdminShell } from './AdminDashboardPage'
-import { subscribeItems, createItem, updateItem, markItemUsed, subscribeAllUsers } from '@/lib/firebase/firestore'
+import { subscribeItems, createItem, updateItem, deleteItem, markItemUsed, subscribeAllUsers } from '@/lib/firebase/firestore'
 import { uploadShopImage } from '@/lib/firebase/storage'
 import { collection, onSnapshot, query } from 'firebase/firestore'
 import { db } from '@/lib/firebase/config'
@@ -369,50 +369,72 @@ export const ShopAdminPage = () => {
               </form>
             )}
 
-            <div className="space-y-2">
-              {items.map((item) => (
-                <div key={item.id} className="bg-swan-card border border-swan-border rounded-xl overflow-hidden">
-                  {item.imageUrl && (
-                    <img
-                      src={item.imageUrl}
-                      alt={item.name}
-                      className="w-full aspect-video object-cover"
-                      onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }}
-                    />
-                  )}
-                  <div className="px-4 py-3 flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      {item.avatarColor && (
-                        <SwanAvatar color={item.avatarColor} size={32} showCard={false} />
-                      )}
-                      <div>
-                        <p className="font-medium text-sm">{item.name}</p>
-                        <p className="text-xs text-swan-sub flex items-center gap-1">
-                          {item.category === 'benefit' ? '特典' :
-                           item.itemSubtype === 'avatar_color'      ? 'アイコン(背景)' :
-                           item.itemSubtype === 'avatar_decoration'  ? 'アイコン(装飾)' :
-                           item.itemSubtype === 'title'              ? '称号' : '装飾品'}
-                          <FeatherPtIcon size={10} className="text-swan-accent" />
-                          {item.cost}
-                        </p>
+            {/* ジャンル別ソート + 値段順 */}
+            {(() => {
+              const GENRE_ORDER: Record<string, number> = {
+                avatar_color: 0, avatar_decoration: 1, title: 2, benefit: 3,
+              }
+              const sorted = [...items].sort((a, b) => {
+                const ga = GENRE_ORDER[a.itemSubtype ?? a.category] ?? 9
+                const gb = GENRE_ORDER[b.itemSubtype ?? b.category] ?? 9
+                return ga !== gb ? ga - gb : a.cost - b.cost
+              })
+
+              let lastGenre = ''
+              return (
+                <div className="space-y-1">
+                  {sorted.map((item) => {
+                    const genre = item.category === 'benefit'  ? '特典'
+                      : item.itemSubtype === 'avatar_color'      ? 'アイコン(背景)'
+                      : item.itemSubtype === 'avatar_decoration' ? 'アイコン(装飾)'
+                      : item.itemSubtype === 'title'             ? '称号'
+                      : '装飾品'
+                    const showHeader = genre !== lastGenre
+                    lastGenre = genre
+                    return (
+                      <div key={item.id}>
+                        {showHeader && (
+                          <p className="text-xs text-swan-sub font-semibold mt-3 mb-1 px-1">{genre}</p>
+                        )}
+                        <div className="bg-swan-card border border-swan-border rounded-xl overflow-hidden">
+                          {item.imageUrl && (
+                            <img src={item.imageUrl} alt={item.name}
+                              className="w-full aspect-video object-cover"
+                              onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }} />
+                          )}
+                          <div className="px-4 py-3 flex items-center justify-between">
+                            <div className="flex items-center gap-3 min-w-0">
+                              {item.avatarColor && <SwanAvatar color={item.avatarColor} size={28} frame={item.frameStyle} />}
+                              <div className="min-w-0">
+                                <p className="font-medium text-sm truncate">{item.name}</p>
+                                <p className="text-xs text-swan-sub flex items-center gap-1">
+                                  <FeatherPtIcon size={10} className="text-swan-accent" />{item.cost}
+                                  {!item.isAvailable && <span className="text-red-400 ml-1">非公開</span>}
+                                </p>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-1.5 shrink-0">
+                              <button onClick={() => updateItem(item.id, { isAvailable: !item.isAvailable })}
+                                className={`flex items-center gap-1 text-xs px-2 py-1 rounded border ${item.isAvailable ? 'text-green-400 border-green-400/30' : 'text-swan-sub border-swan-border'}`}>
+                                {item.isAvailable ? <Eye size={11} /> : <EyeOff size={11} />}
+                              </button>
+                              <button onClick={() => openForm(item)} className="text-swan-accent p-1">
+                                <Pencil size={14} />
+                              </button>
+                              <button onClick={() => {
+                                if (confirm(`「${item.name}」を削除しますか？`)) deleteItem(item.id)
+                              }} className="text-red-400/70 hover:text-red-400 p-1">
+                                <X size={14} />
+                              </button>
+                            </div>
+                          </div>
+                        </div>
                       </div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <button
-                        onClick={() => updateItem(item.id, { isAvailable: !item.isAvailable })}
-                        className={`flex items-center gap-1 text-xs px-2 py-1 rounded border ${item.isAvailable ? 'text-green-400 border-green-400/30' : 'text-swan-sub border-swan-border'}`}
-                      >
-                        {item.isAvailable ? <Eye size={12} /> : <EyeOff size={12} />}
-                        {item.isAvailable ? '公開中' : '非公開'}
-                      </button>
-                      <button onClick={() => openForm(item)} className="text-swan-accent">
-                        <Pencil size={14} />
-                      </button>
-                    </div>
-                  </div>
+                    )
+                  })}
                 </div>
-              ))}
-            </div>
+              )
+            })()}
           </>
         )}
 

@@ -36,16 +36,17 @@ export const ShopPage = () => {
     return subscribeUserItems(user.uid, setUserItems)
   }, [user])
 
-  const filteredItems = items.filter((i) => {
-    if (!i.isAvailable) return false
-    if (tab === 'benefit') return i.category === 'benefit'
-    // 装飾品タブ：サブタブでフィルタ
-    if (i.category !== 'cosmetic') return false
-    if (cosmeticSub === 'avatar_color')      return i.itemSubtype === 'avatar_color'
-    if (cosmeticSub === 'avatar_decoration') return i.itemSubtype === 'avatar_decoration'
-    if (cosmeticSub === 'title')             return i.itemSubtype === 'title'
-    return false
-  })
+  const filteredItems = items
+    .filter((i) => {
+      if (!i.isAvailable) return false
+      if (tab === 'benefit') return i.category === 'benefit'
+      if (i.category !== 'cosmetic') return false
+      if (cosmeticSub === 'avatar_color')      return i.itemSubtype === 'avatar_color'
+      if (cosmeticSub === 'avatar_decoration') return i.itemSubtype === 'avatar_decoration'
+      if (cosmeticSub === 'title')             return i.itemSubtype === 'title'
+      return false
+    })
+    .sort((a, b) => a.cost - b.cost)  // 値段の安い順
   const currentColor = user?.avatarColor ?? DEFAULT_AVATAR_COLOR
 
   // 装飾品：購入済み（使用済み含む）かどうか

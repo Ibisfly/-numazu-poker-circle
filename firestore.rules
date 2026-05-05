@@ -112,6 +112,12 @@ service cloud.firestore {
       allow update, delete: if isAdmin();
     }
 
+    // ── achievementConfigs（管理者が設定する実績報酬）──────────────────────
+    match /achievementConfigs/{achievementId} {
+      allow read: if isActiveUser();
+      allow write: if isAdmin();
+    }
+
     // ── notifications ────────────────────────────────────────────────────────
     match /notifications/{notificationId} {
       allow read: if isActiveUser() && resource.data.uid == request.auth.uid;

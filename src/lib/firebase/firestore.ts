@@ -418,6 +418,9 @@ export const createItem = (data: Omit<Item, 'id' | 'createdAt'>) =>
 export const updateItem = (itemId: string, data: Partial<Item>) =>
   updateDoc(doc(db, 'items', itemId), data as Record<string, unknown>)
 
+export const deleteItem = (itemId: string) =>
+  deleteDoc(doc(db, 'items', itemId))
+
 export const markItemUsed = (userItemId: string) =>
   updateDoc(doc(db, 'userItems', userItemId), {
     usedAt: serverTimestamp(),
@@ -492,6 +495,146 @@ export const settleMatch = async (
   }
 
   await batch.commit()
+}
+
+// ── Achievement Config（管理者が設定する報酬）─────────────────────────────
+
+export interface AchievementReward {
+  achievementId: string
+  rewardType?: 'title' | 'item'
+  rewardTitleText?: string
+  rewardTitleTier?: string
+  rewardItemId?: string
+  updatedBy?: string
+  updatedAt?: typeof serverTimestamp
+}
+
+export const subscribeAchievementConfigs = (cb: (configs: AchievementReward[]) => void) =>
+  onSnapshot(collection(db, 'achievementConfigs'), (snap) =>
+    cb(snap.docs.map((d) => ({ achievementId: d.id, ...d.data() } as AchievementReward)))
+  )
+
+export const saveAchievementConfig = (config: AchievementReward, adminUid: string) =>
+  setDoc(doc(db, 'achievementConfigs', config.achievementId), {
+    ...config,
+    updatedBy: adminUid,
+    updatedAt: serverTimestamp(),
+  })
+
+// 実績を解除＋報酬を自動付与
+export const unlockAchievementWithReward = async (uid: string, achievementId: string, achievementName: string) => {
+  // 既解除チェック
+  const existing = await getDocs(
+    query(collection(db, 'userAchievements'), where('uid', '==', uid), where('achievementId', '==', achievementId))
+  )
+  if (!existing.empty) return false  // 既解除
+
+  const batch = writeBatch(db)
+
+  // 実績レコード
+  batch.set(doc(collection(db, 'userAchievements')), {
+    uid, achievementId, unlockedAt: serverTimestamp(),
+  })
+
+  // 通知
+  const notifRef = doc(collection(db, 'notifications'))
+  batch.set(notifRef, {
+    uid, type: 'achievement',
+    message: `実績「${achievementName}」を解除しました！`,
+    isRead: false, createdAt: serverTimestamp(),
+  })
+
+  // 報酬チェック
+  const configSnap = await getDoc(doc(db, 'achievementConfigs', achievementId))
+  if (configSnap.exists()) {
+    const config = configSnap.data() as AchievementReward
+    if (config.rewardType === 'title' && config.rewardTitleText) {
+      batch.update(doc(db, 'users', uid), {
+        equippedTitle: config.rewardTitleText,
+        equippedTitleTier: config.rewardTitleTier ?? 'common',
+      })
+    }
+    if (config.rewardType === 'item' && config.rewardItemId) {
+      const itemRef = doc(collection(db, 'userItems'))
+      batch.set(itemRef, {
+        uid, itemId: config.rewardItemId, category: 'cosmetic',
+        purchasedAt: serverTimestamp(), usedAt: null, equipped: false,
+      })
+    }
+  }
+
+  await batch.commit()
+  return true  // 新規解除
+}
+
+// 実績条件チェック（イベント後に呼び出す）
+export const checkAndUnlockAchievements = async (uid: string) => {
+  const [logsSnap, achievedSnap, userItemsSnap, resultsSnap, matchesSnap, userSnap] = await Promise.all([
+    getDocs(query(collection(db, 'pointLogs'), where('uid', '==', uid))),
+    getDocs(query(collection(db, 'userAchievements'), where('uid', '==', uid))),
+    getDocs(query(collection(db, 'userItems'), where('uid', '==', uid))),
+    getDocs(collection(db, 'matchResults')),
+    getDocs(collection(db, 'matches')),
+    getDoc(doc(db, 'users', uid)),
+  ])
+
+  const alreadyUnlocked = new Set(achievedSnap.docs.map((d) => d.data().achievementId as string))
+  const logs = logsSnap.docs.map((d) => d.data())
+  const userItemsData = userItemsSnap.docs.map((d) => d.data())
+  const userData = userSnap.data()
+  const matchMap = new Map(matchesSnap.docs.map((d) => [d.id, d.data()]))
+
+  const attendanceCount = logs.filter((l) => l.type === 'attendance').length
+  const shopPurchaseCount = userItemsData.length
+  const totalPoints = userData?.totalPoints ?? 0
+
+  let tournamentEntries = 0, tournamentWins = 0, tournamentTop3 = 0, tournamentConsecutiveWins = 0
+  let matchEntries = 0, matchWins = 0
+
+  for (const doc of resultsSnap.docs) {
+    const result = doc.data()
+    const match = matchMap.get(result.matchId)
+    if (!match) continue
+
+    if (match.matchCategory === 'ring') {
+      const cb: { uid: string }[] = result.cashbacks ?? []
+      if (cb.find((c) => c.uid === uid)) matchEntries++
+      const ranks: { uid: string; rank: number }[] = result.rankings ?? []
+      const e = ranks.find((r) => r.uid === uid)
+      if (e?.rank === 1) matchWins++
+    } else {
+      const rankings: { uid: string; rank: number; earnedPoints: number }[] = result.rankings ?? []
+      const e = rankings.find((r) => r.uid === uid)
+      if (e) {
+        tournamentEntries++
+        if (e.rank === 1) { tournamentWins++; tournamentConsecutiveWins++ } else tournamentConsecutiveWins = 0
+        if (e.earnedPoints > 0) tournamentTop3++
+      }
+    }
+  }
+
+  const CONDITIONS: { id: string; name: string; met: boolean }[] = [
+    { id: 'first_attendance',  name: 'はじめの一羽',   met: attendanceCount >= 1 },
+    { id: 'regular_10',        name: '常連の翼',       met: attendanceCount >= 10 },
+    { id: 'legend_30',         name: '伝説の黒鳥',     met: attendanceCount >= 30 },
+    { id: 'tournament_first',  name: 'フライトビギナー', met: tournamentEntries >= 1 },
+    { id: 'podium',            name: '表彰台',          met: tournamentTop3 >= 1 },
+    { id: 'champion',          name: '王者の羽',        met: tournamentWins >= 1 },
+    { id: 'consecutive_win',   name: '連覇の飛翔',      met: tournamentConsecutiveWins >= 2 },
+    { id: 'match_debut',       name: 'マッチデビュー',  met: matchEntries >= 1 },
+    { id: 'match_hunter',      name: 'ハンター',         met: matchWins >= 1 },
+    { id: 'collector',         name: 'コレクター',      met: shopPurchaseCount >= 5 },
+    { id: 'millionaire',       name: '大富豪の羽',      met: totalPoints >= 10000 },
+  ]
+
+  const unlocked: string[] = []
+  for (const c of CONDITIONS) {
+    if (c.met && !alreadyUnlocked.has(c.id)) {
+      const isNew = await unlockAchievementWithReward(uid, c.id, c.name)
+      if (isNew) unlocked.push(c.id)
+    }
+  }
+  return unlocked
 }
 
 // ── Admin: Ring Game Settlement ────────────────────────────────────────────
