@@ -1,0 +1,124 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ── ヘルパー関数 ─────────────────────────────────────────────────────────
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isActiveUser() {
+      return isSignedIn() &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.status == 'active';
+    }
+
+    function isAdmin() {
+      return isSignedIn() &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin' &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.status == 'active';
+    }
+
+    function isSelf(uid) {
+      return request.auth.uid == uid;
+    }
+
+    // ── users ────────────────────────────────────────────────────────────────
+    match /users/{uid} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && isSelf(uid)
+        && request.resource.data.role == 'member'
+        && request.resource.data.status == 'pending';
+      allow update: if (isSelf(uid) && isActiveUser()
+          && request.resource.data.role == resource.data.role
+          && request.resource.data.status == resource.data.status)
+        || isAdmin();
+    }
+
+    // ── events ───────────────────────────────────────────────────────────────
+    match /events/{eventId} {
+      allow read: if isActiveUser();
+      allow write: if isAdmin();
+    }
+
+    // ── attendances ──────────────────────────────────────────────────────────
+    match /attendances/{attendanceId} {
+      allow read: if isAdmin() || (isActiveUser() && resource.data.uid == request.auth.uid);
+      allow write: if isAdmin();
+    }
+
+    // ── pointLogs ────────────────────────────────────────────────────────────
+    match /pointLogs/{logId} {
+      allow read: if isActiveUser() && resource.data.uid == request.auth.uid
+        || isAdmin();
+      // 自分のログ作成、または管理者が他ユーザー分のログを作成
+      allow create: if isAdmin()
+        || (isActiveUser() && request.resource.data.uid == request.auth.uid);
+      allow update, delete: if isAdmin();
+    }
+
+    // ── tournaments ──────────────────────────────────────────────────────────
+    match /tournaments/{tournamentId} {
+      allow read: if isActiveUser();
+      allow write: if isAdmin();
+    }
+
+    // ── matches ──────────────────────────────────────────────────────────────
+    match /matches/{matchId} {
+      allow read: if isActiveUser();
+      // 一般: participants フィールドのみ更新可（エントリー）
+      // 管理者: 全フィールド更新可（ステータス変更・精算等）
+      allow update: if isAdmin()
+        || (isActiveUser() &&
+            request.resource.data.diff(resource.data).affectedKeys().hasOnly(['participants']));
+      allow create, delete: if isAdmin();
+    }
+
+    // ── matchResults ─────────────────────────────────────────────────────────
+    match /matchResults/{resultId} {
+      allow read: if isActiveUser();
+      allow write: if isAdmin();
+    }
+
+    // ── items ────────────────────────────────────────────────────────────────
+    match /items/{itemId} {
+      allow read: if isActiveUser();
+      allow write: if isAdmin();
+    }
+
+    // ── userItems ────────────────────────────────────────────────────────────
+    match /userItems/{userItemId} {
+      allow read: if isActiveUser() && resource.data.uid == request.auth.uid || isAdmin();
+      allow create: if isActiveUser() && request.resource.data.uid == request.auth.uid;
+      // 管理者: 全フィールド更新可
+      // 本人: usedAt のみ更新可（特典の自己消費）
+      allow update: if isAdmin()
+        || (isActiveUser()
+            && resource.data.uid == request.auth.uid
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['usedAt']));
+    }
+
+    // ── achievements（マスタ） ───────────────────────────────────────────────
+    match /achievements/{achievementId} {
+      allow read: if isActiveUser();
+      allow write: if isAdmin();
+    }
+
+    // ── userAchievements ─────────────────────────────────────────────────────
+    match /userAchievements/{userAchievementId} {
+      allow read: if isActiveUser() && resource.data.uid == request.auth.uid || isAdmin();
+      // create: request.resource.data で判定
+      allow create: if isActiveUser() && request.resource.data.uid == request.auth.uid;
+      allow update, delete: if isAdmin();
+    }
+
+    // ── notifications ────────────────────────────────────────────────────────
+    match /notifications/{notificationId} {
+      allow read: if isActiveUser() && resource.data.uid == request.auth.uid;
+      allow update: if isActiveUser() && resource.data.uid == request.auth.uid
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['isRead']);
+      // create: 管理者またはアクティブユーザーが自分宛に作成可
+      allow create: if isAdmin() || isActiveUser();
+    }
+  }
+}

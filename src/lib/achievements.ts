@@ -1,0 +1,81 @@
+import type { Achievement } from '@/types'
+
+export const ACHIEVEMENTS: Achievement[] = [
+  {
+    id: 'first_attendance',
+    name: 'はじめの一羽',
+    description: '初回来店（来店ポイント初付与）',
+    condition: 'attendance_count >= 1',
+    iconUrl: '🪶',
+  },
+  {
+    id: 'regular_10',
+    name: '常連の翼',
+    description: '累計来店10回',
+    condition: 'attendance_count >= 10',
+    iconUrl: '🦢',
+  },
+  {
+    id: 'legend_30',
+    name: '伝説の黒鳥',
+    description: '累計来店30回',
+    condition: 'attendance_count >= 30',
+    iconUrl: '👑',
+  },
+  {
+    id: 'tournament_first',
+    name: 'フライトビギナー',
+    description: 'トーナメント初参加',
+    condition: 'tournament_count >= 1',
+    iconUrl: '🎯',
+  },
+  {
+    id: 'podium',
+    name: '表彰台',
+    description: 'トーナメント3位以内を初めて獲得',
+    condition: 'tournament_top3 >= 1',
+    iconUrl: '🥉',
+  },
+  {
+    id: 'champion',
+    name: '王者の羽',
+    description: 'トーナメント優勝',
+    condition: 'tournament_win >= 1',
+    iconUrl: '🏆',
+  },
+  {
+    id: 'consecutive_win',
+    name: '連覇の飛翔',
+    description: 'トーナメント連続優勝（2回以上）',
+    condition: 'tournament_consecutive_win >= 2',
+    iconUrl: '⚡',
+  },
+  {
+    id: 'match_debut',
+    name: 'マッチデビュー',
+    description: 'ポイントマッチ初エントリー',
+    condition: 'match_entry >= 1',
+    iconUrl: '🃏',
+  },
+  {
+    id: 'match_hunter',
+    name: 'ハンター',
+    description: 'ポイントマッチで優勝',
+    condition: 'match_win >= 1',
+    iconUrl: '🎖️',
+  },
+  {
+    id: 'collector',
+    name: 'コレクター',
+    description: 'ショップアイテムを5種類以上購入',
+    condition: 'shop_purchase >= 5',
+    iconUrl: '🛍️',
+  },
+  {
+    id: 'millionaire',
+    name: '大富豪の羽',
+    description: '累計ポイント10,000🪶到達',
+    condition: 'total_points >= 10000',
+    iconUrl: '💎',
+  },
+]

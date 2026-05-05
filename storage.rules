@@ -1,0 +1,15 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    // ショップ商品画像
+    // 管理者認証はアプリ側（RequireAuth requireAdmin）で担保しているため
+    // Storage側はサインイン済み + ファイル制限のみ
+    match /shop-images/{imageId} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null
+        && request.resource.size < 5 * 1024 * 1024
+        && request.resource.contentType.matches('image/.*');
+    }
+  }
+}

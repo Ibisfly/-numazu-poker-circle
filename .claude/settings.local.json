@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "Bash(npm create *)",
+      "Bash(firebase firestore:databases:create \"\\(default\\)\" --location asia-northeast1)",
+      "Bash(python3 -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\(d.get\\('email',''\\), d.get\\('scope',''\\)[:100]\\)\")",
+      "Bash(python3 -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\(d.get\\('name','ERROR'\\), d.get\\('error',{}\\).get\\('message',''\\)\\)\")",
+      "Bash(npx pwa-assets-generator *)"
+    ]
+  }
+}
