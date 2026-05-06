@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { ACHIEVEMENTS } from '@/lib/achievements'
+import { AchievementIcon } from './AchievementIcons'
 
 interface Props {
   achievementId: string
@@ -63,8 +64,8 @@ export const AchievementUnlockModal = ({ achievementId, onClose }: Props) => {
         <div className="bg-gradient-to-br from-[#1a1a2e] to-[#16213e] border border-yellow-500/50 rounded-2xl px-8 py-8 text-center shadow-2xl min-w-[260px]"
           style={{ boxShadow: '0 0 40px rgba(255,215,0,0.3)' }}>
           {/* アイコン */}
-          <div className="text-5xl mb-3" style={{ animation: 'primePulse 1.5s ease-in-out infinite' }}>
-            {ach?.iconUrl ?? '🏅'}
+          <div className="flex justify-center mb-3" style={{ animation: 'primePulse 1.5s ease-in-out infinite' }}>
+            <AchievementIcon achievementId={achievementId} size={56} />
           </div>
 
           <p className="text-xs text-yellow-400/70 uppercase tracking-widest mb-1">Achievement Unlocked</p>

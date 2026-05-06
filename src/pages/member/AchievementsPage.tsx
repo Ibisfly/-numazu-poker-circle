@@ -6,6 +6,7 @@ import { useAuth } from '@/lib/hooks/useAuth'
 import { subscribeUserAchievements } from '@/lib/firebase/firestore'
 import type { UserAchievement } from '@/types'
 import { ACHIEVEMENTS } from '@/lib/achievements'
+import { AchievementIcon } from '@/components/ui/AchievementIcons'
 
 export const AchievementsPage = () => {
   const { user } = useAuth()
@@ -37,7 +38,7 @@ export const AchievementsPage = () => {
               >
                 <div className="w-10 h-10 flex items-center justify-center shrink-0">
                   {unlocked ? (
-                    <span className="text-2xl">{ach.iconUrl}</span>
+                    <AchievementIcon achievementId={ach.id} size={36} />
                   ) : (
                     <Lock size={22} className="text-swan-muted" />
                   )}

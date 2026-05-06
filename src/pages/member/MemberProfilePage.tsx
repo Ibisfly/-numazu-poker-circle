@@ -5,6 +5,7 @@ import { FeatherIcon } from '@/components/ui/FeatherIcon'
 import { SwanAvatar, DEFAULT_AVATAR_COLOR } from '@/components/ui/SwanAvatar'
 import { BeginnerIcon, Trophy, Award } from '@/components/ui/Icons'
 import { GoldMedalIcon, BronzeMedalIcon } from '@/components/ui/Icons'
+import { AchievementIcon } from '@/components/ui/AchievementIcons'
 import {
   getUser,
   subscribePointLogs,
@@ -229,7 +230,7 @@ export const MemberProfilePage = () => {
                   className="bg-swan-card border border-swan-accent/30 rounded-lg px-3 py-2 text-xs flex items-center gap-1"
                   title={ua.def?.description}
                 >
-                  <span>{ua.def?.iconUrl ?? '🏅'}</span>
+                  <AchievementIcon achievementId={ua.achievementId} size={18} />
                   {ua.def?.name ?? ua.achievementId}
                 </div>
               ))}

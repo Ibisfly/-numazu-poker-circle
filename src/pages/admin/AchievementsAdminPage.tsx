@@ -7,6 +7,7 @@ import {
   subscribeItems, type AchievementReward,
 } from '@/lib/firebase/firestore'
 import { ACHIEVEMENTS } from '@/lib/achievements'
+import { AchievementIcon } from '@/components/ui/AchievementIcons'
 import type { Item } from '@/types'
 import { ChevronLeft } from '@/components/ui/Icons'
 import type { TitleTier } from '@/components/ui/TitleBadge'
@@ -82,7 +83,7 @@ export const AchievementsAdminPage = () => {
               <div key={ach.id} className="bg-swan-card border border-swan-border rounded-xl p-4">
                 <div className="flex items-center justify-between mb-2">
                   <div className="flex items-center gap-2">
-                    <span className="text-xl">{ach.iconUrl}</span>
+                    <AchievementIcon achievementId={ach.id} size={28} />
                     <div>
                       <p className="font-semibold text-sm">{ach.name}</p>
                       <p className="text-xs text-swan-sub">{ach.description}</p>

@@ -5,6 +5,7 @@ import { FeatherIcon } from '@/components/ui/FeatherIcon'
 import { Shield, LogOut, Pencil, X, Check, Award, BeginnerIcon, CreditCard } from '@/components/ui/Icons'
 import { SwanAvatar, AVATAR_COLORS, DEFAULT_AVATAR_COLOR } from '@/components/ui/SwanAvatar'
 import { TitleBadge, type TitleTier } from '@/components/ui/TitleBadge'
+import { AchievementIcon } from '@/components/ui/AchievementIcons'
 import { CouponModal } from '@/components/ui/CouponModal'
 import { useAuth } from '@/lib/hooks/useAuth'
 import {
@@ -422,7 +423,7 @@ export const ProfilePage = () => {
                 const def = ACHIEVEMENTS.find((a) => a.id === ua.achievementId)
                 return (
                   <div key={ua.id} className="bg-swan-card border border-swan-accent/30 rounded-lg px-3 py-2 text-xs flex items-center gap-1">
-                    <span>{def?.iconUrl ?? ''}</span>
+                    <AchievementIcon achievementId={ua.achievementId} size={16} />
                     {def?.name ?? ua.achievementId}
                   </div>
                 )

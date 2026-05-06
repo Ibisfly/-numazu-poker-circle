@@ -506,7 +506,6 @@ export interface AchievementReward {
   rewardTitleTier?: string
   rewardItemId?: string
   updatedBy?: string
-  updatedAt?: typeof serverTimestamp
 }
 
 export const subscribeAchievementConfigs = (cb: (configs: AchievementReward[]) => void) =>
@@ -514,12 +513,19 @@ export const subscribeAchievementConfigs = (cb: (configs: AchievementReward[]) =
     cb(snap.docs.map((d) => ({ achievementId: d.id, ...d.data() } as AchievementReward)))
   )
 
-export const saveAchievementConfig = (config: AchievementReward, adminUid: string) =>
-  setDoc(doc(db, 'achievementConfigs', config.achievementId), {
-    ...config,
+export const saveAchievementConfig = (config: AchievementReward, adminUid: string) => {
+  // Firestore は undefined を書き込めないため、値が存在するフィールドだけを明示的に渡す
+  const data: Record<string, unknown> = {
+    achievementId: config.achievementId,
     updatedBy: adminUid,
     updatedAt: serverTimestamp(),
-  })
+  }
+  if (config.rewardType)      data.rewardType      = config.rewardType
+  if (config.rewardTitleText) data.rewardTitleText = config.rewardTitleText
+  if (config.rewardTitleTier) data.rewardTitleTier = config.rewardTitleTier
+  if (config.rewardItemId)    data.rewardItemId    = config.rewardItemId
+  return setDoc(doc(db, 'achievementConfigs', config.achievementId), data)
+}
 
 // 実績を解除＋報酬を自動付与
 export const unlockAchievementWithReward = async (uid: string, achievementId: string, achievementName: string) => {
