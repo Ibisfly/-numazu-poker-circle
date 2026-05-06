@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { AdminShell } from './AdminDashboardPage'
-import { subscribeAllUsers, addPointLog } from '@/lib/firebase/firestore'
+import { subscribeAllUsers, addPointLog, resetYearlyPoints } from '@/lib/firebase/firestore'
 import { useAuth } from '@/lib/hooks/useAuth'
 import type { User } from '@/types'
 import { ChevronLeft, FeatherPtIcon, Plus, Minus } from '@/components/ui/Icons'
@@ -9,12 +9,20 @@ import { ChevronLeft, FeatherPtIcon, Plus, Minus } from '@/components/ui/Icons'
 export const PointsPage = () => {
   const { user: adminUser } = useAuth()
   const [allUsers, setAllUsers] = useState<User[]>([])
+
+  // 手動調整
   const [selectedUid, setSelectedUid] = useState('')
   const [type, setType] = useState<'add' | 'subtract'>('add')
   const [amount, setAmount] = useState('')
   const [reason, setReason] = useState('')
   const [saving, setSaving] = useState(false)
   const [msg, setMsg] = useState('')
+
+  // 年間リセット
+  const [resetYear, setResetYear] = useState(new Date().getFullYear())
+  const [showResetConfirm, setShowResetConfirm] = useState(false)
+  const [resetting, setResetting] = useState(false)
+  const [resetMsg, setResetMsg] = useState('')
 
   useEffect(() => {
     return subscribeAllUsers((users) => {
@@ -47,15 +55,37 @@ export const PointsPage = () => {
     }
   }
 
+  const handleYearReset = async () => {
+    if (!adminUser) return
+    setResetting(true)
+    setResetMsg('')
+    try {
+      const result = await resetYearlyPoints(adminUser.uid, resetYear)
+      if (result) {
+        setResetMsg(
+          `${resetYear}年のランキングを確定しました。年間1位：${result.winner.playerName}（${result.winner.yearPoints.toLocaleString()}pt）/ 対象 ${result.totalParticipants}名をリセット`
+        )
+      } else {
+        setResetMsg('アクティブメンバーがいないためリセットできませんでした')
+      }
+      setShowResetConfirm(false)
+    } catch (e) {
+      setResetMsg('リセットに失敗しました: ' + (e instanceof Error ? e.message : 'エラー'))
+    } finally {
+      setResetting(false)
+    }
+  }
+
   if (!adminUser) return null
 
   return (
     <AdminShell title="手動ポイント調整">
-      <div className="py-4 space-y-4">
+      <div className="py-4 space-y-6">
         <Link to="/admin" className="text-xs text-swan-accent flex items-center gap-1">
           <ChevronLeft size={14} /> ダッシュボード
         </Link>
 
+        {/* ── 手動調整フォーム ── */}
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label className="text-xs text-swan-sub block mb-1">対象メンバー</label>
@@ -141,6 +171,73 @@ export const PointsPage = () => {
             {saving ? '処理中...' : `${type === 'add' ? '加算' : '減算'}する`}
           </button>
         </form>
+
+        {/* ── 年間ランキング確定・リセット ── */}
+        <div className="border-t border-swan-border pt-5 space-y-3">
+          <div>
+            <h3 className="text-sm font-semibold text-swan-text">年間ランキング確定・リセット</h3>
+            <p className="text-xs text-swan-sub mt-1">
+              対象年のランキングを Firestore に保存し、全メンバーの年間ポイントを0にリセットします。
+              年間1位のメンバーに「年間王者」実績が付与されます。
+            </p>
+          </div>
+
+          <div>
+            <label className="text-xs text-swan-sub block mb-1">対象年度</label>
+            <input
+              type="number"
+              value={resetYear}
+              onChange={(e) => setResetYear(parseInt(e.target.value))}
+              min="2024"
+              max="2099"
+              className="w-32 bg-swan-card border border-swan-border rounded-lg px-3 py-2 text-sm text-swan-text focus:outline-none focus:border-red-400"
+            />
+          </div>
+
+          {resetMsg && (
+            <p className={`text-sm ${resetMsg.includes('失敗') || resetMsg.includes('できません') ? 'text-red-400' : 'text-green-400'}`}>
+              {resetMsg}
+            </p>
+          )}
+
+          <button
+            onClick={() => setShowResetConfirm(true)}
+            disabled={resetting}
+            className="w-full bg-red-500/10 text-red-400 border border-red-500/30 font-bold py-2.5 rounded-xl text-sm disabled:opacity-50"
+          >
+            {resetting ? 'リセット中...' : `${resetYear}年のランキングを確定してリセット`}
+          </button>
+        </div>
+
+        {/* 確認ダイアログ */}
+        {showResetConfirm && (
+          <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center px-6">
+            <div className="bg-swan-dark border border-red-500/30 rounded-2xl p-6 w-full max-w-xs text-center space-y-4">
+              <p className="font-bold text-red-400">年間リセットを実行しますか？</p>
+              <div className="text-xs text-swan-sub text-left space-y-1">
+                <p>・{resetYear}年のランキングスナップショットを保存</p>
+                <p>・年間1位に「年間王者」実績を付与</p>
+                <p>・全メンバーの年間ポイントを0にリセット</p>
+                <p className="text-red-400 mt-2">この操作は取り消せません。</p>
+              </div>
+              <div className="flex gap-2">
+                <button
+                  onClick={handleYearReset}
+                  disabled={resetting}
+                  className="flex-1 bg-red-500/20 text-red-400 border border-red-500/30 font-bold py-2 rounded-xl text-sm disabled:opacity-50"
+                >
+                  {resetting ? '処理中...' : '実行する'}
+                </button>
+                <button
+                  onClick={() => setShowResetConfirm(false)}
+                  className="flex-1 bg-swan-muted text-swan-sub py-2 rounded-xl text-sm"
+                >
+                  キャンセル
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </AdminShell>
   )

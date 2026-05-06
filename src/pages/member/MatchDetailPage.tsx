@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { AppShell } from '@/components/layout/AppShell'
 import { FeatherIcon } from '@/components/ui/FeatherIcon'
 import { useAuth } from '@/lib/hooks/useAuth'
-import { subscribeMatch, subscribeAllUsers } from '@/lib/firebase/firestore'
+import { subscribeMatch, subscribeAllUsers, performRebuy, performReentry } from '@/lib/firebase/firestore'
 import type { Match, User } from '@/types'
 import { writeBatch, doc, collection, increment, serverTimestamp } from 'firebase/firestore'
 import { db } from '@/lib/firebase/config'
@@ -16,6 +16,11 @@ export const MatchDetailPage = () => {
   const [allUsers, setAllUsers] = useState<User[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+
+  // リバイ / リエントリー用
+  const [confirmAction, setConfirmAction] = useState<'rebuy' | 'reentry' | null>(null)
+  const [actionLoading, setActionLoading] = useState(false)
+  const [actionMsg, setActionMsg] = useState('')
 
   useEffect(() => {
     if (!matchId) return
@@ -31,9 +36,16 @@ export const MatchDetailPage = () => {
 
   if (!user || !match) return null
 
+  const cat = match.matchCategory ?? 'tournament'
   const isEntered = match.participants.includes(user.uid)
   const isFull = match.participants.length >= match.capacity
-  const totalPool = match.entryFee * match.participants.length
+  const isOngoing = match.status === 'ongoing'
+
+  // プール計算（リバイ・リエントリーを含む）
+  const totalRebuys = Object.values(match.rebuys ?? {}).reduce((s, n) => s + n, 0)
+  const totalReentries = Object.values(match.reentries ?? {}).reduce((s, n) => s + n, 0)
+  const extraEntries = cat === 'ring' ? totalRebuys : totalReentries
+  const totalPool = match.entryFee * (match.participants.length + extraEntries)
 
   const handleEntry = async () => {
     if (!matchId) return
@@ -58,7 +70,6 @@ export const MatchDetailPage = () => {
         createdAt: serverTimestamp(),
         createdBy: user.uid,
       })
-      // エントリー費はリスクなので累計・年間・保有すべてから減算
       batch.update(doc(db, 'users', user.uid), {
         totalPoints: increment(-match.entryFee),
         yearPoints:  increment(-match.entryFee),
@@ -72,12 +83,47 @@ export const MatchDetailPage = () => {
     }
   }
 
+  const handleExtraEntry = async () => {
+    if (!match) return
+    setActionMsg('')
+    if ((user.ownedPoints ?? 0) < match.entryFee) {
+      setActionMsg('ポイント残高が不足しています')
+      setConfirmAction(null)
+      return
+    }
+    setActionLoading(true)
+    try {
+      if (confirmAction === 'rebuy') {
+        await performRebuy(match, user.uid)
+        setActionMsg('リバイしました')
+      } else {
+        await performReentry(match, user.uid)
+        setActionMsg('リエントリーしました')
+      }
+    } catch {
+      setActionMsg('処理に失敗しました')
+    } finally {
+      setActionLoading(false)
+      setConfirmAction(null)
+    }
+  }
+
+  // 各参加者の追加エントリー数
+  const getExtraCount = (uid: string) =>
+    cat === 'ring'
+      ? (match.rebuys ?? {})[uid] ?? 0
+      : (match.reentries ?? {})[uid] ?? 0
+
+  const extraLabel = cat === 'ring' ? 'リバイ' : 'リエントリー'
+  const canExtraEntry = isEntered && isOngoing && (cat === 'ring' ? match.hasRebuy : match.hasReentry)
+
   return (
     <AppShell title={match.title} showBack onBack={() => navigate('/matches')}>
       <div className="py-4 space-y-5">
+
         {/* カテゴリ＋ステータスバッジ */}
         <div className="flex items-center gap-2 flex-wrap">
-          {(match.matchCategory ?? 'tournament') === 'tournament' ? (
+          {cat === 'tournament' ? (
             <span className="text-xs font-bold text-purple-400 bg-purple-400/10 border border-purple-400/30 px-2 py-1 rounded-full">トーナメント</span>
           ) : (
             <span className="text-xs font-bold text-cyan-400 bg-cyan-400/10 border border-cyan-400/30 px-2 py-1 rounded-full">リングゲーム</span>
@@ -108,10 +154,16 @@ export const MatchDetailPage = () => {
             <span className="text-swan-sub text-sm">賞金プール</span>
             <span className="font-bold text-swan-accent flex items-center gap-1"><FeatherIcon />{totalPool.toLocaleString()}</span>
           </div>
+          {extraEntries > 0 && (
+            <div className="flex justify-between text-xs text-swan-sub">
+              <span>{extraLabel}追加分</span>
+              <span>+{extraEntries}回</span>
+            </div>
+          )}
         </div>
 
         {/* 分配率（トーナメントのみ） */}
-        {(match.matchCategory ?? 'tournament') === 'tournament' && match.distributionRules.length > 0 && (
+        {cat === 'tournament' && match.distributionRules.length > 0 && (
           <div className="bg-swan-card border border-swan-border rounded-xl p-4">
             <h3 className="text-sm font-semibold mb-3 text-swan-sub">褒章</h3>
             {match.distributionRules.map((rule) => (
@@ -124,27 +176,39 @@ export const MatchDetailPage = () => {
             ))}
           </div>
         )}
-        {(match.matchCategory ?? 'tournament') === 'ring' && (
+        {cat === 'ring' && (
           <div className="bg-cyan-500/5 border border-cyan-500/20 rounded-xl p-3">
             <p className="text-xs text-cyan-400">精算時に管理者がキャッシュバック額を入力します</p>
           </div>
         )}
 
-        {/* 参加者リスト */}
+        {/* 参加者リスト（追加エントリー数付き） */}
         {match.participants.length > 0 && (
           <div className="bg-swan-card border border-swan-border rounded-xl p-4">
-            <h3 className="text-sm font-semibold mb-3 text-swan-sub">エントリー済み ({match.participants.length}名)</h3>
-            <div className="space-y-1">
-              {match.participants.map((uid) => (
-                <div key={uid} className={`text-sm py-1 ${uid === user.uid ? 'text-swan-accent font-medium' : 'text-swan-sub'}`}>
-                  {getName(uid)}{uid === user.uid && '（自分）'}
-                </div>
-              ))}
+            <h3 className="text-sm font-semibold mb-3 text-swan-sub">
+              エントリー済み ({match.participants.length}名)
+            </h3>
+            <div className="space-y-1.5">
+              {match.participants.map((uid) => {
+                const extra = getExtraCount(uid)
+                return (
+                  <div key={uid} className="flex items-center justify-between">
+                    <span className={`text-sm ${uid === user.uid ? 'text-swan-accent font-medium' : 'text-swan-sub'}`}>
+                      {getName(uid)}{uid === user.uid && '（自分）'}
+                    </span>
+                    {extra > 0 && (
+                      <span className="text-xs text-swan-sub border border-swan-border px-1.5 py-0.5 rounded-full">
+                        {extraLabel} ×{extra}
+                      </span>
+                    )}
+                  </div>
+                )
+              })}
             </div>
           </div>
         )}
 
-        {/* エントリーボタン */}
+        {/* エントリーボタン（受付中のみ） */}
         {match.status === 'recruiting' && (
           <div className="space-y-2">
             {error && <p className="text-red-400 text-sm text-center">{error}</p>}
@@ -167,8 +231,30 @@ export const MatchDetailPage = () => {
             )}
           </div>
         )}
-        {/* タイマーアプリリンク（登録済みの場合のみ表示）*/}
-        {match.timerAppUrl && match.status === 'ongoing' && (
+
+        {/* リバイ / リエントリーボタン（開催中 + 対応フラグあり + エントリー済み） */}
+        {canExtraEntry && (
+          <div className="space-y-2">
+            {actionMsg && (
+              <p className={`text-sm text-center ${actionMsg.includes('失敗') || actionMsg.includes('不足') ? 'text-red-400' : 'text-green-400'}`}>
+                {actionMsg}
+              </p>
+            )}
+            <button
+              onClick={() => setConfirmAction(cat === 'ring' ? 'rebuy' : 'reentry')}
+              className={`w-full font-bold py-3 rounded-xl transition-opacity ${
+                cat === 'ring'
+                  ? 'bg-cyan-500/20 text-cyan-400 border border-cyan-500/40 hover:bg-cyan-500/30'
+                  : 'bg-purple-500/20 text-purple-400 border border-purple-500/40 hover:bg-purple-500/30'
+              }`}
+            >
+              {extraLabel}する（🪶{match.entryFee.toLocaleString()}）
+            </button>
+          </div>
+        )}
+
+        {/* タイマーアプリリンク */}
+        {match.timerAppUrl && isOngoing && (
           <a
             href={match.timerAppUrl}
             target="_blank"
@@ -178,8 +264,45 @@ export const MatchDetailPage = () => {
             タイマーアプリで観戦・参加 ↗
           </a>
         )}
-
       </div>
+
+      {/* リバイ / リエントリー確認ダイアログ */}
+      {confirmAction && (
+        <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center px-6">
+          <div className={`bg-swan-dark border rounded-2xl p-6 w-full max-w-xs text-center space-y-4 ${
+            confirmAction === 'rebuy' ? 'border-cyan-500/30' : 'border-purple-500/30'
+          }`}>
+            <p className={`font-bold text-lg ${confirmAction === 'rebuy' ? 'text-cyan-400' : 'text-purple-400'}`}>
+              {confirmAction === 'rebuy' ? 'リバイしますか？' : 'リエントリーしますか？'}
+            </p>
+            <p className="text-sm text-swan-sub">
+              🪶{match.entryFee.toLocaleString()} を消費します
+            </p>
+            <p className="text-xs text-swan-sub">
+              現在の保有ポイント: 🪶{(user.ownedPoints ?? 0).toLocaleString()}
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setConfirmAction(null)}
+                className="flex-1 bg-swan-muted text-swan-sub py-2.5 rounded-xl text-sm"
+              >
+                キャンセル
+              </button>
+              <button
+                onClick={handleExtraEntry}
+                disabled={actionLoading}
+                className={`flex-1 font-bold py-2.5 rounded-xl text-sm disabled:opacity-50 ${
+                  confirmAction === 'rebuy'
+                    ? 'bg-cyan-500/20 text-cyan-400 border border-cyan-500/40'
+                    : 'bg-purple-500/20 text-purple-400 border border-purple-500/40'
+                }`}
+              >
+                {actionLoading ? '処理中...' : '確定する'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </AppShell>
   )
 }

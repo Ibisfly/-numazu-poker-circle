@@ -74,11 +74,22 @@ export interface Match {
   // トーナメントオプション
   hasReentry?: boolean
   hasBounty?: boolean
+  reentries?: Record<string, number>  // uid → リエントリー回数
   // リングゲームオプション
   hasRebuy?: boolean
+  rebuys?: Record<string, number>     // uid → リバイ回数
   // 外部タイマーアプリ連携（将来拡張）
   // ALLin-Timer 等の外部セッションURLを記録する
   timerAppUrl?: string
+}
+
+export interface UserTitle {
+  id: string
+  uid: string
+  title: string
+  tier: 'common' | 'rare' | 'elite' | 'prime'
+  achievementId: string
+  acquiredAt: Timestamp
 }
 
 export interface MatchRanking {
@@ -143,6 +154,21 @@ export interface Achievement {
   description: string
   condition: string
   iconUrl?: string
+  isSecret?: boolean
+}
+
+export interface YearlyRankingEntry {
+  rank: number
+  uid: string
+  playerName: string
+  yearPoints: number
+}
+
+export interface YearlyRankingSnapshot {
+  year: number
+  rankings: YearlyRankingEntry[]
+  settledBy: string
+  settledAt: Timestamp
 }
 
 export interface UserAchievement {

@@ -396,7 +396,11 @@ export const MatchesAdminPage = () => {
                 <h3 className="font-bold">精算：{settlingRing.title}</h3>
                 <p className="text-xs text-swan-sub mt-1">
                   参加者ごとのキャッシュバック額を入力
-                  （エントリー費 <span className="text-cyan-400">{settlingRing.entryFee}pt</span>、プール {settlingRing.entryFee * settlingRing.participants.length}pt）
+                  （エントリー費 <span className="text-cyan-400">{settlingRing.entryFee}pt</span>、
+                  プール {settlingRing.entryFee * (
+                    settlingRing.participants.length +
+                    Object.values(settlingRing.rebuys ?? {}).reduce((s, n) => s + n, 0)
+                  )}pt）
                 </p>
               </div>
               <div className="space-y-2">

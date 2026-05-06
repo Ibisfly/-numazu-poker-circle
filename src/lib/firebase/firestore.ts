@@ -138,6 +138,12 @@ export const subscribeEvents = (cb: (events: Event[]) => void) =>
 export const createEvent = (data: Omit<Event, 'id' | 'createdAt'>) =>
   addDoc(collection(db, 'events'), { ...data, createdAt: serverTimestamp() })
 
+export const updateEvent = (eventId: string, data: Partial<Omit<Event, 'id' | 'createdAt' | 'createdBy'>>) =>
+  updateDoc(doc(db, 'events', eventId), data as Record<string, unknown>)
+
+export const deleteEvent = (eventId: string) =>
+  deleteDoc(doc(db, 'events', eventId))
+
 // ── Matches ────────────────────────────────────────────────────────────────
 
 export const subscribeMatches = (cb: (matches: Match[]) => void) =>
@@ -497,6 +503,61 @@ export const settleMatch = async (
   await batch.commit()
 }
 
+// ── Yearly Rankings ────────────────────────────────────────────────────────
+
+export const subscribeYearlyRankings = (
+  cb: (snapshots: import('@/types').YearlyRankingSnapshot[]) => void
+) =>
+  onSnapshot(
+    query(collection(db, 'yearlyRankings'), orderBy('year', 'desc')),
+    (snap) =>
+      cb(snap.docs.map((d) => d.data() as import('@/types').YearlyRankingSnapshot))
+  )
+
+// 年間ランキング確定：スナップショット保存 → 1位に称号付与 → yearPoints全リセット
+export const resetYearlyPoints = async (adminUid: string, year: number) => {
+  const usersSnap = await getDocs(
+    query(
+      collection(db, 'users'),
+      where('status', '==', 'active'),
+      orderBy('yearPoints', 'desc')
+    )
+  )
+  if (usersSnap.empty) return null
+
+  const users = usersSnap.docs.map((d) => d.data() as User)
+  const winner = users[0]
+
+  const batch = writeBatch(db)
+
+  // 年間スナップショットを保存
+  batch.set(doc(db, 'yearlyRankings', String(year)), {
+    year,
+    rankings: users.map((u, i) => ({
+      rank: i + 1,
+      uid: u.uid,
+      playerName: u.playerName,
+      yearPoints: u.yearPoints,
+    })),
+    settledBy: adminUid,
+    settledAt: serverTimestamp(),
+  })
+
+  // 全ユーザーの yearPoints をリセット
+  for (const userDoc of usersSnap.docs) {
+    batch.update(userDoc.ref, { yearPoints: 0 })
+  }
+
+  await batch.commit()
+
+  // 1位ユーザーに年間王者実績を付与（yearPoints > 0 の場合のみ）
+  if (winner.yearPoints > 0) {
+    await unlockAchievementWithReward(winner.uid, 'annual_champion', '年間王者')
+  }
+
+  return { winner, totalParticipants: users.length }
+}
+
 // ── Achievement Config（管理者が設定する報酬）─────────────────────────────
 
 export interface AchievementReward {
@@ -555,9 +616,14 @@ export const unlockAchievementWithReward = async (uid: string, achievementId: st
   if (configSnap.exists()) {
     const config = configSnap.data() as AchievementReward
     if (config.rewardType === 'title' && config.rewardTitleText) {
-      batch.update(doc(db, 'users', uid), {
-        equippedTitle: config.rewardTitleText,
-        equippedTitleTier: config.rewardTitleTier ?? 'common',
+      // 自動装備せず userTitles コレクションに保存 → プロフィールで任意に装備
+      const titleRef = doc(collection(db, 'userTitles'))
+      batch.set(titleRef, {
+        uid,
+        title: config.rewardTitleText,
+        tier: config.rewardTitleTier ?? 'common',
+        achievementId,
+        acquiredAt: serverTimestamp(),
       })
     }
     if (config.rewardType === 'item' && config.rewardItemId) {
@@ -573,64 +639,154 @@ export const unlockAchievementWithReward = async (uid: string, achievementId: st
   return true  // 新規解除
 }
 
-// 実績条件チェック（イベント後に呼び出す）
+// ── User Titles（実績報酬の称号）──────────────────────────────────────────
+
+export const subscribeUserTitles = (
+  uid: string,
+  cb: (titles: import('@/types').UserTitle[]) => void
+) =>
+  onSnapshot(
+    query(collection(db, 'userTitles'), where('uid', '==', uid)),
+    (snap) =>
+      cb(snap.docs.map((d) => ({ id: d.id, ...d.data() } as import('@/types').UserTitle)))
+  )
+
+// ── Rebuy / Reentry ────────────────────────────────────────────────────────
+
+export const performRebuy = async (match: Match, uid: string) => {
+  const batch = writeBatch(db)
+  batch.update(doc(db, 'matches', match.id), {
+    [`rebuys.${uid}`]: increment(1),
+  } as Record<string, unknown>)
+  const logRef = doc(collection(db, 'pointLogs'))
+  batch.set(logRef, {
+    uid,
+    type: 'match',
+    amount: -match.entryFee,
+    description: `${match.title} リバイ費`,
+    relatedId: match.id,
+    createdAt: serverTimestamp(),
+    createdBy: uid,
+  })
+  batch.update(doc(db, 'users', uid), {
+    totalPoints: increment(-match.entryFee),
+    yearPoints:  increment(-match.entryFee),
+    ownedPoints: increment(-match.entryFee),
+  })
+  await batch.commit()
+}
+
+export const performReentry = async (match: Match, uid: string) => {
+  const batch = writeBatch(db)
+  batch.update(doc(db, 'matches', match.id), {
+    [`reentries.${uid}`]: increment(1),
+  } as Record<string, unknown>)
+  const logRef = doc(collection(db, 'pointLogs'))
+  batch.set(logRef, {
+    uid,
+    type: 'match',
+    amount: -match.entryFee,
+    description: `${match.title} リエントリー費`,
+    relatedId: match.id,
+    createdAt: serverTimestamp(),
+    createdBy: uid,
+  })
+  batch.update(doc(db, 'users', uid), {
+    totalPoints: increment(-match.entryFee),
+    yearPoints:  increment(-match.entryFee),
+    ownedPoints: increment(-match.entryFee),
+  })
+  await batch.commit()
+}
+
+// 実績条件チェック（精算・来店・購入後に呼び出す）
 export const checkAndUnlockAchievements = async (uid: string) => {
-  const [logsSnap, achievedSnap, userItemsSnap, resultsSnap, matchesSnap, userSnap] = await Promise.all([
-    getDocs(query(collection(db, 'pointLogs'), where('uid', '==', uid))),
+  const [achievedSnap, userItemsSnap, resultsSnap, matchesSnap, userSnap, attendancesSnap] = await Promise.all([
     getDocs(query(collection(db, 'userAchievements'), where('uid', '==', uid))),
     getDocs(query(collection(db, 'userItems'), where('uid', '==', uid))),
     getDocs(collection(db, 'matchResults')),
     getDocs(collection(db, 'matches')),
     getDoc(doc(db, 'users', uid)),
+    getDocs(query(collection(db, 'attendances'), where('uid', '==', uid))),
   ])
 
   const alreadyUnlocked = new Set(achievedSnap.docs.map((d) => d.data().achievementId as string))
-  const logs = logsSnap.docs.map((d) => d.data())
-  const userItemsData = userItemsSnap.docs.map((d) => d.data())
   const userData = userSnap.data()
   const matchMap = new Map(matchesSnap.docs.map((d) => [d.id, d.data()]))
 
-  const attendanceCount = logs.filter((l) => l.type === 'attendance').length
-  const shopPurchaseCount = userItemsData.length
+  const attendanceCount = attendancesSnap.size
+  const shopPurchaseCount = userItemsSnap.size
   const totalPoints = userData?.totalPoints ?? 0
 
-  let tournamentEntries = 0, tournamentWins = 0, tournamentTop3 = 0, tournamentConsecutiveWins = 0
-  let matchEntries = 0, matchWins = 0
+  let tournamentEntries = 0
+  let tournamentWins = 0
+  let tournamentTop = 0
+  let tournamentTotalPoints = 0
+  let ringEntries = 0
+  let ringEarnedTotal = 0
+  let hasNearMiss = false
+  let hasBigRingWin = false
+  let hasBigLoss = false
 
-  for (const doc of resultsSnap.docs) {
-    const result = doc.data()
+  for (const resultDoc of resultsSnap.docs) {
+    const result = resultDoc.data()
     const match = matchMap.get(result.matchId)
     if (!match) continue
 
     if (match.matchCategory === 'ring') {
-      const cb: { uid: string }[] = result.cashbacks ?? []
-      if (cb.find((c) => c.uid === uid)) matchEntries++
-      const ranks: { uid: string; rank: number }[] = result.rankings ?? []
-      const e = ranks.find((r) => r.uid === uid)
-      if (e?.rank === 1) matchWins++
+      const cashbacks: { uid: string; amount: number }[] = result.cashbacks ?? []
+      const userCashback = cashbacks.find((c) => c.uid === uid)
+      if (!userCashback) continue
+      ringEntries++
+      const entryFee: number = match.entryFee ?? 0
+      const net = userCashback.amount - entryFee
+      if (net > 0) {
+        ringEarnedTotal += net
+        if (net > 1000) hasBigRingWin = true
+      }
+      // 1試合で1000以上のマイナス
+      if (entryFee - userCashback.amount >= 1000) hasBigLoss = true
     } else {
       const rankings: { uid: string; rank: number; earnedPoints: number }[] = result.rankings ?? []
       const e = rankings.find((r) => r.uid === uid)
-      if (e) {
-        tournamentEntries++
-        if (e.rank === 1) { tournamentWins++; tournamentConsecutiveWins++ } else tournamentConsecutiveWins = 0
-        if (e.earnedPoints > 0) tournamentTop3++
+      if (!e) continue
+      tournamentEntries++
+      if (e.rank === 1) tournamentWins++
+      if (e.earnedPoints > 0) {
+        tournamentTop++
+        tournamentTotalPoints += e.earnedPoints
+      }
+      // ポイント圏外の1つ下（泡沫の夢）
+      const rules: { rank: number; points: number }[] = match.distributionRules ?? []
+      const paidRules = rules.filter((r) => r.points > 0)
+      if (paidRules.length > 0) {
+        const lastPaidRank = Math.max(...paidRules.map((r) => r.rank))
+        if (e.rank === lastPaidRank + 1) hasNearMiss = true
       }
     }
   }
 
+  // annual_champion は resetYearlyPoints() 内で付与するためここでは判定しない
   const CONDITIONS: { id: string; name: string; met: boolean }[] = [
-    { id: 'first_attendance',  name: 'はじめの一羽',   met: attendanceCount >= 1 },
-    { id: 'regular_10',        name: '常連の翼',       met: attendanceCount >= 10 },
-    { id: 'legend_30',         name: '伝説の黒鳥',     met: attendanceCount >= 30 },
-    { id: 'tournament_first',  name: 'フライトビギナー', met: tournamentEntries >= 1 },
-    { id: 'podium',            name: '表彰台',          met: tournamentTop3 >= 1 },
-    { id: 'champion',          name: '王者の羽',        met: tournamentWins >= 1 },
-    { id: 'consecutive_win',   name: '連覇の飛翔',      met: tournamentConsecutiveWins >= 2 },
-    { id: 'match_debut',       name: 'マッチデビュー',  met: matchEntries >= 1 },
-    { id: 'match_hunter',      name: 'ハンター',         met: matchWins >= 1 },
-    { id: 'collector',         name: 'コレクター',      met: shopPurchaseCount >= 5 },
-    { id: 'millionaire',       name: '大富豪の羽',      met: totalPoints >= 10000 },
+    { id: 'first_attendance',      name: 'はじめの一歩',          met: attendanceCount >= 1 },
+    { id: 'regular_5',             name: '常連メンバー',           met: attendanceCount >= 5 },
+    { id: 'legend_20',             name: 'いつもこの場所で',       met: attendanceCount >= 20 },
+    { id: 'tournament_first',      name: 'フライトビギナー',       met: tournamentEntries >= 1 },
+    { id: 'podium',                name: '表彰台',                 met: tournamentTop >= 1 },
+    { id: 'champion',              name: 'Champion',               met: tournamentWins >= 1 },
+    { id: 'trophy_collector',      name: 'トロフィーコレクター',   met: tournamentWins >= 3 },
+    { id: 'tournament_points_10k', name: '爆噴き',                 met: tournamentTotalPoints >= 10000 },
+    { id: 'ring_debut',            name: 'リングイン',             met: ringEntries >= 1 },
+    { id: 'ring_earnings_200',     name: '勝利の鐘',               met: ringEarnedTotal >= 200 },
+    { id: 'ring_earnings_2k',      name: '大喰らい',               met: ringEarnedTotal >= 2000 },
+    { id: 'ring_earnings_10k',     name: '羽も積もれば山となる',   met: ringEarnedTotal >= 10000 },
+    { id: 'ring_big_win',          name: '総てを手に入れた',       met: hasBigRingWin },
+    { id: 'shopper',               name: '買い物上手',             met: shopPurchaseCount >= 5 },
+    { id: 'saver',                 name: '貯金好き',               met: totalPoints >= 2000 },
+    { id: 'vault',                 name: '金庫が足りない！',        met: totalPoints >= 20000 },
+    { id: 'near_miss',             name: '泡沫の夢',               met: hasNearMiss },
+    { id: 'fish',                  name: 'フィッシュ！',            met: hasBigLoss },
+    { id: 'count_stop',            name: 'カウントストップ',        met: totalPoints > 99999 },
   ]
 
   const unlocked: string[] = []

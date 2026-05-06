@@ -12,6 +12,7 @@ import {
   subscribePointLogs,
   subscribeUserAchievements,
   subscribeUserItems,
+  subscribeUserTitles,
   updateUser,
   isPlayerNameTaken,
   equipAvatarColor,
@@ -19,12 +20,12 @@ import {
   unequipTitle,
   equipFrame,
   equipOverlay,
+  subscribeItems,
 } from '@/lib/firebase/firestore'
 import { FRAME_DEFS } from '@/components/ui/SwanAvatar'
 import { logOut } from '@/lib/firebase/auth'
-import type { PointLog, UserAchievement, UserItem, Item } from '@/types'
+import type { PointLog, UserAchievement, UserItem, Item, UserTitle } from '@/types'
 import { ACHIEVEMENTS } from '@/lib/achievements'
-import { subscribeItems } from '@/lib/firebase/firestore'
 
 // 装飾選択UI 共通コンポーネント
 const DecoSection = ({
@@ -75,6 +76,7 @@ export const ProfilePage = () => {
   const [achievements, setAchievements] = useState<UserAchievement[]>([])
   const [userItems, setUserItems] = useState<UserItem[]>([])
   const [allItems, setAllItems] = useState<Item[]>([])
+  const [userTitles, setUserTitles] = useState<UserTitle[]>([])
 
   // 編集フォーム状態
   const [editing, setEditing] = useState(false)
@@ -96,7 +98,8 @@ export const ProfilePage = () => {
     const u2 = subscribeUserAchievements(user.uid, setAchievements)
     const u3 = subscribeUserItems(user.uid, setUserItems)
     const u4 = subscribeItems(setAllItems)
-    return () => { u1(); u2(); u3(); u4() }
+    const u5 = subscribeUserTitles(user.uid, setUserTitles)
+    return () => { u1(); u2(); u3(); u4(); u5() }
   }, [user])
 
   const openEdit = () => {
@@ -172,8 +175,36 @@ export const ProfilePage = () => {
     purchasedItems.filter((i) => i.decorationType === 'frame' && i.frameStyle).map((i) => i.frameStyle!)
   )].filter((k) => FRAME_DEFS[k])
 
-  // 称号：itemSubtype === 'title' で照合
+  // 称号：ショップ購入 + 実績報酬をまとめる
   const ownedTitleItems = purchasedItems.filter((i) => i.itemSubtype === 'title')
+  // 全所持称号リスト（重複タイトルテキストは除去）
+  const allOwnedTitles: { key: string; title: string; tier: TitleTier; source: 'shop' | 'achievement' }[] = [
+    ...ownedTitleItems.map((i) => ({
+      key: `shop-${i.id}`,
+      title: i.name,
+      tier: (i.titleTier ?? 'common') as TitleTier,
+      source: 'shop' as const,
+    })),
+    ...userTitles.map((t) => ({
+      key: `ach-${t.id}`,
+      title: t.title,
+      tier: t.tier as TitleTier,
+      source: 'achievement' as const,
+    })),
+  ]
+  // 同じタイトルテキストの重複を除去
+  const dedupedTitles = allOwnedTitles.filter(
+    (t, i, arr) => arr.findIndex((x) => x.title === t.title) === i
+  )
+  // 現在装備中の称号がリストにない場合（旧コードで直接書き込まれた場合）も選択肢に追加
+  if (user?.equippedTitle && !dedupedTitles.some((t) => t.title === user.equippedTitle)) {
+    dedupedTitles.push({
+      key: 'equipped-legacy',
+      title: user.equippedTitle,
+      tier: (user.equippedTitleTier ?? 'common') as TitleTier,
+      source: 'achievement',
+    })
+  }
 
   if (!user) return null
 
@@ -295,7 +326,7 @@ export const ProfilePage = () => {
             {/* 称号 */}
             <div>
               <p className="text-xs text-swan-sub mb-2 font-medium">称号</p>
-              {ownedTitleItems.length === 0 ? (
+              {dedupedTitles.length === 0 ? (
                 <p className="text-xs text-swan-sub">まだ称号を所持していません</p>
               ) : (
                 <div className="space-y-1.5">
@@ -309,21 +340,23 @@ export const ProfilePage = () => {
                   >
                     称号なし
                   </button>
-                  {ownedTitleItems.map((item) => {
-                    const tier = (item.titleTier ?? 'common') as TitleTier
-                    const active = editTitle === item.name
+                  {dedupedTitles.map((t) => {
+                    const active = editTitle === t.title
                     return (
                       <button
-                        key={item.id}
-                        onClick={() => { setEditTitle(item.name); setEditTitleTier(tier) }}
+                        key={t.key}
+                        onClick={() => { setEditTitle(t.title); setEditTitleTier(t.tier) }}
                         className={`w-full text-left px-3 py-2 rounded-lg border transition-colors flex items-center justify-between ${
-                          active
-                            ? 'border-swan-accent bg-swan-accent/10'
-                            : 'border-swan-border'
+                          active ? 'border-swan-accent bg-swan-accent/10' : 'border-swan-border'
                         }`}
                       >
-                        <TitleBadge title={item.name} tier={tier} />
-                        <span className="text-xs text-swan-sub ml-2 shrink-0">{tier.toUpperCase()}</span>
+                        <TitleBadge title={t.title} tier={t.tier} />
+                        <div className="flex items-center gap-1.5 ml-2 shrink-0">
+                          <span className="text-xs text-swan-sub">{t.tier.toUpperCase()}</span>
+                          {t.source === 'achievement' && (
+                            <span className="text-[9px] text-purple-400 border border-purple-400/40 px-1 py-0.5 rounded">実績</span>
+                          )}
+                        </div>
                       </button>
                     )
                   })}

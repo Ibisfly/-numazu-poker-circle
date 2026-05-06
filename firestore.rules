@@ -66,11 +66,12 @@ service cloud.firestore {
     // ── matches ──────────────────────────────────────────────────────────────
     match /matches/{matchId} {
       allow read: if isActiveUser();
-      // 一般: participants フィールドのみ更新可（エントリー）
+      // 一般: participants / rebuys / reentries のみ更新可
       // 管理者: 全フィールド更新可（ステータス変更・精算等）
       allow update: if isAdmin()
         || (isActiveUser() &&
-            request.resource.data.diff(resource.data).affectedKeys().hasOnly(['participants']));
+            request.resource.data.diff(resource.data).affectedKeys()
+              .hasOnly(['participants', 'rebuys', 'reentries']));
       allow create, delete: if isAdmin();
     }
 
@@ -89,7 +90,8 @@ service cloud.firestore {
     // ── userItems ────────────────────────────────────────────────────────────
     match /userItems/{userItemId} {
       allow read: if isActiveUser() && resource.data.uid == request.auth.uid || isAdmin();
-      allow create: if isActiveUser() && request.resource.data.uid == request.auth.uid;
+      // 管理者は実績報酬としてアイテムを他ユーザーへ付与できる
+      allow create: if (isActiveUser() && request.resource.data.uid == request.auth.uid) || isAdmin();
       // 管理者: 全フィールド更新可
       // 本人: usedAt のみ更新可（特典の自己消費）
       allow update: if isAdmin()
@@ -107,13 +109,26 @@ service cloud.firestore {
     // ── userAchievements ─────────────────────────────────────────────────────
     match /userAchievements/{userAchievementId} {
       allow read: if isActiveUser() && resource.data.uid == request.auth.uid || isAdmin();
-      // create: request.resource.data で判定
-      allow create: if isActiveUser() && request.resource.data.uid == request.auth.uid;
+      // 管理者は他ユーザーへの付与も可（精算後の自動解除に必要）
+      allow create: if (isActiveUser() && request.resource.data.uid == request.auth.uid) || isAdmin();
       allow update, delete: if isAdmin();
     }
 
     // ── achievementConfigs（管理者が設定する実績報酬）──────────────────────
     match /achievementConfigs/{achievementId} {
+      allow read: if isActiveUser();
+      allow write: if isAdmin();
+    }
+
+    // ── userTitles（実績報酬の称号）─────────────────────────────────────────
+    match /userTitles/{titleId} {
+      allow read: if isActiveUser() && resource.data.uid == request.auth.uid || isAdmin();
+      allow create: if (isActiveUser() && request.resource.data.uid == request.auth.uid) || isAdmin();
+      allow update, delete: if isAdmin();
+    }
+
+    // ── yearlyRankings ───────────────────────────────────────────────────────
+    match /yearlyRankings/{year} {
       allow read: if isActiveUser();
       allow write: if isAdmin();
     }
