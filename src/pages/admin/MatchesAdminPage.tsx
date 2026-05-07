@@ -4,49 +4,91 @@ import { AdminShell } from './AdminDashboardPage'
 import {
   subscribeMatches, createMatch, updateMatch, deleteMatch,
   settleMatch, settleRingGame, subscribeAllUsers, checkAndUnlockAchievements,
+  getTimerProvisionalRankings, getTimerSessionState,
 } from '@/lib/firebase/firestore'
 import { useAuth } from '@/lib/hooks/useAuth'
 import type { Match, MatchStatus, User, DistributionRule, MatchCategory } from '@/types'
 import { Timestamp } from 'firebase/firestore'
 import { ChevronLeft, Plus, FeatherPtIcon } from '@/components/ui/Icons'
 
-// ── タイマーアプリ連携セクション（将来拡張ポイント）──────────────────────
-// TODO: ALLin-Timer 等の外部アプリと連携する場合、ここを拡張する。
-//   ・timerAppUrl を自動生成できるようになれば「セッション作成」ボタンを追加
-//   ・外部APIが公開されれば参加者データを自動送信する処理を追加
-//   ・結果の自動取り込みもここで処理する
+// ── タイマーアプリ連携セクション ──────────────────────────────────────────
 const TimerAppSection = ({ match }: { match: Match }) => {
   const [editing, setEditing] = useState(false)
   const [url, setUrl] = useState(match.timerAppUrl ?? '')
+  const [timerState, setTimerState] = useState<{
+    state: string
+    currentLevel: number
+    remainingPlayers: number
+    totalPlayers: number
+  } | null>(null)
+
+  // タイマーセッションの状態を取得
+  useEffect(() => {
+    if (!match.timerSessionId) return
+    getTimerSessionState(match.timerSessionId).then(setTimerState)
+  }, [match.timerSessionId])
 
   const save = () => {
     updateMatch(match.id, { timerAppUrl: url.trim() || undefined })
     setEditing(false)
   }
 
+  // タイマーアプリのベースURL（環境変数または相対パス）
+  const timerAppBase = '/timer'  // 同一ドメイン想定、将来は環境変数化
+
   return (
     <div className="border-t border-swan-border/50 pt-2 mt-1">
       <div className="flex items-center justify-between">
         <span className="text-xs text-swan-sub">タイマーアプリ</span>
-        {match.timerAppUrl ? (
-          <div className="flex items-center gap-2">
-            <a
-              href={match.timerAppUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-xs text-cyan-400 border border-cyan-400/30 px-2 py-1 rounded-lg hover:bg-cyan-400/10"
-            >
-              アプリを開く ↗
-            </a>
-            <button onClick={() => setEditing(!editing)} className="text-xs text-swan-sub">
-              {editing ? '閉じる' : 'URL変更'}
-            </button>
-          </div>
-        ) : (
-          <button onClick={() => setEditing(!editing)} className="text-xs text-swan-sub border border-swan-border px-2 py-1 rounded-lg">
-            {editing ? 'キャンセル' : 'URLを登録'}
-          </button>
-        )}
+        <div className="flex items-center gap-2">
+          {match.timerSessionId ? (
+            <>
+              <a
+                href={`${timerAppBase}/session/${match.timerSessionId}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-xs text-green-400 border border-green-400/30 px-2 py-1 rounded-lg hover:bg-green-400/10"
+              >
+                タイマー管理 ↗
+              </a>
+              {timerState && (
+                <span className="text-xs text-swan-sub">
+                  {timerState.state === 'finished' ? '終了' :
+                   timerState.state === 'running' ? `Lv${timerState.currentLevel} (${timerState.remainingPlayers}/${timerState.totalPlayers})` :
+                   timerState.state}
+                </span>
+              )}
+            </>
+          ) : match.timerAppUrl ? (
+            <>
+              <a
+                href={match.timerAppUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-xs text-cyan-400 border border-cyan-400/30 px-2 py-1 rounded-lg hover:bg-cyan-400/10"
+              >
+                外部タイマー ↗
+              </a>
+              <button onClick={() => setEditing(!editing)} className="text-xs text-swan-sub">
+                {editing ? '閉じる' : 'URL変更'}
+              </button>
+            </>
+          ) : (
+            <>
+              <a
+                href={`${timerAppBase}/new?matchId=${match.id}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-xs text-swan-accent border border-swan-accent/30 px-2 py-1 rounded-lg hover:bg-swan-accent/10"
+              >
+                セッション作成 ↗
+              </a>
+              <button onClick={() => setEditing(!editing)} className="text-xs text-swan-sub">
+                外部URL
+              </button>
+            </>
+          )}
+        </div>
       </div>
       {editing && (
         <div className="flex gap-2 mt-1.5">
@@ -157,8 +199,34 @@ export const MatchesAdminPage = () => {
   }
 
   // ── トーナメント精算開始 ──────────────────────────────────────────────────
-  const startTournamentSettle = (match: Match) => {
+  const startTournamentSettle = async (match: Match) => {
     setSettlingMatch(match)
+
+    // タイマーセッションがあれば暫定順位を取得
+    if (match.timerSessionId) {
+      try {
+        const provisionalRankings = await getTimerProvisionalRankings(match.timerSessionId)
+        if (provisionalRankings.length > 0) {
+          // 暫定順位をマッチの参加者と紐付け
+          const rankMap = new Map(
+            provisionalRankings
+              .filter(r => r.uid)
+              .map(r => [r.uid!, r.rank])
+          )
+          setRankings(
+            match.participants.map(uid => ({
+              uid,
+              rank: String(rankMap.get(uid) ?? match.participants.indexOf(uid) + 1),
+            }))
+          )
+          return
+        }
+      } catch (err) {
+        console.error('暫定順位の取得に失敗:', err)
+      }
+    }
+
+    // フォールバック: 参加順に仮の順位を設定
     setRankings(match.participants.map((uid, i) => ({ uid, rank: String(i + 1) })))
   }
 

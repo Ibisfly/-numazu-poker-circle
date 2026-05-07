@@ -78,9 +78,9 @@ export interface Match {
   // リングゲームオプション
   hasRebuy?: boolean
   rebuys?: Record<string, number>     // uid → リバイ回数
-  // 外部タイマーアプリ連携（将来拡張）
-  // ALLin-Timer 等の外部セッションURLを記録する
-  timerAppUrl?: string
+  // 外部タイマーアプリ連携
+  timerAppUrl?: string          // 外部タイマーアプリのURL（レガシー）
+  timerSessionId?: string       // タイマーアプリのセッションID
 }
 
 export interface UserTitle {
@@ -192,4 +192,12 @@ export interface Notification {
   message: string
   isRead: boolean
   createdAt: Timestamp
+}
+
+// タイマーアプリからの暫定順位
+export interface TimerProvisionalRanking {
+  rank: number
+  uid: string | null
+  displayName: string
+  bustOrder: number | null
 }

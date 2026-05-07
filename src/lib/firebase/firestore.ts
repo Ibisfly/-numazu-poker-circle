@@ -847,4 +847,99 @@ export const settleRingGame = async (
   await batch.commit()
 }
 
+// ── Timer App Integration ──────────────────────────────────────────────────
+
+// タイマーアプリの暫定順位を取得
+export const getTimerProvisionalRankings = async (
+  timerSessionId: string
+): Promise<import('@/types').TimerProvisionalRanking[]> => {
+  const playersSnap = await getDocs(
+    query(
+      collection(db, 'timerSessions', timerSessionId, 'players'),
+      orderBy('entryAt', 'asc')
+    )
+  )
+
+  if (playersSnap.empty) return []
+
+  interface PlayerData {
+    id: string
+    uid: string | null
+    displayName: string
+    isBusted: boolean
+    bustOrder: number | null
+  }
+
+  const players: PlayerData[] = playersSnap.docs.map(d => ({
+    id: d.id,
+    ...d.data(),
+  } as PlayerData))
+
+  // バストした人を bustOrder の逆順でソート（最後にバストした人が上位）
+  const busted = players
+    .filter(p => p.isBusted && p.bustOrder !== null)
+    .sort((a, b) => (b.bustOrder ?? 0) - (a.bustOrder ?? 0))
+
+  const alive = players.filter(p => !p.isBusted)
+
+  const rankings: import('@/types').TimerProvisionalRanking[] = []
+
+  // 生存者は同率1位
+  for (const p of alive) {
+    rankings.push({
+      rank: 1,
+      uid: p.uid,
+      displayName: p.displayName,
+      bustOrder: null,
+    })
+  }
+
+  // バストした人は生存者数 + 1 位から
+  let currentRank = alive.length + 1
+  for (const p of busted) {
+    rankings.push({
+      rank: currentRank,
+      uid: p.uid,
+      displayName: p.displayName,
+      bustOrder: p.bustOrder,
+    })
+    currentRank++
+  }
+
+  return rankings
+}
+
+// タイマーセッションIDをマッチに紐付け
+export const linkTimerSession = async (matchId: string, timerSessionId: string) => {
+  await updateDoc(doc(db, 'matches', matchId), {
+    timerSessionId,
+  })
+}
+
+// タイマーセッションの状態を取得
+export const getTimerSessionState = async (timerSessionId: string): Promise<{
+  state: string
+  currentLevel: number
+  remainingPlayers: number
+  totalPlayers: number
+} | null> => {
+  const sessionSnap = await getDoc(doc(db, 'timerSessions', timerSessionId))
+  if (!sessionSnap.exists()) return null
+
+  const session = sessionSnap.data()
+  const playersSnap = await getDocs(
+    collection(db, 'timerSessions', timerSessionId, 'players')
+  )
+
+  const players = playersSnap.docs.map(d => d.data())
+  const remainingPlayers = players.filter(p => !p.isBusted).length
+
+  return {
+    state: session.state,
+    currentLevel: session.currentLevel,
+    remainingPlayers,
+    totalPlayers: players.length,
+  }
+}
+
 export { Timestamp, serverTimestamp }

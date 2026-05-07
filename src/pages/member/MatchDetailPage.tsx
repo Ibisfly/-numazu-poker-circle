@@ -254,14 +254,17 @@ export const MatchDetailPage = () => {
         )}
 
         {/* タイマーアプリリンク */}
-        {match.timerAppUrl && isOngoing && (
+        {isOngoing && (match.timerSessionId || match.timerAppUrl) && (
           <a
-            href={match.timerAppUrl}
+            href={match.timerSessionId
+              ? `/timer/live/${match.timerSessionId}`
+              : match.timerAppUrl!
+            }
             target="_blank"
             rel="noopener noreferrer"
-            className="flex items-center justify-center gap-2 w-full border border-cyan-400/40 text-cyan-400 bg-cyan-400/10 py-3 rounded-xl text-sm font-medium hover:bg-cyan-400/20 transition-colors"
+            className="flex items-center justify-center gap-2 w-full border border-green-400/40 text-green-400 bg-green-400/10 py-3 rounded-xl text-sm font-medium hover:bg-green-400/20 transition-colors"
           >
-            タイマーアプリで観戦・参加 ↗
+            タイマーで観戦・自分の席を確認 ↗
           </a>
         )}
       </div>
