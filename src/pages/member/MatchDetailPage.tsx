@@ -257,7 +257,7 @@ export const MatchDetailPage = () => {
         {isOngoing && (match.timerSessionId || match.timerAppUrl) && (
           <a
             href={match.timerSessionId
-              ? `/timer/live/${match.timerSessionId}`
+              ? `https://timer-black-swan.web.app/live/${match.timerSessionId}`
               : match.timerAppUrl!
             }
             target="_blank"

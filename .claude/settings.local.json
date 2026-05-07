@@ -7,7 +7,12 @@
       "Bash(python3 -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\(d.get\\('email',''\\), d.get\\('scope',''\\)[:100]\\)\")",
       "Bash(python3 -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\(d.get\\('name','ERROR'\\), d.get\\('error',{}\\).get\\('message',''\\)\\)\")",
       "Bash(npx pwa-assets-generator *)",
-      "WebFetch(domain:api.github.com)"
+      "WebFetch(domain:api.github.com)",
+      "Bash(gh api *)",
+      "Bash(gh repo *)",
+      "PowerShell(npm create *)",
+      "Read(//c/Users/abeno/my_project/timer/**)",
+      "Bash(npx tailwindcss *)"
     ]
   }
 }

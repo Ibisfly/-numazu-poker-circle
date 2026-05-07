@@ -33,8 +33,8 @@ const TimerAppSection = ({ match }: { match: Match }) => {
     setEditing(false)
   }
 
-  // タイマーアプリのベースURL（環境変数または相対パス）
-  const timerAppBase = '/timer'  // 同一ドメイン想定、将来は環境変数化
+  // タイマーアプリのベースURL
+  const timerAppBase = 'https://timer-black-swan.web.app'
 
   return (
     <div className="border-t border-swan-border/50 pt-2 mt-1">
