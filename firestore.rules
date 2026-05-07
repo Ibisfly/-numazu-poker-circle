@@ -141,5 +141,25 @@ service cloud.firestore {
       // create: 管理者またはアクティブユーザーが自分宛に作成可
       allow create: if isAdmin() || isActiveUser();
     }
+
+    // ── timerSessions（タイマーアプリ）───────────────────────────────────────
+    match /timerSessions/{sessionId} {
+      // 認証済みユーザーは読み取り可（ライブビュー用）
+      allow read: if isSignedIn();
+      // 管理者のみ作成・更新・削除
+      allow create, update, delete: if isAdmin();
+
+      // プレイヤーサブコレクション
+      match /players/{playerId} {
+        allow read: if isSignedIn();
+        allow create, update, delete: if isAdmin();
+      }
+
+      // テーブルサブコレクション
+      match /tables/{tableId} {
+        allow read: if isSignedIn();
+        allow create, update, delete: if isAdmin();
+      }
+    }
   }
 }
