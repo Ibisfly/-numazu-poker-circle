@@ -1,22 +1,27 @@
 import { useEffect, useState } from 'react'
 import { AppShell } from '@/components/layout/AppShell'
 import { FeatherIcon } from '@/components/ui/FeatherIcon'
-import { SwanAvatar, DEFAULT_AVATAR_COLOR } from '@/components/ui/SwanAvatar'
+import { SwanAvatar, DEFAULT_AVATAR_COLOR, DynamicPointIcon } from '@/components/ui/SwanAvatar'
 import { useAuth } from '@/lib/hooks/useAuth'
 import {
   subscribeItems, subscribeUserItems,
   purchaseItem, purchaseBenefitItem, equipAvatarColor, equipFrame, equipOverlay,
+  equipPointIcon, purchaseCustomHandTitle,
+  subscribeBingoCards, subscribeUserBingoCards, purchaseBingoCard,
 } from '@/lib/firebase/firestore'
-import type { Item, UserItem } from '@/types'
+import type { Item, UserItem, BingoCard, UserBingoCard } from '@/types'
+import { BeginnerIcon, Star } from '@/components/ui/Icons'
 import { Plus, Minus } from '@/components/ui/Icons'
 
-type Tab = 'cosmetic' | 'benefit'
-type CosmeticSub = 'avatar_color' | 'avatar_decoration' | 'title'
+type Tab = 'cosmetic' | 'bingo' | 'benefit'
+type CosmeticSub = 'avatar_color' | 'avatar_decoration' | 'title' | 'point_icon' | 'custom_hand_title'
 
 const COSMETIC_SUBS: { value: CosmeticSub; label: string }[] = [
-  { value: 'avatar_color',      label: 'アイコン(背景)' },
-  { value: 'avatar_decoration', label: 'アイコン(装飾)' },
+  { value: 'avatar_color',      label: '背景' },
+  { value: 'avatar_decoration', label: '装飾' },
   { value: 'title',             label: '称号' },
+  { value: 'point_icon',        label: 'アイコン' },
+  { value: 'custom_hand_title', label: 'ハンド称号' },
 ]
 
 export const ShopPage = () => {
@@ -29,11 +34,22 @@ export const ShopPage = () => {
   const [msg, setMsg] = useState('')
   // 特典の購入数 map { itemId: number }
   const [qty, setQty] = useState<Record<string, number>>({})
+  // カスタムハンド称号用ダイアログ
+  const [handTitleItem, setHandTitleItem] = useState<Item | null>(null)
+  const [handInput, setHandInput] = useState('')
+  // ビンゴカード
+  const [bingoCards, setBingoCards] = useState<BingoCard[]>([])
+  const [userBingoCards, setUserBingoCards] = useState<UserBingoCard[]>([])
 
   useEffect(() => { return subscribeItems(setItems) }, [])
+  useEffect(() => { return subscribeBingoCards(setBingoCards) }, [])
   useEffect(() => {
     if (!user) return
     return subscribeUserItems(user.uid, setUserItems)
+  }, [user])
+  useEffect(() => {
+    if (!user) return
+    return subscribeUserBingoCards(user.uid, setUserBingoCards)
   }, [user])
 
   const filteredItems = items
@@ -44,10 +60,22 @@ export const ShopPage = () => {
       if (cosmeticSub === 'avatar_color')      return i.itemSubtype === 'avatar_color'
       if (cosmeticSub === 'avatar_decoration') return i.itemSubtype === 'avatar_decoration'
       if (cosmeticSub === 'title')             return i.itemSubtype === 'title'
+      if (cosmeticSub === 'point_icon')        return i.itemSubtype === 'point_icon'
+      if (cosmeticSub === 'custom_hand_title') return i.itemSubtype === 'custom_hand_title'
       return false
     })
     .sort((a, b) => a.cost - b.cost)  // 値段の安い順
   const currentColor = user?.avatarColor ?? DEFAULT_AVATAR_COLOR
+  const currentPointIcon = user?.equippedPointIcon ?? 'feather'
+
+  // カスタムハンド称号の所持リスト
+  const ownedHandTitles = userItems.filter(
+    (ui) => ui.category === 'cosmetic' && ui.customValue
+  )
+
+  // ビンゴカードの購入済みID
+  const ownedBingoCardIds = new Set(userBingoCards.map((ub) => ub.bingoCardId))
+  const availableBingoCards = bingoCards.filter((bc) => bc.isAvailable)
 
   // 装飾品：購入済み（使用済み含む）かどうか
   const cosmeticOwnedIds = new Set(
@@ -71,7 +99,35 @@ export const ShopPage = () => {
       if (item.avatarColor)  await equipAvatarColor(user.uid, item.avatarColor)
       if (item.decorationType === 'frame'   && item.frameStyle) await equipFrame(user.uid, item.frameStyle)
       if (item.decorationType === 'overlay' && item.overlayId)  await equipOverlay(user.uid, item.overlayId)
+      if (item.itemSubtype === 'point_icon' && item.pointIconId) await equipPointIcon(user.uid, item.pointIconId)
       setMsg(`「${item.name}」を購入しました！`)
+    } catch (e: unknown) {
+      setMsg(e instanceof Error ? e.message : '購入に失敗しました')
+    } finally { setLoading(null) }
+  }
+
+  // カスタムハンド称号の購入
+  const handleCustomHandPurchase = async () => {
+    if (!user || !handTitleItem) return
+    setLoading(handTitleItem.id)
+    setMsg('')
+    try {
+      await purchaseCustomHandTitle(user.uid, handTitleItem, handInput, user.ownedPoints ?? 0)
+      setMsg(`マイハンドは"${handInput.toUpperCase()}" を購入しました！`)
+      setHandTitleItem(null)
+      setHandInput('')
+    } catch (e: unknown) {
+      setMsg(e instanceof Error ? e.message : '購入に失敗しました')
+    } finally { setLoading(null) }
+  }
+
+  const handleBingoPurchase = async (card: BingoCard) => {
+    if (!user) return
+    setLoading(card.id)
+    setMsg('')
+    try {
+      await purchaseBingoCard(user.uid, card, user.ownedPoints ?? 0)
+      setMsg(`ビンゴカード「${card.name}」を購入しました！`)
     } catch (e: unknown) {
       setMsg(e instanceof Error ? e.message : '購入に失敗しました')
     } finally { setLoading(null) }
@@ -96,6 +152,7 @@ export const ShopPage = () => {
     if (item.avatarColor)  await equipAvatarColor(user.uid, item.avatarColor)
     if (item.decorationType === 'frame'   && item.frameStyle) await equipFrame(user.uid, item.frameStyle)
     if (item.decorationType === 'overlay' && item.overlayId)  await equipOverlay(user.uid, item.overlayId)
+    if (item.itemSubtype === 'point_icon' && item.pointIconId) await equipPointIcon(user.uid, item.pointIconId)
     setMsg(`「${item.name}」を装備しました`)
   }
 
@@ -114,12 +171,16 @@ export const ShopPage = () => {
 
         {/* タブ */}
         <div className="flex bg-swan-card rounded-xl p-1">
-          {(['cosmetic', 'benefit'] as Tab[]).map((t) => (
-            <button key={t} onClick={() => setTab(t)}
+          {([
+            { key: 'cosmetic', label: '装飾品' },
+            { key: 'bingo', label: 'ビンゴ' },
+            { key: 'benefit', label: '特典' },
+          ] as { key: Tab; label: string }[]).map(({ key, label }) => (
+            <button key={key} onClick={() => setTab(key)}
               className={`flex-1 py-2 text-sm rounded-lg font-medium transition-colors ${
-                tab === t ? 'bg-swan-accent text-black' : 'text-swan-sub'
+                tab === key ? 'bg-swan-accent text-black' : 'text-swan-sub'
               }`}>
-              {t === 'cosmetic' ? '装飾品' : '特典'}
+              {label}
             </button>
           ))}
         </div>
@@ -154,6 +215,20 @@ export const ShopPage = () => {
         {/* ── 装飾品リスト ── */}
         {tab === 'cosmetic' && (
           <div className="space-y-3">
+            {/* カスタムハンド称号の所持リスト表示 */}
+            {cosmeticSub === 'custom_hand_title' && ownedHandTitles.length > 0 && (
+              <div className="bg-swan-card border border-green-500/30 rounded-xl p-4">
+                <h3 className="text-sm font-semibold text-green-400 mb-2">所持中のハンド称号</h3>
+                <div className="flex flex-wrap gap-2">
+                  {ownedHandTitles.map((ui) => (
+                    <span key={ui.id} className="text-sm bg-green-500/10 text-green-400 border border-green-500/30 px-3 py-1 rounded-full">
+                      マイハンドは"{ui.customValue}"
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {filteredItems.length === 0 && (
               <p className="text-center text-swan-sub py-12">アイテムはありません</p>
             )}
@@ -161,7 +236,14 @@ export const ShopPage = () => {
               const owned = cosmeticOwnedIds.has(item.id)
               const canAfford = (user.ownedPoints ?? 0) >= item.cost
               const isColorItem = !!item.avatarColor
-              const isEquipped = isColorItem && currentColor === item.avatarColor
+              const isPointIconItem = item.itemSubtype === 'point_icon'
+              const isFrameItem = item.decorationType === 'frame'
+              const isCustomHandItem = item.itemSubtype === 'custom_hand_title'
+              const isEquippedColor = isColorItem && currentColor === item.avatarColor
+              const isEquippedIcon = isPointIconItem && item.pointIconId === currentPointIcon
+              const isEquippedFrame = isFrameItem && item.frameStyle === user?.equippedFrame
+              const isEquipped = isEquippedColor || isEquippedIcon || isEquippedFrame
+              const canEquip = isColorItem || isPointIconItem || isFrameItem
 
               return (
                 <div key={item.id} className={`bg-swan-card border rounded-xl overflow-hidden transition-colors ${
@@ -176,14 +258,31 @@ export const ShopPage = () => {
                   )}
                   <div className="p-4">
                     {/* プレビュー */}
-                    {(isColorItem || item.decorationType === 'frame' || item.decorationType === 'overlay') && (
+                    {(isColorItem || isFrameItem || item.decorationType === 'overlay') && (
                       <div className="flex justify-center mb-4 py-2">
                         <SwanAvatar
                           color={isColorItem ? item.avatarColor! : currentColor}
                           size={64}
-                          frame={item.decorationType === 'frame' ? (item.frameStyle ?? undefined) : undefined}
+                          frame={isFrameItem ? (item.frameStyle ?? undefined) : undefined}
                           overlay={item.decorationType === 'overlay' ? (item.overlayId ?? undefined) : undefined}
                         />
+                      </div>
+                    )}
+                    {/* ポイントアイコンプレビュー */}
+                    {isPointIconItem && item.pointIconId && (
+                      <div className="flex justify-center mb-4 py-2">
+                        <div className="bg-swan-dark rounded-full p-4 inline-flex items-center gap-2">
+                          <DynamicPointIcon iconId={item.pointIconId} size={32} />
+                          <span className="text-swan-accent font-bold text-xl">1,000</span>
+                        </div>
+                      </div>
+                    )}
+                    {/* カスタムハンド称号プレビュー */}
+                    {isCustomHandItem && (
+                      <div className="flex justify-center mb-4 py-2">
+                        <div className="text-lg font-medium text-amber-400">
+                          マイハンドは"<span className="font-bold">AA</span>"
+                        </div>
                       </div>
                     )}
                     <div className="flex items-start justify-between mb-3">
@@ -193,13 +292,27 @@ export const ShopPage = () => {
                         {isEquipped && (
                           <span className="inline-block text-xs text-swan-accent border border-swan-accent/30 px-2 py-0.5 rounded-full mt-1">装備中</span>
                         )}
+                        {isCustomHandItem && (
+                          <p className="text-xs text-amber-400 mt-1">※ 購入ごとに好きなハンドを設定可能</p>
+                        )}
                       </div>
                       <p className="font-bold text-swan-accent flex items-center gap-1 shrink-0 ml-3">
                         <FeatherIcon />{item.cost.toLocaleString()}
                       </p>
                     </div>
-                    {owned ? (
-                      isColorItem ? (
+                    {/* カスタムハンド称号は常に購入可能 */}
+                    {isCustomHandItem ? (
+                      <button
+                        onClick={() => { setHandTitleItem(item); setHandInput('') }}
+                        disabled={loading === item.id || !canAfford}
+                        className={`w-full py-2 rounded-lg text-sm font-medium transition-opacity ${
+                          canAfford ? 'bg-amber-500/20 text-amber-400 border border-amber-500/40 hover:bg-amber-500/30'
+                          : 'bg-swan-muted text-swan-sub cursor-not-allowed'
+                        } disabled:opacity-50`}>
+                        {loading === item.id ? '処理中...' : canAfford ? 'ハンドを選んで購入' : 'ポイント不足'}
+                      </button>
+                    ) : owned ? (
+                      canEquip ? (
                         <button onClick={() => handleEquipCosmetic(item)} disabled={isEquipped}
                           className={`w-full py-2 rounded-lg text-sm font-medium ${
                             isEquipped ? 'bg-swan-muted text-swan-sub cursor-default'
@@ -223,6 +336,95 @@ export const ShopPage = () => {
                       </button>
                     )}
                   </div>
+                </div>
+              )
+            })}
+          </div>
+        )}
+
+        {/* ── ビンゴカードリスト ── */}
+        {tab === 'bingo' && (
+          <div className="space-y-3">
+            {/* 説明 */}
+            <div className="bg-gradient-to-r from-purple-500/20 to-pink-500/20 rounded-xl p-4 border border-purple-500/30">
+              <h3 className="font-bold text-swan-text mb-1 flex items-center gap-2">
+                🎯 Ring de BINGO
+              </h3>
+              <p className="text-xs text-swan-sub">
+                リングゲーム中にミッションをクリアしてビンゴを目指そう！
+                マス達成・ビンゴ達成でポイントゲット！
+              </p>
+            </div>
+
+            {availableBingoCards.length === 0 && (
+              <p className="text-center text-swan-sub py-12">販売中のビンゴカードはありません</p>
+            )}
+            {availableBingoCards.map((card) => {
+              const owned = ownedBingoCardIds.has(card.id)
+              const activeCard = userBingoCards.find((ub) => ub.bingoCardId === card.id && !ub.completedAt)
+              const canAfford = (user.ownedPoints ?? 0) >= card.cost
+
+              return (
+                <div key={card.id} className={`bg-swan-card border rounded-xl p-4 space-y-3 ${
+                  owned ? 'border-green-500/50' : 'border-swan-border'
+                }`}>
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <h3 className="font-semibold text-swan-text flex items-center gap-1.5">
+                        {card.name}
+                        {card.level === 'beginner' && <BeginnerIcon size={14} />}
+                      </h3>
+                      <p className="text-xs text-swan-sub mt-0.5">{card.description}</p>
+                    </div>
+                    <p className="font-bold text-swan-accent flex items-center gap-1 shrink-0">
+                      <FeatherIcon />{card.cost.toLocaleString()}
+                    </p>
+                  </div>
+
+                  {/* ミニプレビュー */}
+                  <div className="grid grid-cols-5 gap-0.5">
+                    {Array.from({ length: 25 }).map((_, i) => (
+                      <div
+                        key={i}
+                        className={`aspect-square rounded-sm ${
+                          i === 12
+                            ? 'bg-swan-accent/30 flex items-center justify-center'
+                            : activeCard?.completedCells.includes(i)
+                            ? 'bg-swan-accent'
+                            : 'bg-swan-dark border border-swan-border'
+                        }`}
+                      >
+                        {i === 12 && <Star size={8} className="text-swan-accent" />}
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* 報酬 */}
+                  <div className="flex justify-around text-xs text-swan-sub">
+                    <span>1マス: +{card.pointsPerCell}pt</span>
+                    <span>BINGO: +{card.pointsPerBingo}pt</span>
+                  </div>
+
+                  {/* ボタン */}
+                  {activeCard ? (
+                    <div className="text-center py-2 bg-green-500/10 border border-green-500/30 rounded-lg">
+                      <p className="text-green-400 text-sm font-medium">
+                        進行中 ({activeCard.completedCells.length}/25マス)
+                      </p>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => handleBingoPurchase(card)}
+                      disabled={loading === card.id || !canAfford}
+                      className={`w-full py-2.5 rounded-lg text-sm font-medium transition-opacity ${
+                        canAfford
+                          ? 'bg-swan-accent text-black hover:opacity-90'
+                          : 'bg-swan-muted text-swan-sub cursor-not-allowed'
+                      } disabled:opacity-50`}
+                    >
+                      {loading === card.id ? '処理中...' : canAfford ? '購入する' : 'ポイント不足'}
+                    </button>
+                  )}
                 </div>
               )
             })}
@@ -302,6 +504,53 @@ export const ShopPage = () => {
           </div>
         )}
       </div>
+
+      {/* カスタムハンド称号入力ダイアログ */}
+      {handTitleItem && (
+        <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center px-6">
+          <div className="bg-swan-dark border border-amber-500/30 rounded-2xl p-6 w-full max-w-xs space-y-4">
+            <h3 className="font-bold text-amber-400 text-center">マイハンドを入力</h3>
+            <p className="text-xs text-swan-sub text-center">
+              好きなポーカーハンドを入力してください<br />
+              例: AA, KQs, T9o, 87s
+            </p>
+            <input
+              type="text"
+              value={handInput}
+              onChange={(e) => setHandInput(e.target.value.toUpperCase())}
+              placeholder="例: AA"
+              maxLength={5}
+              className="w-full bg-swan-card border border-swan-border rounded-lg px-4 py-3 text-center text-xl font-bold text-swan-text tracking-widest focus:outline-none focus:border-amber-500"
+              autoFocus
+            />
+            {handInput && (
+              <div className="text-center py-2">
+                <span className="text-amber-400 font-medium">
+                  マイハンドは"<span className="font-bold">{handInput}</span>"
+                </span>
+              </div>
+            )}
+            <p className="text-xs text-swan-sub text-center flex items-center justify-center gap-1">
+              価格: <FeatherIcon />{handTitleItem.cost.toLocaleString()}
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => { setHandTitleItem(null); setHandInput('') }}
+                className="flex-1 bg-swan-muted text-swan-sub py-2.5 rounded-xl text-sm"
+              >
+                キャンセル
+              </button>
+              <button
+                onClick={handleCustomHandPurchase}
+                disabled={loading === handTitleItem.id || !handInput.trim()}
+                className="flex-1 bg-amber-500/20 text-amber-400 border border-amber-500/40 font-medium py-2.5 rounded-xl text-sm disabled:opacity-50"
+              >
+                {loading === handTitleItem.id ? '処理中...' : '購入する'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </AppShell>
   )
 }

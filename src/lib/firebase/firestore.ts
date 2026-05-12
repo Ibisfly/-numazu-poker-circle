@@ -28,6 +28,8 @@ import type {
   UserAchievement,
   Notification,
   PointLogType,
+  BingoCard,
+  UserBingoCard,
 } from '@/types'
 
 // ── Users ──────────────────────────────────────────────────────────────────
@@ -448,6 +450,46 @@ export const equipTitle = (uid: string, title: string, tier: string) =>
 
 export const unequipTitle = (uid: string) =>
   updateDoc(doc(db, 'users', uid), { equippedTitle: null, equippedTitleTier: null })
+
+export const equipPointIcon = (uid: string, pointIconId: string | null) =>
+  updateDoc(doc(db, 'users', uid), { equippedPointIcon: pointIconId })
+
+// カスタムハンド称号の購入（複数回購入可能）
+export const purchaseCustomHandTitle = async (
+  uid: string,
+  item: Item,
+  handValue: string,
+  currentPoints: number
+) => {
+  if (currentPoints < item.cost) throw new Error('残高不足')
+  if (!handValue.trim()) throw new Error('ハンドを入力してください')
+
+  const batch = writeBatch(db)
+  const userItemRef = doc(collection(db, 'userItems'))
+  batch.set(userItemRef, {
+    uid,
+    itemId: item.id,
+    category: item.category,
+    purchasedAt: serverTimestamp(),
+    usedAt: null,
+    equipped: false,
+    customValue: handValue.trim().toUpperCase(),
+  })
+  const logRef = doc(collection(db, 'pointLogs'))
+  batch.set(logRef, {
+    uid,
+    type: 'shop',
+    amount: -item.cost,
+    description: `マイハンドは"${handValue.trim().toUpperCase()}" を購入`,
+    relatedId: item.id,
+    createdAt: serverTimestamp(),
+    createdBy: uid,
+  })
+  batch.update(doc(db, 'users', uid), {
+    ownedPoints: increment(-item.cost),
+  })
+  await batch.commit()
+}
 
 // ── Admin: Match Settlement ────────────────────────────────────────────────
 
@@ -940,6 +982,317 @@ export const getTimerSessionState = async (timerSessionId: string): Promise<{
     remainingPlayers,
     totalPlayers: players.length,
   }
+}
+
+// ── Ring de BINGO ──────────────────────────────────────────────────────────
+
+export const subscribeBingoCards = (cb: (cards: BingoCard[]) => void) =>
+  onSnapshot(
+    query(collection(db, 'bingoCards'), orderBy('createdAt', 'desc')),
+    (snap) => cb(snap.docs.map((d) => ({ id: d.id, ...d.data() } as BingoCard)))
+  )
+
+export const createBingoCard = (data: Omit<BingoCard, 'id' | 'createdAt'>) =>
+  addDoc(collection(db, 'bingoCards'), { ...data, createdAt: serverTimestamp() })
+
+export const updateBingoCard = (cardId: string, data: Partial<BingoCard>) =>
+  updateDoc(doc(db, 'bingoCards', cardId), data as Record<string, unknown>)
+
+export const deleteBingoCard = (cardId: string) =>
+  deleteDoc(doc(db, 'bingoCards', cardId))
+
+export const subscribeUserBingoCards = (
+  uid: string,
+  cb: (cards: UserBingoCard[]) => void
+) =>
+  onSnapshot(
+    query(
+      collection(db, 'userBingoCards'),
+      where('uid', '==', uid),
+      orderBy('purchasedAt', 'desc')
+    ),
+    (snap) =>
+      cb(snap.docs.map((d) => ({ id: d.id, ...d.data() } as UserBingoCard)))
+  )
+
+export const purchaseBingoCard = async (
+  uid: string,
+  bingoCard: BingoCard,
+  currentPoints: number
+) => {
+  if (currentPoints < bingoCard.cost) throw new Error('残高不足')
+
+  const batch = writeBatch(db)
+  const userCardRef = doc(collection(db, 'userBingoCards'))
+  batch.set(userCardRef, {
+    uid,
+    bingoCardId: bingoCard.id,
+    bingoCardName: bingoCard.name,
+    bingoCardLevel: bingoCard.level,
+    missions: bingoCard.missions,
+    completedCells: [12], // 中央はFREE
+    claimedBingoLines: [],
+    pointsPerCell: bingoCard.pointsPerCell,
+    pointsPerBingo: bingoCard.pointsPerBingo,
+    purchasedAt: serverTimestamp(),
+  })
+
+  const logRef = doc(collection(db, 'pointLogs'))
+  batch.set(logRef, {
+    uid,
+    type: 'shop',
+    amount: -bingoCard.cost,
+    description: `ビンゴカード「${bingoCard.name}」を購入`,
+    relatedId: bingoCard.id,
+    createdAt: serverTimestamp(),
+    createdBy: uid,
+  })
+
+  batch.update(doc(db, 'users', uid), {
+    ownedPoints: increment(-bingoCard.cost),
+  })
+
+  await batch.commit()
+  return userCardRef.id
+}
+
+const BINGO_LINES = [
+  // 横5列
+  [0, 1, 2, 3, 4],
+  [5, 6, 7, 8, 9],
+  [10, 11, 12, 13, 14],
+  [15, 16, 17, 18, 19],
+  [20, 21, 22, 23, 24],
+  // 縦5列
+  [0, 5, 10, 15, 20],
+  [1, 6, 11, 16, 21],
+  [2, 7, 12, 17, 22],
+  [3, 8, 13, 18, 23],
+  [4, 9, 14, 19, 24],
+  // 斜め2列
+  [0, 6, 12, 18, 24],
+  [4, 8, 12, 16, 20],
+]
+
+export const stampBingoCell = async (
+  userBingoCardId: string,
+  cellIndex: number,
+  adminUid: string
+) => {
+  const cardSnap = await getDoc(doc(db, 'userBingoCards', userBingoCardId))
+  if (!cardSnap.exists()) throw new Error('ビンゴカードが見つかりません')
+
+  const card = cardSnap.data() as UserBingoCard
+  if (card.completedCells.includes(cellIndex)) {
+    throw new Error('このマスは既にスタンプ済みです')
+  }
+
+  const newCompletedCells = [...card.completedCells, cellIndex]
+
+  // 新しく達成したビンゴラインをチェック
+  const newBingoLines: number[] = []
+  BINGO_LINES.forEach((line, lineIndex) => {
+    if (card.claimedBingoLines.includes(lineIndex)) return
+    const isComplete = line.every((idx) => newCompletedCells.includes(idx))
+    if (isComplete) newBingoLines.push(lineIndex)
+  })
+
+  const batch = writeBatch(db)
+
+  // カード更新
+  const updateData: Record<string, unknown> = {
+    completedCells: newCompletedCells,
+  }
+  if (newBingoLines.length > 0) {
+    updateData.claimedBingoLines = [...card.claimedBingoLines, ...newBingoLines]
+  }
+  if (newCompletedCells.length === 25) {
+    updateData.completedAt = serverTimestamp()
+  }
+  batch.update(doc(db, 'userBingoCards', userBingoCardId), updateData)
+
+  // セル達成ポイント付与
+  const cellPoints = card.pointsPerCell
+  if (cellPoints > 0) {
+    const logRef = doc(collection(db, 'pointLogs'))
+    batch.set(logRef, {
+      uid: card.uid,
+      type: 'manual',
+      amount: cellPoints,
+      description: `ビンゴ「${card.bingoCardName}」マス達成`,
+      relatedId: userBingoCardId,
+      createdAt: serverTimestamp(),
+      createdBy: adminUid,
+    })
+    batch.update(doc(db, 'users', card.uid), {
+      totalPoints: increment(cellPoints),
+      yearPoints: increment(cellPoints),
+      ownedPoints: increment(cellPoints),
+    })
+  }
+
+  // ビンゴライン達成ポイント付与
+  if (newBingoLines.length > 0) {
+    const bingoPoints = card.pointsPerBingo * newBingoLines.length
+    const logRef = doc(collection(db, 'pointLogs'))
+    batch.set(logRef, {
+      uid: card.uid,
+      type: 'manual',
+      amount: bingoPoints,
+      description: `ビンゴ「${card.bingoCardName}」${newBingoLines.length}ライン達成！`,
+      relatedId: userBingoCardId,
+      createdAt: serverTimestamp(),
+      createdBy: adminUid,
+    })
+    batch.update(doc(db, 'users', card.uid), {
+      totalPoints: increment(bingoPoints),
+      yearPoints: increment(bingoPoints),
+      ownedPoints: increment(bingoPoints),
+    })
+  }
+
+  // 通知
+  const notifRef = doc(collection(db, 'notifications'))
+  let message = `ビンゴ「${card.bingoCardName}」のマスをクリア！ +${cellPoints}pt`
+  if (newBingoLines.length > 0) {
+    message += ` 🎉 BINGO ${newBingoLines.length}ライン達成！ +${card.pointsPerBingo * newBingoLines.length}pt`
+  }
+  batch.set(notifRef, {
+    uid: card.uid,
+    type: 'point_awarded',
+    message,
+    isRead: false,
+    createdAt: serverTimestamp(),
+  })
+
+  await batch.commit()
+
+  return { newBingoLines: newBingoLines.length, cellPoints, totalBingoPoints: card.pointsPerBingo * newBingoLines.length }
+}
+
+export const getUserBingoCard = async (userBingoCardId: string): Promise<UserBingoCard | null> => {
+  const snap = await getDoc(doc(db, 'userBingoCards', userBingoCardId))
+  return snap.exists() ? { id: snap.id, ...snap.data() } as UserBingoCard : null
+}
+
+export const deleteUserBingoCard = async (userBingoCardId: string) => {
+  await deleteDoc(doc(db, 'userBingoCards', userBingoCardId))
+}
+
+// ── Bingo Self-Stamp（セルフスタンプ）──────────────────────────────────────
+
+export const getBingoStampCode = async (): Promise<string | null> => {
+  const snap = await getDoc(doc(db, 'settings', 'bingoStamp'))
+  return snap.exists() ? snap.data().code : null
+}
+
+export const setBingoStampCode = async (code: string) => {
+  await setDoc(doc(db, 'settings', 'bingoStamp'), {
+    code,
+    updatedAt: serverTimestamp(),
+  })
+}
+
+export const selfStampBingoCell = async (
+  userBingoCardId: string,
+  cellIndex: number,
+  stampCode: string
+) => {
+  // コード検証
+  const codeSnap = await getDoc(doc(db, 'settings', 'bingoStamp'))
+  if (!codeSnap.exists() || codeSnap.data().code !== stampCode) {
+    throw new Error('無効なスタンプコードです')
+  }
+
+  const cardSnap = await getDoc(doc(db, 'userBingoCards', userBingoCardId))
+  if (!cardSnap.exists()) throw new Error('ビンゴカードが見つかりません')
+
+  const card = cardSnap.data() as UserBingoCard
+  if (card.completedCells.includes(cellIndex)) {
+    throw new Error('このマスは既にスタンプ済みです')
+  }
+
+  const newCompletedCells = [...card.completedCells, cellIndex]
+
+  // 新しく達成したビンゴラインをチェック
+  const newBingoLines: number[] = []
+  BINGO_LINES.forEach((line, lineIndex) => {
+    if (card.claimedBingoLines.includes(lineIndex)) return
+    const isComplete = line.every((idx) => newCompletedCells.includes(idx))
+    if (isComplete) newBingoLines.push(lineIndex)
+  })
+
+  const batch = writeBatch(db)
+
+  // カード更新
+  const updateData: Record<string, unknown> = {
+    completedCells: newCompletedCells,
+  }
+  if (newBingoLines.length > 0) {
+    updateData.claimedBingoLines = [...card.claimedBingoLines, ...newBingoLines]
+  }
+  if (newCompletedCells.length === 25) {
+    updateData.completedAt = serverTimestamp()
+  }
+  batch.update(doc(db, 'userBingoCards', userBingoCardId), updateData)
+
+  // セル達成ポイント付与
+  const cellPoints = card.pointsPerCell
+  if (cellPoints > 0) {
+    const logRef = doc(collection(db, 'pointLogs'))
+    batch.set(logRef, {
+      uid: card.uid,
+      type: 'manual',
+      amount: cellPoints,
+      description: `ビンゴ「${card.bingoCardName}」マス達成`,
+      relatedId: userBingoCardId,
+      createdAt: serverTimestamp(),
+      createdBy: card.uid,
+    })
+    batch.update(doc(db, 'users', card.uid), {
+      totalPoints: increment(cellPoints),
+      yearPoints: increment(cellPoints),
+      ownedPoints: increment(cellPoints),
+    })
+  }
+
+  // ビンゴライン達成ポイント付与
+  if (newBingoLines.length > 0) {
+    const bingoPoints = card.pointsPerBingo * newBingoLines.length
+    const logRef = doc(collection(db, 'pointLogs'))
+    batch.set(logRef, {
+      uid: card.uid,
+      type: 'manual',
+      amount: bingoPoints,
+      description: `ビンゴ「${card.bingoCardName}」${newBingoLines.length}ライン達成！`,
+      relatedId: userBingoCardId,
+      createdAt: serverTimestamp(),
+      createdBy: card.uid,
+    })
+    batch.update(doc(db, 'users', card.uid), {
+      totalPoints: increment(bingoPoints),
+      yearPoints: increment(bingoPoints),
+      ownedPoints: increment(bingoPoints),
+    })
+  }
+
+  // 通知
+  const notifRef = doc(collection(db, 'notifications'))
+  let message = `ビンゴ「${card.bingoCardName}」のマスをクリア！ +${cellPoints}pt`
+  if (newBingoLines.length > 0) {
+    message += ` 🎉 BINGO ${newBingoLines.length}ライン達成！ +${card.pointsPerBingo * newBingoLines.length}pt`
+  }
+  batch.set(notifRef, {
+    uid: card.uid,
+    type: 'point_awarded',
+    message,
+    isRead: false,
+    createdAt: serverTimestamp(),
+  })
+
+  await batch.commit()
+
+  return { newBingoLines: newBingoLines.length, cellPoints, totalBingoPoints: card.pointsPerBingo * newBingoLines.length }
 }
 
 export { Timestamp, serverTimestamp }

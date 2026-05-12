@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { AppShell } from '@/components/layout/AppShell'
 import { FeatherIcon } from '@/components/ui/FeatherIcon'
-import { CreditCard, ShoppingBag, BeginnerIcon } from '@/components/ui/Icons'
+import { CreditCard, ShoppingBag, BeginnerIcon, BookOpen, Layers } from '@/components/ui/Icons'
 import { FlyingSwanProgress } from '@/components/ui/FlyingSwanProgress'
 import { DEFAULT_AVATAR_COLOR } from '@/components/ui/SwanAvatar'
 import { useAuth } from '@/lib/hooks/useAuth'
@@ -50,21 +50,54 @@ export const HomePage = () => {
           </div>
         </div>
 
-        {/* ② クイックリンク（会員証・ショップ） */}
-        <div className="grid grid-cols-2 gap-3">
+        {/* ② 初心者向けガイドブック誘導 */}
+        {user.isBeginner && (
+          <Link
+            to="/guide"
+            className="relative block bg-gradient-to-r from-green-500/20 via-yellow-500/20 to-green-500/20 border-2 border-green-400/50 rounded-xl p-3 hover:opacity-90 transition-all"
+          >
+            <div className="absolute -top-2 -right-2 w-5 h-5 bg-green-400 rounded-full flex items-center justify-center animate-bounce">
+              <span className="text-xs font-bold text-black">!</span>
+            </div>
+            <div className="flex items-center gap-3">
+              <BeginnerIcon size={24} />
+              <div className="flex-1">
+                <p className="font-bold text-green-400 text-sm">初心者の方へ</p>
+                <p className="text-xs text-swan-sub">まずはガイドブックをチェック！</p>
+              </div>
+            </div>
+          </Link>
+        )}
+
+        {/* ③ クイックリンク */}
+        <div className="grid grid-cols-4 gap-2">
           <Link
             to="/card"
-            className="bg-swan-card border border-swan-border rounded-xl p-4 flex flex-col items-center gap-2 hover:border-swan-accent transition-colors"
+            className="bg-swan-card border border-swan-border rounded-xl p-2.5 flex flex-col items-center gap-1 hover:border-swan-accent transition-colors"
           >
-            <CreditCard size={28} className="text-swan-accent" />
-            <p className="text-xs text-swan-sub">会員証</p>
+            <CreditCard size={22} className="text-swan-accent" />
+            <p className="text-[9px] text-swan-sub">会員証</p>
+          </Link>
+          <Link
+            to="/guide"
+            className="bg-swan-card border border-swan-border rounded-xl p-2.5 flex flex-col items-center gap-1 hover:border-swan-accent transition-colors"
+          >
+            <BookOpen size={22} className="text-green-400" />
+            <p className="text-[9px] text-swan-sub">ガイド</p>
+          </Link>
+          <Link
+            to="/bingo"
+            className="bg-swan-card border border-swan-border rounded-xl p-2.5 flex flex-col items-center gap-1 hover:border-swan-accent transition-colors"
+          >
+            <Layers size={22} className="text-purple-400" />
+            <p className="text-[9px] text-swan-sub">ビンゴ</p>
           </Link>
           <Link
             to="/shop"
-            className="bg-swan-card border border-swan-border rounded-xl p-4 flex flex-col items-center gap-2 hover:border-swan-accent transition-colors"
+            className="bg-swan-card border border-swan-border rounded-xl p-2.5 flex flex-col items-center gap-1 hover:border-swan-accent transition-colors"
           >
-            <ShoppingBag size={28} className="text-swan-accent" />
-            <p className="text-xs text-swan-sub">ショップ</p>
+            <ShoppingBag size={22} className="text-swan-accent" />
+            <p className="text-[9px] text-swan-sub">ショップ</p>
           </Link>
         </div>
 

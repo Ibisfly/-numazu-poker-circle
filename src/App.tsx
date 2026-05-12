@@ -20,6 +20,8 @@ import { AchievementsPage } from '@/pages/member/AchievementsPage'
 import { NotificationsPage } from '@/pages/member/NotificationsPage'
 import { MembersDirectoryPage } from '@/pages/member/MembersDirectoryPage'
 import { MemberProfilePage } from '@/pages/member/MemberProfilePage'
+import { GuidePage } from '@/pages/member/GuidePage'
+import { BingoPage } from '@/pages/member/BingoPage'
 
 // Admin
 import { AdminDashboardPage } from '@/pages/admin/AdminDashboardPage'
@@ -31,6 +33,8 @@ import { MatchesAdminPage } from '@/pages/admin/MatchesAdminPage'
 import { ShopAdminPage } from '@/pages/admin/ShopAdminPage'
 import { PointsPage } from '@/pages/admin/PointsPage'
 import { AchievementsAdminPage } from '@/pages/admin/AchievementsAdminPage'
+import { BingoAdminPage } from '@/pages/admin/BingoAdminPage'
+import { BingoStampPage } from '@/pages/admin/BingoStampPage'
 
 export const App = () => (
   <BrowserRouter>
@@ -54,6 +58,8 @@ export const App = () => (
         <Route path="/notifications" element={<RequireAuth><NotificationsPage /></RequireAuth>} />
         <Route path="/members" element={<RequireAuth><MembersDirectoryPage /></RequireAuth>} />
         <Route path="/members/:uid" element={<RequireAuth><MemberProfilePage /></RequireAuth>} />
+        <Route path="/guide" element={<RequireAuth><GuidePage /></RequireAuth>} />
+        <Route path="/bingo" element={<RequireAuth><BingoPage /></RequireAuth>} />
 
         {/* ── Admin (requires admin role) ── */}
         <Route path="/admin" element={<RequireAuth requireAdmin><AdminDashboardPage /></RequireAuth>} />
@@ -65,6 +71,8 @@ export const App = () => (
         <Route path="/admin/shop" element={<RequireAuth requireAdmin><ShopAdminPage /></RequireAuth>} />
         <Route path="/admin/points" element={<RequireAuth requireAdmin><PointsPage /></RequireAuth>} />
         <Route path="/admin/achievements" element={<RequireAuth requireAdmin><AchievementsAdminPage /></RequireAuth>} />
+        <Route path="/admin/bingo" element={<RequireAuth requireAdmin><BingoAdminPage /></RequireAuth>} />
+        <Route path="/admin/bingo/stamp" element={<RequireAuth requireAdmin><BingoStampPage /></RequireAuth>} />
 
         {/* ── Fallback ── */}
         <Route path="*" element={<Navigate to="/" replace />} />

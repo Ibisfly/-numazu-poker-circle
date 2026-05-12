@@ -5,7 +5,7 @@ import { SpadeIcon } from '@/components/ui/Icons'
 const navItems = [
   { to: '/', icon: Home, label: 'ホーム', exact: true },
   { to: '/ranking', icon: BarChart2, label: 'ランキング' },
-  { to: '/members', icon: Users, label: '名簿' },
+  { to: '/members', icon: Users, label: 'メンバー' },
   { to: '/matches', icon: SpadeIcon, label: 'マッチ' },
   { to: '/profile', icon: User, label: 'マイページ' },
 ]

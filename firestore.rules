@@ -108,7 +108,8 @@ service cloud.firestore {
 
     // ── userAchievements ─────────────────────────────────────────────────────
     match /userAchievements/{userAchievementId} {
-      allow read: if isActiveUser() && resource.data.uid == request.auth.uid || isAdmin();
+      // 実績はプロフィール閲覧時に表示するため、アクティブユーザーは全員の実績を読める
+      allow read: if isActiveUser();
       // 管理者は他ユーザーへの付与も可（精算後の自動解除に必要）
       allow create: if (isActiveUser() && request.resource.data.uid == request.auth.uid) || isAdmin();
       allow update, delete: if isAdmin();
@@ -140,6 +141,27 @@ service cloud.firestore {
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['isRead']);
       // create: 管理者またはアクティブユーザーが自分宛に作成可
       allow create: if isAdmin() || isActiveUser();
+    }
+
+    // ── settings（アプリ設定）───────────────────────────────────────────────
+    match /settings/{settingId} {
+      allow read: if isActiveUser();
+      allow write: if isAdmin();
+    }
+
+    // ── bingoCards（ビンゴカードマスタ）─────────────────────────────────────
+    match /bingoCards/{cardId} {
+      allow read: if isActiveUser();
+      allow write: if isAdmin();
+    }
+
+    // ── userBingoCards（ユーザーのビンゴカード進行状況）────────────────────────
+    match /userBingoCards/{userCardId} {
+      allow read: if isActiveUser() && resource.data.uid == request.auth.uid || isAdmin();
+      allow create: if (isActiveUser() && request.resource.data.uid == request.auth.uid) || isAdmin();
+      // 本人はセルフスタンプ用、管理者は全更新可
+      allow update: if isAdmin() || (isActiveUser() && resource.data.uid == request.auth.uid);
+      allow delete: if isActiveUser() && resource.data.uid == request.auth.uid || isAdmin();
     }
 
     // ── timerSessions（タイマーアプリ）───────────────────────────────────────

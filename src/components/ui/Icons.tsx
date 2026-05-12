@@ -36,7 +36,9 @@ export {
   Coins,
   Layers,
   ChevronRight,
+  ChevronDown,
   Minus,
+  BookOpen,
 } from 'lucide-react'
 
 import type { SVGProps } from 'react'

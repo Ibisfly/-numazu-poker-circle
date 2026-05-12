@@ -21,6 +21,7 @@ export interface User {
   equippedTitleTier?: 'common' | 'rare' | 'elite' | 'prime'
   equippedFrame?: string  // FRAME_DEFS のキー
   equippedOverlay?: string  // OVERLAY_DEFS のキー
+  equippedPointIcon?: string  // POINT_ICON_DEFS のキー（デフォルト: feather）
   createdAt: Timestamp
 }
 
@@ -129,11 +130,13 @@ export interface Item {
   isAvailable: boolean
   imageUrl?: string        // 商品画像URL（任意）
   avatarColor?: string     // アバターカラー用アイテムの場合の色コード
-  itemSubtype?: 'title' | 'avatar_color' | 'avatar_decoration'
+  itemSubtype?: 'title' | 'avatar_color' | 'avatar_decoration' | 'point_icon' | 'custom_hand_title'
   decorationType?: 'frame' | 'overlay'  // avatar_decoration の下位分類
   frameStyle?: string    // FRAME_DEFS のキー
   overlayId?:  string    // OVERLAY_DEFS のキー
+  pointIconId?: string   // POINT_ICON_DEFS のキー
   titleTier?: 'common' | 'rare' | 'elite' | 'prime'  // 称号レアリティ
+  allowMultiplePurchase?: boolean  // 複数購入可能か（custom_hand_title用）
   createdBy: string
   createdAt: Timestamp
 }
@@ -146,6 +149,7 @@ export interface UserItem {
   purchasedAt: Timestamp
   usedAt?: Timestamp
   equipped?: boolean
+  customValue?: string  // カスタムハンド称号の入力値（例: "98s", "TT"）
 }
 
 export interface Achievement {
@@ -200,4 +204,42 @@ export interface TimerProvisionalRanking {
   uid: string | null
   displayName: string
   bustOrder: number | null
+}
+
+// ── Ring de BINGO ─────────────────────────────────────────────────────────────
+
+export type BingoCardLevel = 'beginner' | 'advanced'
+
+export interface BingoMission {
+  cellIndex: number  // 0-24 (5x5グリッド、中央12はFREE)
+  text: string
+}
+
+export interface BingoCard {
+  id: string
+  level: BingoCardLevel
+  name: string
+  description: string
+  missions: BingoMission[]
+  pointsPerCell: number    // 1マス達成ごとのポイント
+  pointsPerBingo: number   // ビンゴ1列達成ごとのポイント
+  cost: number             // 購入価格
+  isAvailable: boolean
+  createdBy: string
+  createdAt: Timestamp
+}
+
+export interface UserBingoCard {
+  id: string
+  uid: string
+  bingoCardId: string
+  bingoCardName: string
+  bingoCardLevel: BingoCardLevel
+  missions: BingoMission[]
+  completedCells: number[]    // 完了したセルのインデックス配列
+  claimedBingoLines: number[] // ポイント受取済みのビンゴラインインデックス
+  pointsPerCell: number
+  pointsPerBingo: number
+  purchasedAt: Timestamp
+  completedAt?: Timestamp     // 全マス完了時
 }

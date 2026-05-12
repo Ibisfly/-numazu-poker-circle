@@ -29,7 +29,7 @@ export const MembersDirectoryPage = () => {
   const sorted = [...filtered].sort((a, b) => b.totalPoints - a.totalPoints)
 
   return (
-    <AppShell title="名簿">
+    <AppShell title="メンバー">
       <div className="py-4 space-y-4">
         <input
           type="text"
@@ -58,6 +58,7 @@ export const MembersDirectoryPage = () => {
                   color={u.avatarColor ?? DEFAULT_AVATAR_COLOR}
                   size={36}
                   showCard={false}
+                  frame={u.equippedFrame}
                 />
                 <div className="flex-1 min-w-0">
                   <p className={`font-semibold text-sm truncate flex items-center gap-1.5 ${isMe ? 'text-swan-accent' : 'text-swan-text'}`}>
