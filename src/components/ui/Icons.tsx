@@ -37,8 +37,10 @@ export {
   Layers,
   ChevronRight,
   ChevronDown,
+  ChevronUp,
   Minus,
   BookOpen,
+  Shuffle,
 } from 'lucide-react'
 
 import type { SVGProps } from 'react'

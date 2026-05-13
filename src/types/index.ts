@@ -30,6 +30,7 @@ export interface Event {
   title: string
   date: Timestamp
   attendancePoint: number
+  bingoCardId?: string       // このイベントで配布するビンゴカードID
   createdBy: string
   createdAt: Timestamp
 }
@@ -188,6 +189,7 @@ export type NotificationType =
   | 'achievement'
   | 'match_started'
   | 'match_result'
+  | 'match_ready'
 
 export interface Notification {
   id: string
@@ -208,22 +210,27 @@ export interface TimerProvisionalRanking {
 
 // ── Ring de BINGO ─────────────────────────────────────────────────────────────
 
-export type BingoCardLevel = 'beginner' | 'advanced'
-
 export interface BingoMission {
   cellIndex: number  // 0-24 (5x5グリッド、中央12はFREE)
   text: string
 }
 
+export interface BingoMissionTemplate {
+  id: string
+  text: string
+  isActive: boolean
+  createdBy: string
+  createdAt: Timestamp
+}
+
 export interface BingoCard {
   id: string
-  level: BingoCardLevel
   name: string
   description: string
   missions: BingoMission[]
-  pointsPerCell: number    // 1マス達成ごとのポイント
-  pointsPerBingo: number   // ビンゴ1列達成ごとのポイント
-  cost: number             // 購入価格
+  pointsPerCell: number       // 1マス達成ごとのポイント
+  pointsPerBingo: number      // 初回ビンゴ達成ポイント
+  pointsForCompletion: number // 全マス完了ボーナス
   isAvailable: boolean
   createdBy: string
   createdAt: Timestamp
@@ -234,12 +241,15 @@ export interface UserBingoCard {
   uid: string
   bingoCardId: string
   bingoCardName: string
-  bingoCardLevel: BingoCardLevel
+  eventId: string             // 配布元イベントID
   missions: BingoMission[]
   completedCells: number[]    // 完了したセルのインデックス配列
   claimedBingoLines: number[] // ポイント受取済みのビンゴラインインデックス
   pointsPerCell: number
   pointsPerBingo: number
-  purchasedAt: Timestamp
+  pointsForCompletion: number // 全マス完了ボーナス
+  assignedAt: Timestamp       // 配布日時
   completedAt?: Timestamp     // 全マス完了時
+  firstBingoClaimed?: boolean // 初回ビンゴポイント受取済みフラグ
 }
+

@@ -1,19 +1,20 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { AdminShell } from './AdminDashboardPage'
-import { subscribeEvents, createEvent, updateEvent, deleteEvent } from '@/lib/firebase/firestore'
+import { subscribeEvents, createEvent, updateEvent, deleteEvent, subscribeBingoCards } from '@/lib/firebase/firestore'
 import { useAuth } from '@/lib/hooks/useAuth'
-import type { Event } from '@/types'
+import type { Event, BingoCard } from '@/types'
 import { Timestamp } from 'firebase/firestore'
-import { ChevronLeft, Plus, Pencil, X } from '@/components/ui/Icons'
+import { ChevronLeft, Plus, Pencil, X, Layers } from '@/components/ui/Icons'
 import { FeatherPtIcon } from '@/components/ui/Icons'
 
 // フォームの初期値
-const EMPTY = { title: '', date: '', attendancePoint: '50' }
+const EMPTY = { title: '', date: '', attendancePoint: '50', bingoCardId: '' }
 
 export const EventsPage = () => {
   const { user } = useAuth()
   const [events, setEvents]     = useState<Event[]>([])
+  const [bingoCards, setBingoCards] = useState<BingoCard[]>([])
   const [showForm, setShowForm] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)  // 編集中のイベントID（nullなら新規）
   const [form, setForm]         = useState(EMPTY)
@@ -21,6 +22,7 @@ export const EventsPage = () => {
   const [deletingId, setDeletingId] = useState<string | null>(null)
 
   useEffect(() => { return subscribeEvents(setEvents) }, [])
+  useEffect(() => { return subscribeBingoCards(setBingoCards) }, [])
 
   const openCreate = () => {
     setForm(EMPTY)
@@ -33,6 +35,7 @@ export const EventsPage = () => {
       title:           ev.title,
       date:            ev.date?.toDate().toISOString().slice(0, 10) ?? '',
       attendancePoint: String(ev.attendancePoint),
+      bingoCardId:     ev.bingoCardId ?? '',
     })
     setEditingId(ev.id)
     setShowForm(true)
@@ -49,6 +52,7 @@ export const EventsPage = () => {
         title:           form.title.trim(),
         date:            Timestamp.fromDate(new Date(form.date)),
         attendancePoint: parseInt(form.attendancePoint, 10),
+        bingoCardId:     form.bingoCardId || undefined,
       }
       if (editingId) {
         await updateEvent(editingId, payload)
@@ -60,6 +64,8 @@ export const EventsPage = () => {
       setSaving(false)
     }
   }
+
+  const availableBingoCards = bingoCards.filter((c) => c.isAvailable)
 
   const handleDelete = async (id: string) => {
     await deleteEvent(id)
@@ -123,6 +129,24 @@ export const EventsPage = () => {
                 className="w-full bg-swan-black border border-swan-border rounded-lg px-3 py-2 text-sm text-swan-text focus:outline-none focus:border-swan-accent"
               />
             </div>
+            <div>
+              <label className="text-xs text-swan-sub block mb-1">配布するビンゴカード</label>
+              <select
+                value={form.bingoCardId}
+                onChange={(e) => setForm({ ...form, bingoCardId: e.target.value })}
+                className="w-full bg-swan-black border border-swan-border rounded-lg px-3 py-2 text-sm text-swan-text focus:outline-none focus:border-swan-accent"
+              >
+                <option value="">配布しない</option>
+                {availableBingoCards.map((card) => (
+                  <option key={card.id} value={card.id}>
+                    {card.name}
+                  </option>
+                ))}
+              </select>
+              <p className="text-xs text-swan-sub mt-1">
+                来店スキャン時に自動でビンゴカードを配布します
+              </p>
+            </div>
             <div className="flex gap-2">
               <button type="submit" disabled={saving}
                 className="flex-1 bg-swan-accent text-black font-bold py-2 rounded-lg text-sm disabled:opacity-50">
@@ -161,7 +185,9 @@ export const EventsPage = () => {
           {events.length === 0 && (
             <p className="text-center text-swan-sub py-8">イベントはありません</p>
           )}
-          {events.map((ev) => (
+          {events.map((ev) => {
+            const bingoCard = bingoCards.find((c) => c.id === ev.bingoCardId)
+            return (
             <div key={ev.id} className="bg-swan-card border border-swan-border rounded-xl px-4 py-3">
               <div className="flex items-start justify-between">
                 <div className="min-w-0">
@@ -171,6 +197,11 @@ export const EventsPage = () => {
                     <span className="flex items-center gap-1">
                       付与: <FeatherPtIcon size={11} className="text-swan-accent" /> {ev.attendancePoint}
                     </span>
+                    {bingoCard && (
+                      <span className="flex items-center gap-1 text-purple-400">
+                        <Layers size={11} /> {bingoCard.name}
+                      </span>
+                    )}
                   </div>
                 </div>
                 <div className="flex items-center gap-1 shrink-0 ml-2">
@@ -189,7 +220,7 @@ export const EventsPage = () => {
                 </div>
               </div>
             </div>
-          ))}
+          )})}
         </div>
       </div>
     </AdminShell>

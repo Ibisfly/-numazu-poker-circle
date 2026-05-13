@@ -183,5 +183,11 @@ service cloud.firestore {
         allow create, update, delete: if isAdmin();
       }
     }
+
+    // ── bingoMissionTemplates（ビンゴミッションのテンプレートプール）─────────
+    match /bingoMissionTemplates/{templateId} {
+      allow read: if isAdmin();
+      allow write: if isAdmin();
+    }
   }
 }

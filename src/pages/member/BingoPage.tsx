@@ -1,28 +1,90 @@
 import { useEffect, useState, useRef, useCallback } from 'react'
-import { Link } from 'react-router-dom'
 import jsQR from 'jsqr'
 import { AppShell } from '@/components/layout/AppShell'
 import { FeatherIcon } from '@/components/ui/FeatherIcon'
-import { BeginnerIcon, Star, Check, Camera, X } from '@/components/ui/Icons'
+import { Star, Camera, X } from '@/components/ui/Icons'
 import { useAuth } from '@/lib/hooks/useAuth'
 import {
   subscribeUserBingoCards,
-  subscribeBingoCards,
   deleteUserBingoCard,
   selfStampBingoCell,
 } from '@/lib/firebase/firestore'
-import type { UserBingoCard, BingoCard } from '@/types'
+import type { UserBingoCard } from '@/types'
 
-type Mode = 'view' | 'scan' | 'stamp'
+type Mode = 'view' | 'scan' | 'stamp' | 'stamped'
+
+const ConfettiEffect = ({ onComplete }: { onComplete: () => void }) => {
+  useEffect(() => {
+    const timer = setTimeout(onComplete, 3000)
+    return () => clearTimeout(timer)
+  }, [onComplete])
+
+  return (
+    <div className="fixed inset-0 z-50 pointer-events-none overflow-hidden">
+      {Array.from({ length: 50 }).map((_, i) => (
+        <div
+          key={i}
+          className="absolute w-3 h-3 animate-confetti"
+          style={{
+            left: `${Math.random() * 100}%`,
+            backgroundColor: ['#f59e0b', '#ef4444', '#22c55e', '#3b82f6', '#a855f7', '#ec4899'][i % 6],
+            animationDelay: `${Math.random() * 0.5}s`,
+            animationDuration: `${2 + Math.random()}s`,
+          }}
+        />
+      ))}
+      <div className="absolute inset-0 flex items-center justify-center">
+        <div className="bg-black/80 px-8 py-6 rounded-2xl text-center animate-bounce-in">
+          <p className="text-4xl mb-2">🎉</p>
+          <p className="text-2xl font-bold text-yellow-400">BINGO!</p>
+        </div>
+      </div>
+      <style>{`
+        @keyframes confetti {
+          0% { transform: translateY(-10vh) rotate(0deg); opacity: 1; }
+          100% { transform: translateY(110vh) rotate(720deg); opacity: 0; }
+        }
+        @keyframes bounce-in {
+          0% { transform: scale(0); }
+          50% { transform: scale(1.2); }
+          100% { transform: scale(1); }
+        }
+        .animate-confetti { animation: confetti 2.5s ease-out forwards; }
+        .animate-bounce-in { animation: bounce-in 0.5s ease-out forwards; }
+      `}</style>
+    </div>
+  )
+}
+
+const StampOverlay = ({ show }: { show: boolean }) => {
+  if (!show) return null
+  return (
+    <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+      <div className="w-8 h-8 rounded-full bg-red-500/70 border-2 border-red-700 flex items-center justify-center animate-stamp">
+        <span className="text-white text-xs font-bold">済</span>
+      </div>
+      <style>{`
+        @keyframes stamp {
+          0% { transform: scale(2) rotate(-20deg); opacity: 0; }
+          50% { transform: scale(1.2) rotate(10deg); opacity: 1; }
+          100% { transform: scale(1) rotate(0deg); opacity: 1; }
+        }
+        .animate-stamp { animation: stamp 0.3s ease-out forwards; }
+      `}</style>
+    </div>
+  )
+}
 
 const BingoGrid = ({
   userCard,
   onCellClick,
   selectable,
+  stampingCell,
 }: {
   userCard: UserBingoCard
   onCellClick?: (index: number) => void
   selectable?: boolean
+  stampingCell?: number | null
 }) => {
   const completedSet = new Set(userCard.completedCells)
 
@@ -33,27 +95,30 @@ const BingoGrid = ({
         const isCompleted = completedSet.has(i)
         const isFree = i === 12
         const canSelect = selectable && !isCompleted && !isFree
+        const isStamping = stampingCell === i
 
         return (
           <button
             key={i}
             onClick={() => canSelect && onCellClick?.(i)}
             disabled={!canSelect}
-            className={`aspect-square rounded-lg flex items-center justify-center text-center p-1 text-[10px] leading-tight transition-all ${
-              isCompleted
-                ? 'bg-swan-accent text-black font-semibold'
+            className={`relative aspect-square rounded-lg flex items-center justify-center text-center p-1 text-[10px] leading-tight transition-all ${
+              isFree
+                ? 'bg-swan-accent/20 border border-swan-accent/50'
                 : canSelect
                 ? 'bg-swan-dark border border-swan-border text-swan-sub hover:border-swan-accent active:scale-95'
                 : 'bg-swan-card border border-swan-border text-swan-sub'
             }`}
           >
             {isFree ? (
-              <Star size={16} className={isCompleted ? 'text-black' : 'text-swan-accent'} />
-            ) : isCompleted ? (
-              <Check size={14} />
+              <Star size={16} className="text-swan-accent" />
             ) : (
-              <span className="line-clamp-3">{mission?.text ?? ''}</span>
+              <span className={`line-clamp-3 ${isCompleted ? 'opacity-50' : ''}`}>
+                {mission?.text ?? ''}
+              </span>
             )}
+            {isCompleted && !isFree && <StampOverlay show={true} />}
+            {isStamping && <StampOverlay show={true} />}
           </button>
         )
       })}
@@ -84,10 +149,7 @@ const BingoCardDetail = ({
     <div className="bg-swan-card border border-swan-border rounded-2xl p-4 space-y-4">
       <div className="flex items-center justify-between">
         <div>
-          <div className="flex items-center gap-2">
-            <h3 className="font-bold text-swan-text">{userCard.bingoCardName}</h3>
-            {userCard.bingoCardLevel === 'beginner' && <BeginnerIcon size={14} />}
-          </div>
+          <h3 className="font-bold text-swan-text">{userCard.bingoCardName}</h3>
           <p className="text-xs text-swan-sub mt-0.5">
             {completedCount}/25マス完了 ・ {bingoCount}ビンゴ
           </p>
@@ -98,7 +160,6 @@ const BingoCardDetail = ({
         </div>
       </div>
 
-      {/* プログレスバー */}
       <div className="h-2 bg-swan-dark rounded-full overflow-hidden">
         <div
           className="h-full bg-gradient-to-r from-swan-accent to-yellow-400 transition-all"
@@ -106,10 +167,8 @@ const BingoCardDetail = ({
         />
       </div>
 
-      {/* ビンゴグリッド */}
       <BingoGrid userCard={userCard} />
 
-      {/* 報酬情報 */}
       <div className="flex justify-around text-center pt-2 border-t border-swan-border">
         <div>
           <p className="text-xs text-swan-sub">1マス達成</p>
@@ -118,9 +177,15 @@ const BingoCardDetail = ({
           </p>
         </div>
         <div>
-          <p className="text-xs text-swan-sub">BINGO達成</p>
+          <p className="text-xs text-swan-sub">初BINGO</p>
           <p className="font-semibold text-swan-accent flex items-center justify-center gap-0.5">
             +{userCard.pointsPerBingo} <FeatherIcon size={12} />
+          </p>
+        </div>
+        <div>
+          <p className="text-xs text-swan-sub">全埋め</p>
+          <p className="font-semibold text-purple-400 flex items-center justify-center gap-0.5">
+            +{userCard.pointsForCompletion} <FeatherIcon size={12} />
           </p>
         </div>
       </div>
@@ -147,7 +212,6 @@ const BingoCardDetail = ({
         </div>
       )}
 
-      {/* 破棄確認 */}
       {showDeleteConfirm && (
         <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-4 space-y-3">
           <p className="text-sm text-red-400 text-center">
@@ -177,12 +241,13 @@ const BingoCardDetail = ({
 export const BingoPage = () => {
   const { user } = useAuth()
   const [userCards, setUserCards] = useState<UserBingoCard[]>([])
-  const [availableCards, setAvailableCards] = useState<BingoCard[]>([])
   const [mode, setMode] = useState<Mode>('view')
   const [selectedCard, setSelectedCard] = useState<UserBingoCard | null>(null)
   const [scannedCode, setScannedCode] = useState<string | null>(null)
   const [message, setMessage] = useState('')
   const [stamping, setStamping] = useState(false)
+  const [stampingCell, setStampingCell] = useState<number | null>(null)
+  const [showConfetti, setShowConfetti] = useState(false)
 
   const videoRef = useRef<HTMLVideoElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
@@ -194,12 +259,6 @@ export const BingoPage = () => {
     if (!user) return
     return subscribeUserBingoCards(user.uid, setUserCards)
   }, [user])
-
-  useEffect(() => {
-    return subscribeBingoCards((cards) =>
-      setAvailableCards(cards.filter((c) => c.isAvailable))
-    )
-  }, [])
 
   const activeCards = userCards.filter((c) => !c.completedAt)
   const completedCards = userCards.filter((c) => c.completedAt)
@@ -278,35 +337,47 @@ export const BingoPage = () => {
 
   const handleStamp = async (cellIndex: number) => {
     if (!selectedCard || !scannedCode || stamping) return
+
     setStamping(true)
+    setStampingCell(cellIndex)
+    setMode('stamped')
     setMessage('')
+
     try {
       const result = await selfStampBingoCell(selectedCard.id, cellIndex, scannedCode)
       let msg = `✅ スタンプ完了！ +${result.cellPoints}pt`
-      if (result.newBingoLines > 0) {
-        msg += ` 🎉 BINGO ${result.newBingoLines}ライン達成！ +${result.totalBingoPoints}pt`
+      if (result.isFirstBingo) {
+        msg += ` 🎉 初BINGO達成！ +${result.totalBingoPoints}pt`
+        setShowConfetti(true)
+      }
+      if (result.isFullCompletion && result.completionPoints > 0) {
+        msg += ` 🏆 全埋め完了！ +${result.completionPoints}pt`
       }
       setMessage(msg)
+
       setTimeout(() => {
         setMode('view')
         setSelectedCard(null)
         setScannedCode(null)
+        setStampingCell(null)
         setMessage('')
-      }, 2000)
+        setStamping(false)
+      }, result.isFirstBingo ? 3500 : 2000)
     } catch (e) {
       setMessage(e instanceof Error ? e.message : 'エラーが発生しました')
-    } finally {
       setStamping(false)
+      setStampingCell(null)
+      setMode('stamp')
     }
   }
 
   return (
     <AppShell title="Ring de BINGO">
+      {showConfetti && <ConfettiEffect onComplete={() => setShowConfetti(false)} />}
+
       <div className="py-4 space-y-6">
-        {/* 通常表示モード */}
         {mode === 'view' && (
           <>
-            {/* 説明 */}
             <div className="bg-gradient-to-r from-purple-500/20 to-pink-500/20 rounded-xl p-4 border border-purple-500/30">
               <h3 className="font-bold text-swan-text mb-1">🎯 Ring de BINGOとは？</h3>
               <p className="text-xs text-swan-sub">
@@ -315,11 +386,10 @@ export const BingoPage = () => {
               </p>
             </div>
 
-            {/* 進行中のカード */}
-            {activeCards.length > 0 && (
+            {activeCards.length > 0 ? (
               <div>
                 <h2 className="text-sm font-semibold text-swan-sub mb-3 uppercase tracking-wide">
-                  進行中のビンゴ
+                  今日のビンゴ
                 </h2>
                 <div className="space-y-4">
                   {activeCards.map((card) => (
@@ -332,54 +402,16 @@ export const BingoPage = () => {
                   ))}
                 </div>
               </div>
-            )}
-
-            {/* ショップへの誘導 */}
-            {activeCards.length === 0 && (
-              <div className="text-center py-8">
-                <p className="text-swan-sub mb-4">ビンゴカードを持っていません</p>
-                <Link
-                  to="/shop"
-                  className="inline-block bg-swan-accent text-black font-semibold px-6 py-3 rounded-xl"
-                >
-                  ショップで購入する
-                </Link>
+            ) : (
+              <div className="text-center py-8 bg-swan-card border border-swan-border rounded-xl">
+                <p className="text-4xl mb-3">🎰</p>
+                <p className="text-swan-sub mb-2">ビンゴカードを持っていません</p>
+                <p className="text-xs text-swan-muted">
+                  来店時に配布されます
+                </p>
               </div>
             )}
 
-            {/* 購入可能なカード一覧 */}
-            {availableCards.length > 0 && (
-              <div>
-                <h2 className="text-sm font-semibold text-swan-sub mb-3 uppercase tracking-wide">
-                  購入可能なビンゴカード
-                </h2>
-                <div className="space-y-2">
-                  {availableCards.map((card) => (
-                    <Link
-                      key={card.id}
-                      to="/shop"
-                      className="flex items-center justify-between bg-swan-card border border-swan-border rounded-xl px-4 py-3 hover:border-swan-accent transition-colors"
-                    >
-                      <div className="flex items-center gap-2">
-                        <span className="text-lg">🎰</span>
-                        <div>
-                          <p className="font-semibold text-swan-text flex items-center gap-1.5">
-                            {card.name}
-                            {card.level === 'beginner' && <BeginnerIcon size={12} />}
-                          </p>
-                          <p className="text-xs text-swan-sub">{card.description}</p>
-                        </div>
-                      </div>
-                      <p className="font-bold text-swan-accent flex items-center gap-1">
-                        {card.cost.toLocaleString()} <FeatherIcon size={12} />
-                      </p>
-                    </Link>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* 完了したカード */}
             {completedCards.length > 0 && (
               <div>
                 <h2 className="text-sm font-semibold text-swan-sub mb-3 uppercase tracking-wide">
@@ -400,7 +432,6 @@ export const BingoPage = () => {
           </>
         )}
 
-        {/* スキャンモード */}
         {mode === 'scan' && (
           <div className="space-y-4">
             <div className="flex items-center justify-between">
@@ -431,36 +462,41 @@ export const BingoPage = () => {
           </div>
         )}
 
-        {/* スタンプ選択モード */}
-        {mode === 'stamp' && selectedCard && (
+        {(mode === 'stamp' || mode === 'stamped') && selectedCard && (
           <div className="space-y-4">
             <div className="flex items-center justify-between">
-              <h2 className="font-bold text-swan-text">スタンプを押すマスを選択</h2>
-              <button onClick={cancelScan} className="text-swan-sub hover:text-swan-accent">
-                <X size={24} />
-              </button>
+              <h2 className="font-bold text-swan-text">
+                {mode === 'stamped' ? 'スタンプ完了！' : 'スタンプを押すマスを選択'}
+              </h2>
+              {mode === 'stamp' && (
+                <button onClick={cancelScan} className="text-swan-sub hover:text-swan-accent">
+                  <X size={24} />
+                </button>
+              )}
             </div>
 
-            <div className="bg-green-500/10 border border-green-500/30 rounded-xl p-3">
-              <p className="text-green-400 text-sm text-center">
-                ✓ QRコード認証OK！1マスだけスタンプを押せます
-              </p>
-            </div>
+            {mode === 'stamp' && (
+              <div className="bg-green-500/10 border border-green-500/30 rounded-xl p-3">
+                <p className="text-green-400 text-sm text-center">
+                  ✓ QRコード認証OK！1マスだけスタンプを押せます
+                </p>
+              </div>
+            )}
 
             <div className="bg-swan-card border border-swan-border rounded-2xl p-4 space-y-4">
-              <div className="flex items-center gap-2">
-                <h3 className="font-bold text-swan-text">{selectedCard.bingoCardName}</h3>
-                {selectedCard.bingoCardLevel === 'beginner' && <BeginnerIcon size={14} />}
-              </div>
+              <h3 className="font-bold text-swan-text">{selectedCard.bingoCardName}</h3>
 
-              <p className="text-xs text-swan-sub">
-                達成したミッションのマスをタップしてください
-              </p>
+              {mode === 'stamp' && (
+                <p className="text-xs text-swan-sub">
+                  達成したミッションのマスをタップしてください
+                </p>
+              )}
 
               <BingoGrid
                 userCard={selectedCard}
-                onCellClick={handleStamp}
-                selectable={!stamping}
+                onCellClick={mode === 'stamp' ? handleStamp : undefined}
+                selectable={mode === 'stamp' && !stamping}
+                stampingCell={stampingCell}
               />
 
               {message && (

@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, useCallback } from 'react'
 import { Link } from 'react-router-dom'
 import jsQR from 'jsqr'
 import { AdminShell } from './AdminDashboardPage'
-import { subscribeEvents, getUser, recordAttendance, checkAndUnlockAchievements } from '@/lib/firebase/firestore'
+import { subscribeEvents, getUser, recordAttendance, checkAndUnlockAchievements, assignBingoCardOnAttendance } from '@/lib/firebase/firestore'
 import { useAuth } from '@/lib/hooks/useAuth'
 import type { Event } from '@/types'
 import { ChevronLeft, Camera, X } from '@/components/ui/Icons'
@@ -110,6 +110,7 @@ export const ScanPage = () => {
       await recordAttendance(selectedEvent.id, targetUser.uid, selectedEvent.attendancePoint, adminUser.uid)
       setResult({ success: true, message: `✓ ${targetUser.playerName} に ${selectedEvent.attendancePoint}pt 付与しました` })
       checkAndUnlockAchievements(targetUser.uid).catch(() => {})
+      assignBingoCardOnAttendance(targetUser.uid, selectedEvent.id).catch(() => {})
       stopScan()
     } catch (e: unknown) {
       setResult({ success: false, message: e instanceof Error ? e.message : 'エラーが発生しました' })
@@ -134,6 +135,7 @@ export const ScanPage = () => {
       if (targetUser.status !== 'active') throw new Error('有効なメンバーではありません')
       await recordAttendance(selectedEvent.id, targetUser.uid, selectedEvent.attendancePoint, adminUser.uid)
       checkAndUnlockAchievements(targetUser.uid).catch(() => {})
+      assignBingoCardOnAttendance(targetUser.uid, selectedEvent.id).catch(() => {})
       setResult({ success: true, message: `✓ ${targetUser.playerName} に ${selectedEvent.attendancePoint}pt 付与しました` })
       setManualUid('')
     } catch (e: unknown) {

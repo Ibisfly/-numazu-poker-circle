@@ -6,18 +6,12 @@ import { CreditCard, ShoppingBag, BeginnerIcon, BookOpen, Layers } from '@/compo
 import { FlyingSwanProgress } from '@/components/ui/FlyingSwanProgress'
 import { DEFAULT_AVATAR_COLOR } from '@/components/ui/SwanAvatar'
 import { useAuth } from '@/lib/hooks/useAuth'
-import { subscribePointLogs, subscribeMatches } from '@/lib/firebase/firestore'
-import type { PointLog, Match } from '@/types'
+import { subscribeMatches } from '@/lib/firebase/firestore'
+import type { Match } from '@/types'
 
 export const HomePage = () => {
   const { user } = useAuth()
-  const [recentLogs, setRecentLogs] = useState<PointLog[]>([])
   const [upcomingMatch, setUpcomingMatch] = useState<Match | null>(null)
-
-  useEffect(() => {
-    if (!user) return
-    return subscribePointLogs(user.uid, (logs) => setRecentLogs(logs.slice(0, 3)))
-  }, [user])
 
   useEffect(() => {
     return subscribeMatches((matches) => {
@@ -70,34 +64,34 @@ export const HomePage = () => {
         )}
 
         {/* ③ クイックリンク */}
-        <div className="grid grid-cols-4 gap-2">
+        <div className="grid grid-cols-2 gap-3">
           <Link
             to="/card"
-            className="bg-swan-card border border-swan-border rounded-xl p-2.5 flex flex-col items-center gap-1 hover:border-swan-accent transition-colors"
+            className="bg-swan-card border border-swan-border rounded-xl p-4 flex items-center gap-3 hover:border-swan-accent transition-colors"
           >
-            <CreditCard size={22} className="text-swan-accent" />
-            <p className="text-[9px] text-swan-sub">会員証</p>
+            <CreditCard size={28} className="text-swan-accent" />
+            <span className="text-sm font-medium text-swan-text">会員証</span>
           </Link>
           <Link
             to="/guide"
-            className="bg-swan-card border border-swan-border rounded-xl p-2.5 flex flex-col items-center gap-1 hover:border-swan-accent transition-colors"
+            className="bg-swan-card border border-swan-border rounded-xl p-4 flex items-center gap-3 hover:border-swan-accent transition-colors"
           >
-            <BookOpen size={22} className="text-green-400" />
-            <p className="text-[9px] text-swan-sub">ガイド</p>
+            <BookOpen size={28} className="text-green-400" />
+            <span className="text-sm font-medium text-swan-text">ガイド</span>
           </Link>
           <Link
             to="/bingo"
-            className="bg-swan-card border border-swan-border rounded-xl p-2.5 flex flex-col items-center gap-1 hover:border-swan-accent transition-colors"
+            className="bg-swan-card border border-swan-border rounded-xl p-4 flex items-center gap-3 hover:border-swan-accent transition-colors"
           >
-            <Layers size={22} className="text-purple-400" />
-            <p className="text-[9px] text-swan-sub">ビンゴ</p>
+            <Layers size={28} className="text-purple-400" />
+            <span className="text-sm font-medium text-swan-text">ビンゴ</span>
           </Link>
           <Link
             to="/shop"
-            className="bg-swan-card border border-swan-border rounded-xl p-2.5 flex flex-col items-center gap-1 hover:border-swan-accent transition-colors"
+            className="bg-swan-card border border-swan-border rounded-xl p-4 flex items-center gap-3 hover:border-swan-accent transition-colors"
           >
-            <ShoppingBag size={22} className="text-swan-accent" />
-            <p className="text-[9px] text-swan-sub">ショップ</p>
+            <ShoppingBag size={28} className="text-swan-accent" />
+            <span className="text-sm font-medium text-swan-text">ショップ</span>
           </Link>
         </div>
 
@@ -125,37 +119,6 @@ export const HomePage = () => {
             </p>
           </Link>
         )}
-
-        {/* ⑤ ポイント履歴 */}
-        <div>
-          <div className="flex items-center justify-between mb-3">
-            <h3 className="text-sm font-semibold text-swan-sub uppercase tracking-wide">最近の履歴</h3>
-            <Link to="/profile" className="text-xs text-swan-accent">すべて見る</Link>
-          </div>
-          {recentLogs.length === 0 ? (
-            <p className="text-swan-sub text-sm">まだポイント履歴はありません</p>
-          ) : (
-            <div className="space-y-2">
-              {recentLogs.map((log) => (
-                <div
-                  key={log.id}
-                  className="flex items-center justify-between bg-swan-card rounded-lg px-4 py-3"
-                >
-                  <div>
-                    <p className="text-sm text-swan-text">{log.description}</p>
-                    <p className="text-xs text-swan-sub">
-                      {log.createdAt?.toDate().toLocaleDateString('ja-JP')}
-                    </p>
-                  </div>
-                  <p className={`font-bold text-sm flex items-center gap-1 ${log.amount >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                    {log.amount >= 0 ? '+' : ''}{log.amount.toLocaleString()}
-                    <FeatherIcon />
-                  </p>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
 
       </div>
     </AppShell>

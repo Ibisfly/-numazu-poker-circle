@@ -287,9 +287,8 @@ export const BingoStampPage = () => {
                   <div className="bg-swan-card border border-swan-border rounded-2xl p-4 space-y-4">
                     <div className="flex items-center justify-between">
                       <div>
-                        <p className="font-bold text-swan-text flex items-center gap-1.5">
+                        <p className="font-bold text-swan-text">
                           {selectedCard.bingoCardName}
-                          {selectedCard.bingoCardLevel === 'beginner' && <BeginnerIcon size={12} />}
                         </p>
                         <p className="text-xs text-swan-sub">
                           {selectedCard.completedCells.length}/25マス完了

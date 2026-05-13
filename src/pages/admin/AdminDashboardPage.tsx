@@ -4,7 +4,7 @@ import { useAuth } from '@/lib/hooks/useAuth'
 import { subscribePendingUsers, subscribeMatches } from '@/lib/firebase/firestore'
 import type { User, Match } from '@/types'
 import {
-  Users, Camera, CalendarDays, Trophy, SpadeIcon, ShoppingBag,
+  Users, Camera, CalendarDays, SpadeIcon, ShoppingBag,
   FeatherPtIcon, ChevronRight, Home, Award, Layers,
 } from '@/components/ui/Icons'
 import type { LucideIcon } from 'lucide-react'
@@ -44,13 +44,11 @@ export const AdminDashboardPage = () => {
     { to: '/admin/members', icon: Users, label: 'メンバー管理', badge: pendingUsers.length },
     { to: '/admin/scan', icon: Camera, label: '来店スキャン' },
     { to: '/admin/events', icon: CalendarDays, label: 'イベント管理' },
-    { to: '/admin/tournament', icon: Trophy, label: 'トーナメント結果' },
     { to: '/admin/matches', icon: SpadeIcon, label: 'マッチ管理', badge: ongoingMatches.length },
     { to: '/admin/shop', icon: ShoppingBag, label: 'ショップ管理' },
     { to: '/admin/points',       icon: FeatherPtIcon, label: 'ポイント調整' },
     { to: '/admin/achievements', icon: Award,         label: '実績管理' },
     { to: '/admin/bingo',        icon: Layers,        label: 'ビンゴカード管理' },
-    { to: '/admin/bingo/stamp',  icon: Camera,        label: 'ビンゴスタンプ' },
   ]
 
   return (
