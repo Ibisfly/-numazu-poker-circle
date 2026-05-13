@@ -30,7 +30,8 @@ export const ShopAdminPage = () => {
   const [formDesc, setFormDesc] = useState('')
   const [formImageUrl, setFormImageUrl] = useState('')
   const [formAvatarColor, setFormAvatarColor] = useState('')
-  const [formSubtype, setFormSubtype] = useState<'none' | 'title' | 'avatar_color' | 'avatar_decoration'>('none')
+  const [formSubtype, setFormSubtype] = useState<'none' | 'title' | 'avatar_color' | 'avatar_decoration' | 'point_icon' | 'custom_hand_title'>('none')
+  const [formPointIconId, setFormPointIconId] = useState('')
   const [formTitleTier, setFormTitleTier] = useState<'common' | 'rare' | 'elite' | 'prime'>('common')
   const [formDecoType, setFormDecoType] = useState<'frame' | 'overlay' | ''>('')
   const [formFrameStyle, setFormFrameStyle] = useState('')
@@ -63,6 +64,7 @@ export const ShopAdminPage = () => {
       setFormDecoType((item.decorationType ?? '') as 'frame' | 'overlay' | '')
       setFormFrameStyle(item.frameStyle ?? '')
       setFormOverlayId(item.overlayId ?? '')
+      setFormPointIconId(item.pointIconId ?? '')
     } else {
       setEditItem(null)
       setFormName('')
@@ -76,6 +78,7 @@ export const ShopAdminPage = () => {
       setFormDecoType('')
       setFormFrameStyle('')
       setFormOverlayId('')
+      setFormPointIconId('')
     }
     setUploadProgress(null)
     setShowForm(true)
@@ -114,6 +117,8 @@ export const ShopAdminPage = () => {
         ...(formSubtype === 'avatar_decoration' && formDecoType && { decorationType: formDecoType }),
         ...(formSubtype === 'avatar_decoration' && formDecoType === 'frame'   && formFrameStyle && { frameStyle: formFrameStyle }),
         ...(formSubtype === 'avatar_decoration' && formDecoType === 'overlay' && formOverlayId  && { overlayId:  formOverlayId }),
+        ...(formSubtype === 'point_icon' && formPointIconId && { pointIconId: formPointIconId }),
+        ...(formSubtype === 'custom_hand_title' && { allowMultiplePurchase: true, titleTier: 'rare' as const }),
       }
       if (editItem) {
         await updateItem(editItem.id, data)
@@ -250,13 +255,15 @@ export const ShopAdminPage = () => {
                     <label className="text-xs text-swan-sub block mb-1">種別</label>
                     <select
                       value={formSubtype}
-                      onChange={(e) => setFormSubtype(e.target.value as 'none' | 'title' | 'avatar_color' | 'avatar_decoration')}
+                      onChange={(e) => setFormSubtype(e.target.value as 'none' | 'title' | 'avatar_color' | 'avatar_decoration' | 'point_icon' | 'custom_hand_title')}
                       className="w-full bg-swan-black border border-swan-border rounded-lg px-3 py-2 text-sm text-swan-text"
                     >
                       <option value="none">種別なし（非表示）</option>
                       <option value="avatar_color">アイコン(背景)</option>
                       <option value="avatar_decoration">アイコン(装飾)</option>
+                      <option value="point_icon">ポイントアイコン</option>
                       <option value="title">称号</option>
+                      <option value="custom_hand_title">ハンド称号（複数購入可）</option>
                     </select>
                     {/* アイコン(装飾) サブ設定 */}
                     {formSubtype === 'avatar_decoration' && (
@@ -325,6 +332,35 @@ export const ShopAdminPage = () => {
                         </p>
                       </div>
                     )}
+
+                    {formSubtype === 'point_icon' && (
+                      <div className="mt-2 space-y-1.5 p-3 bg-swan-black rounded-lg border border-swan-border">
+                        <label className="text-xs text-swan-sub block">
+                          ポイントアイコンID
+                          <span className="ml-2 text-swan-muted font-mono">feather / chips</span>
+                        </label>
+                        <input
+                          type="text"
+                          value={formPointIconId}
+                          onChange={(e) => setFormPointIconId(e.target.value)}
+                          placeholder="chips"
+                          className="w-full bg-swan-card border border-swan-border rounded px-2 py-1.5 text-xs text-swan-text font-mono focus:outline-none"
+                        />
+                        <p className="text-xs text-swan-sub">
+                          羽アイコンの代わりに表示されるポイントアイコン
+                        </p>
+                      </div>
+                    )}
+
+                    {formSubtype === 'custom_hand_title' && (
+                      <div className="mt-2 p-3 bg-amber-500/10 border border-amber-500/30 rounded-lg">
+                        <p className="text-xs text-amber-400">
+                          ※ ハンド称号は購入ごとにユーザーが好きなハンドを入力できます<br />
+                          ※ 同じアイテムを複数回購入可能（コレクション向け）<br />
+                          ※ レアリティは自動的に RARE が適用されます
+                        </p>
+                      </div>
+                    )}
                   </div>
                 )}
 
@@ -372,7 +408,7 @@ export const ShopAdminPage = () => {
             {/* ジャンル別ソート + 値段順 */}
             {(() => {
               const GENRE_ORDER: Record<string, number> = {
-                avatar_color: 0, avatar_decoration: 1, title: 2, benefit: 3,
+                avatar_color: 0, avatar_decoration: 1, point_icon: 2, title: 3, custom_hand_title: 4, benefit: 5,
               }
               const sorted = [...items].sort((a, b) => {
                 const ga = GENRE_ORDER[a.itemSubtype ?? a.category] ?? 9
@@ -387,7 +423,9 @@ export const ShopAdminPage = () => {
                     const genre = item.category === 'benefit'  ? '特典'
                       : item.itemSubtype === 'avatar_color'      ? 'アイコン(背景)'
                       : item.itemSubtype === 'avatar_decoration' ? 'アイコン(装飾)'
+                      : item.itemSubtype === 'point_icon'        ? 'ポイントアイコン'
                       : item.itemSubtype === 'title'             ? '称号'
+                      : item.itemSubtype === 'custom_hand_title' ? 'ハンド称号'
                       : '装飾品'
                     const showHeader = genre !== lastGenre
                     lastGenre = genre

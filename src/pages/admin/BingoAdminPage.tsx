@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { QRCodeSVG } from 'qrcode.react'
 import { AdminShell } from '@/pages/admin/AdminDashboardPage'
 import { FeatherIcon } from '@/components/ui/FeatherIcon'
-import { Plus, Pencil, X, Star, Shuffle, Check } from '@/components/ui/Icons'
+import { Plus, Pencil, X, Star, Shuffle, Check, ChevronLeft } from '@/components/ui/Icons'
 import { useAuth } from '@/lib/hooks/useAuth'
 import {
   subscribeBingoCards,
@@ -193,6 +194,10 @@ export const BingoAdminPage = () => {
   return (
     <AdminShell title="ビンゴカード管理">
       <div className="py-4 space-y-6">
+        <Link to="/admin" className="text-xs text-swan-accent flex items-center gap-1">
+          <ChevronLeft size={14} /> ダッシュボード
+        </Link>
+
         {/* タブ切り替え */}
         <div className="flex gap-2 bg-swan-dark rounded-xl p-1">
           <button

@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { AppShell } from '@/components/layout/AppShell'
 import { FeatherIcon } from '@/components/ui/FeatherIcon'
-import { Shield, LogOut, Pencil, X, Check, Award, BeginnerIcon, CreditCard } from '@/components/ui/Icons'
+import { Shield, LogOut, Pencil, X, Check, BeginnerIcon, CreditCard, ChevronDown, ChevronUp } from '@/components/ui/Icons'
 import { SwanAvatar, AVATAR_COLORS, DEFAULT_AVATAR_COLOR } from '@/components/ui/SwanAvatar'
 import { TitleBadge, type TitleTier } from '@/components/ui/TitleBadge'
 import { AchievementIcon } from '@/components/ui/AchievementIcons'
@@ -20,9 +20,10 @@ import {
   unequipTitle,
   equipFrame,
   equipOverlay,
+  equipPointIcon,
   subscribeItems,
 } from '@/lib/firebase/firestore'
-import { FRAME_DEFS } from '@/components/ui/SwanAvatar'
+import { FRAME_DEFS, POINT_ICON_DEFS, DynamicPointIcon } from '@/components/ui/SwanAvatar'
 import { logOut } from '@/lib/firebase/auth'
 import type { PointLog, UserAchievement, UserItem, Item, UserTitle } from '@/types'
 import { ACHIEVEMENTS } from '@/lib/achievements'
@@ -88,9 +89,11 @@ export const ProfilePage = () => {
   const [editTitleTier, setEditTitleTier] = useState<TitleTier>('common')
   const [editFrame, setEditFrame] = useState<string | null>(null)
   const [editOverlay, setEditOverlay] = useState<string | null>(null)
+  const [editPointIcon, setEditPointIcon] = useState<string>('feather')
   const [saveError, setSaveError] = useState('')
   const [saving, setSaving] = useState(false)
   const [presentingItem, setPresentingItem] = useState<{ ui: UserItem; item?: Item } | null>(null)
+  const [historyExpanded, setHistoryExpanded] = useState(false)
 
   useEffect(() => {
     if (!user) return
@@ -112,6 +115,7 @@ export const ProfilePage = () => {
     setEditTitleTier(user.equippedTitleTier ?? 'common')
     setEditFrame(user.equippedFrame ?? null)
     setEditOverlay(user.equippedOverlay ?? null)
+    setEditPointIcon(user.equippedPointIcon ?? 'feather')
     setSaveError('')
     setEditing(true)
   }
@@ -135,6 +139,9 @@ export const ProfilePage = () => {
       }
       if (editFrame !== (user.equippedFrame ?? null)) await equipFrame(user.uid, editFrame)
       if (editOverlay !== (user.equippedOverlay ?? null)) await equipOverlay(user.uid, editOverlay)
+      if (editPointIcon !== (user.equippedPointIcon ?? 'feather')) {
+        await equipPointIcon(user.uid, editPointIcon === 'feather' ? null : editPointIcon)
+      }
       setEditing(false)
     } catch {
       setSaveError('保存に失敗しました')
@@ -175,7 +182,28 @@ export const ProfilePage = () => {
     purchasedItems.filter((i) => i.decorationType === 'frame' && i.frameStyle).map((i) => i.frameStyle!)
   )].filter((k) => FRAME_DEFS[k])
 
-  // 称号：ショップ購入 + 実績報酬をまとめる
+  // ポイントアイコン：購入済みアイコンID一覧
+  const ownedPointIconIds = [...new Set(
+    purchasedItems.filter((i) => i.itemSubtype === 'point_icon' && i.pointIconId).map((i) => i.pointIconId!)
+  )].filter((k) => POINT_ICON_DEFS[k])
+
+  // カスタムハンド称号：userItems の customValue を持つものを取得
+  const customHandTitles = userItems
+    .filter((ui) => {
+      const item = allItems.find((i) => i.id === ui.itemId)
+      return item?.itemSubtype === 'custom_hand_title' && ui.customValue
+    })
+    .map((ui) => {
+      const item = allItems.find((i) => i.id === ui.itemId)
+      return {
+        key: `custom-${ui.id}`,
+        title: `マイハンドは"${ui.customValue}"`,
+        tier: (item?.titleTier ?? 'common') as TitleTier,
+        source: 'shop' as const,
+      }
+    })
+
+  // 称号：ショップ購入 + 実績報酬 + カスタムハンド称号をまとめる
   const ownedTitleItems = purchasedItems.filter((i) => i.itemSubtype === 'title')
   // 全所持称号リスト（重複タイトルテキストは除去）
   const allOwnedTitles: { key: string; title: string; tier: TitleTier; source: 'shop' | 'achievement' }[] = [
@@ -191,6 +219,7 @@ export const ProfilePage = () => {
       tier: t.tier as TitleTier,
       source: 'achievement' as const,
     })),
+    ...customHandTitles,
   ]
   // 同じタイトルテキストの重複を除去
   const dedupedTitles = allOwnedTitles.filter(
@@ -218,7 +247,7 @@ export const ProfilePage = () => {
         {!editing ? (
           <div className="bg-swan-card border border-swan-border rounded-xl p-4">
             <div className="flex items-center gap-4 mb-3">
-              <SwanAvatar color={currentColor} size={64} showCard />
+              <SwanAvatar color={currentColor} size={64} showCard frame={user.equippedFrame} />
               <div className="flex-1 min-w-0">
                 <div className="flex items-center justify-between mb-0.5">
                   <h2 className="text-lg font-bold flex items-center gap-2 truncate">
@@ -378,6 +407,39 @@ export const ProfilePage = () => {
               />
             )}
 
+            {/* ポイントアイコン選択（購入済みアイコンのみ表示） */}
+            {ownedPointIconIds.length > 0 && (
+              <div>
+                <p className="text-xs text-swan-sub mb-2 font-medium">ポイントアイコン</p>
+                <div className="space-y-1.5">
+                  <button
+                    onClick={() => setEditPointIcon('feather')}
+                    className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg border transition-colors ${
+                      editPointIcon === 'feather' ? 'border-swan-accent bg-swan-accent/10' : 'border-swan-border'
+                    }`}
+                  >
+                    <DynamicPointIcon iconId="feather" size={20} />
+                    <span className="text-sm">羽（デフォルト）</span>
+                  </button>
+                  {ownedPointIconIds.map((iconId) => {
+                    const def = POINT_ICON_DEFS[iconId]
+                    return (
+                      <button
+                        key={iconId}
+                        onClick={() => setEditPointIcon(iconId)}
+                        className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg border transition-colors ${
+                          editPointIcon === iconId ? 'border-swan-accent bg-swan-accent/10' : 'border-swan-border'
+                        }`}
+                      >
+                        <DynamicPointIcon iconId={iconId} size={20} />
+                        <span className="text-sm">{def.name}</span>
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
+
             {saveError && <p className="text-red-400 text-xs">{saveError}</p>}
 
             <div className="flex gap-2 pt-1">
@@ -444,51 +506,73 @@ export const ProfilePage = () => {
           />
         )}
 
-        {/* 解除済み実績 */}
-        {achievements.length > 0 && (
-          <div>
-            <div className="flex items-center justify-between mb-2">
-              <h3 className="text-sm font-semibold text-swan-sub">実績 ({achievements.length})</h3>
-              <Link to="/achievements" className="text-xs text-swan-accent">すべて見る</Link>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              {achievements.slice(0, 6).map((ua) => {
-                const def = ACHIEVEMENTS.find((a) => a.id === ua.achievementId)
-                return (
-                  <div key={ua.id} className="bg-swan-card border border-swan-accent/30 rounded-lg px-3 py-2 text-xs flex items-center gap-1">
-                    <AchievementIcon achievementId={ua.achievementId} size={16} />
-                    {def?.name ?? ua.achievementId}
-                  </div>
-                )
-              })}
-            </div>
+        {/* 実績パズル */}
+        <div className="bg-swan-card border border-swan-border rounded-xl p-4">
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="text-sm font-semibold text-swan-sub">実績 ({achievements.length}/{ACHIEVEMENTS.length})</h3>
+            <Link to="/achievements" className="text-xs text-swan-accent">すべて見る</Link>
           </div>
-        )}
-
-        {achievements.length === 0 && (
-          <Link to="/achievements" className="flex items-center gap-2 text-swan-sub text-sm">
-            <Award size={16} /> 実績を確認する
-          </Link>
-        )}
-
-        {/* ポイント履歴 */}
-        <div>
-          <h3 className="text-sm font-semibold text-swan-sub mb-2">ポイント履歴</h3>
-          {pointLogs.length === 0 ? (
-            <p className="text-swan-sub text-sm">履歴はありません</p>
-          ) : (
-            <div className="space-y-2">
-              {pointLogs.map((log) => (
-                <div key={log.id} className="flex justify-between items-center bg-swan-card rounded-lg px-4 py-3">
-                  <div>
-                    <p className="text-sm">{log.description}</p>
-                    <p className="text-xs text-swan-sub">{log.createdAt?.toDate().toLocaleDateString('ja-JP')}</p>
-                  </div>
-                  <p className={`font-bold text-sm flex items-center gap-1 ${log.amount >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                    {log.amount >= 0 ? '+' : ''}{log.amount.toLocaleString()} <FeatherIcon />
-                  </p>
+          <div className="grid grid-cols-5 gap-1.5">
+            {ACHIEVEMENTS.slice(0, 20).map((def) => {
+              const unlocked = achievements.find((ua) => ua.achievementId === def.id)
+              return (
+                <div
+                  key={def.id}
+                  className={`aspect-square rounded-lg flex items-center justify-center transition-all ${
+                    unlocked
+                      ? 'bg-gradient-to-br from-yellow-500/30 to-amber-600/30 border border-yellow-500/50 shadow-sm shadow-yellow-500/20'
+                      : 'bg-swan-dark border border-swan-border'
+                  }`}
+                  title={unlocked ? def.name : '???'}
+                >
+                  {unlocked ? (
+                    <AchievementIcon achievementId={def.id} size={22} />
+                  ) : (
+                    <div className="w-5 h-5 rounded-full bg-swan-border/50" />
+                  )}
                 </div>
-              ))}
+              )
+            })}
+          </div>
+          <p className="text-[10px] text-swan-muted mt-2 text-center">
+            {achievements.length === 0 ? '実績を解除してパズルを埋めよう！' : `あと${ACHIEVEMENTS.length - achievements.length}個で全解除！`}
+          </p>
+        </div>
+
+        {/* ポイント履歴（折りたたみ） */}
+        <div className="bg-swan-card border border-swan-border rounded-xl overflow-hidden">
+          <button
+            onClick={() => setHistoryExpanded(!historyExpanded)}
+            className="w-full flex items-center justify-between px-4 py-3 hover:bg-swan-dark/50 transition-colors"
+          >
+            <span className="text-sm font-semibold text-swan-sub">
+              ポイント履歴 {pointLogs.length > 0 && `(${pointLogs.length}件)`}
+            </span>
+            {historyExpanded ? (
+              <ChevronUp size={18} className="text-swan-sub" />
+            ) : (
+              <ChevronDown size={18} className="text-swan-sub" />
+            )}
+          </button>
+          {historyExpanded && (
+            <div className="border-t border-swan-border">
+              {pointLogs.length === 0 ? (
+                <p className="text-swan-sub text-sm px-4 py-3">履歴はありません</p>
+              ) : (
+                <div className="divide-y divide-swan-border">
+                  {pointLogs.map((log) => (
+                    <div key={log.id} className="flex justify-between items-center px-4 py-3">
+                      <div>
+                        <p className="text-sm">{log.description}</p>
+                        <p className="text-xs text-swan-sub">{log.createdAt?.toDate().toLocaleDateString('ja-JP')}</p>
+                      </div>
+                      <p className={`font-bold text-sm flex items-center gap-1 ${log.amount >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                        {log.amount >= 0 ? '+' : ''}{log.amount.toLocaleString()} <FeatherIcon />
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           )}
         </div>

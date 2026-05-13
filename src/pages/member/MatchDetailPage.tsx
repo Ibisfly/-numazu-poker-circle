@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
+import { useParams, useNavigate, Link } from 'react-router-dom'
 import { AppShell } from '@/components/layout/AppShell'
 import { FeatherIcon } from '@/components/ui/FeatherIcon'
 import { useAuth } from '@/lib/hooks/useAuth'
-import { subscribeMatch, subscribeAllUsers, performRebuy, performReentry } from '@/lib/firebase/firestore'
+import { subscribeMatch, subscribeAllUsers, performRebuy, performReentry, cancelMatchEntry, notifyAdminsMatchReady } from '@/lib/firebase/firestore'
 import type { Match, User } from '@/types'
 import { writeBatch, doc, collection, increment, serverTimestamp } from 'firebase/firestore'
 import { db } from '@/lib/firebase/config'
@@ -21,6 +21,9 @@ export const MatchDetailPage = () => {
   const [confirmAction, setConfirmAction] = useState<'rebuy' | 'reentry' | null>(null)
   const [actionLoading, setActionLoading] = useState(false)
   const [actionMsg, setActionMsg] = useState('')
+
+  // キャンセル用
+  const [cancelLoading, setCancelLoading] = useState(false)
 
   useEffect(() => {
     if (!matchId) return
@@ -56,9 +59,10 @@ export const MatchDetailPage = () => {
     }
     setLoading(true)
     try {
+      const newParticipants = [...match.participants, user.uid]
       const batch = writeBatch(db)
       batch.update(doc(db, 'matches', matchId), {
-        participants: [...match.participants, user.uid],
+        participants: newParticipants,
       })
       const logRef = doc(collection(db, 'pointLogs'))
       batch.set(logRef, {
@@ -71,15 +75,31 @@ export const MatchDetailPage = () => {
         createdBy: user.uid,
       })
       batch.update(doc(db, 'users', user.uid), {
-        totalPoints: increment(-match.entryFee),
-        yearPoints:  increment(-match.entryFee),
         ownedPoints: increment(-match.entryFee),
       })
       await batch.commit()
+
+      // 3人目のエントリーで管理者に通知
+      if (newParticipants.length === 3) {
+        await notifyAdminsMatchReady({ ...match, participants: newParticipants })
+      }
     } catch {
       setError('エントリーに失敗しました')
     } finally {
       setLoading(false)
+    }
+  }
+
+  const handleCancel = async () => {
+    if (!match) return
+    setCancelLoading(true)
+    setError('')
+    try {
+      await cancelMatchEntry(match, user.uid)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'キャンセルに失敗しました')
+    } finally {
+      setCancelLoading(false)
     }
   }
 
@@ -191,11 +211,15 @@ export const MatchDetailPage = () => {
             <div className="space-y-1.5">
               {match.participants.map((uid) => {
                 const extra = getExtraCount(uid)
+                const isMe = uid === user.uid
                 return (
                   <div key={uid} className="flex items-center justify-between">
-                    <span className={`text-sm ${uid === user.uid ? 'text-swan-accent font-medium' : 'text-swan-sub'}`}>
-                      {getName(uid)}{uid === user.uid && '（自分）'}
-                    </span>
+                    <Link
+                      to={`/members/${uid}`}
+                      className={`text-sm hover:underline ${isMe ? 'text-swan-accent font-medium' : 'text-swan-sub hover:text-swan-text'}`}
+                    >
+                      {getName(uid)}{isMe && '（自分）'}
+                    </Link>
                     {extra > 0 && (
                       <span className="text-xs text-swan-sub border border-swan-border px-1.5 py-0.5 rounded-full">
                         {extraLabel} ×{extra}
@@ -213,8 +237,17 @@ export const MatchDetailPage = () => {
           <div className="space-y-2">
             {error && <p className="text-red-400 text-sm text-center">{error}</p>}
             {isEntered ? (
-              <div className="w-full bg-swan-muted text-swan-sub font-medium py-3 rounded-xl text-center text-sm">
-                エントリー済み（キャンセル不可）
+              <div className="space-y-2">
+                <div className="w-full bg-green-500/10 border border-green-500/30 text-green-400 font-medium py-3 rounded-xl text-center text-sm">
+                  ✓ エントリー済み
+                </div>
+                <button
+                  onClick={handleCancel}
+                  disabled={cancelLoading}
+                  className="w-full border border-red-500/40 text-red-400 font-medium py-2 rounded-xl text-sm hover:bg-red-500/10 disabled:opacity-50 transition-colors"
+                >
+                  {cancelLoading ? 'キャンセル中...' : 'キャンセルする（返金されます）'}
+                </button>
               </div>
             ) : isFull ? (
               <div className="w-full bg-swan-muted text-swan-sub font-medium py-3 rounded-xl text-center">
@@ -229,6 +262,13 @@ export const MatchDetailPage = () => {
                 {loading ? '処理中...' : `エントリーする（🪶${match.entryFee.toLocaleString()}）`}
               </button>
             )}
+          </div>
+        )}
+
+        {/* 開催中のエントリー済み表示（キャンセル不可） */}
+        {match.status === 'ongoing' && isEntered && (
+          <div className="w-full bg-swan-muted text-swan-sub font-medium py-3 rounded-xl text-center text-sm">
+            参加中（キャンセル不可）
           </div>
         )}
 
@@ -257,7 +297,7 @@ export const MatchDetailPage = () => {
         {isOngoing && (match.timerSessionId || match.timerAppUrl) && (
           <a
             href={match.timerSessionId
-              ? `https://timer-black-swan.web.app/live/${match.timerSessionId}`
+              ? `https://timer-black-swan.web.app/live/${match.timerSessionId}?uid=${user.uid}`
               : match.timerAppUrl!
             }
             target="_blank"

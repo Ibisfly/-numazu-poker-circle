@@ -238,27 +238,6 @@ export const MemberProfilePage = () => {
           </div>
         )}
 
-        {/* ポイント履歴 */}
-        <div>
-          <h3 className="text-xs font-semibold text-swan-sub uppercase tracking-wide mb-2">最近のポイント履歴</h3>
-          {pointLogs.slice(0, 10).length === 0 ? (
-            <p className="text-swan-sub text-sm">履歴なし</p>
-          ) : (
-            <div className="space-y-1.5">
-              {pointLogs.slice(0, 10).map((log) => (
-                <div key={log.id} className="flex justify-between items-center bg-swan-card rounded-lg px-3 py-2">
-                  <div>
-                    <p className="text-xs">{log.description}</p>
-                    <p className="text-xs text-swan-sub">{log.createdAt?.toDate().toLocaleDateString('ja-JP')}</p>
-                  </div>
-                  <p className={`font-bold text-xs flex items-center gap-0.5 ${log.amount >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                    {log.amount >= 0 ? '+' : ''}{log.amount.toLocaleString()}<FeatherIcon size={10} />
-                  </p>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
       </div>
     </AppShell>
   )

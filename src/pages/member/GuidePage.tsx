@@ -4,25 +4,70 @@ import { ChevronDown, ChevronRight } from '@/components/ui/Icons'
 
 type Section = 'toc' | 'hand' | 'flow' | 'position' | 'action' | 'terms'
 
-const HAND_RANKINGS = [
-  { name: 'ロイヤルフラッシュ', desc: '同じスートのA-K-Q-J-10', example: 'A♠ K♠ Q♠ J♠ 10♠', rarity: '超激レア' },
-  { name: 'ストレートフラッシュ', desc: '同じスートの5枚連続', example: '9♥ 8♥ 7♥ 6♥ 5♥', rarity: '激レア' },
-  { name: 'フォーカード', desc: '同じランク4枚', example: 'K♠ K♥ K♦ K♣ 2♠', rarity: 'レア' },
-  { name: 'フルハウス', desc: '3枚＋2枚の同ランク', example: 'Q♠ Q♥ Q♦ 7♣ 7♥', rarity: '' },
-  { name: 'フラッシュ', desc: '同じスート5枚', example: 'A♦ J♦ 8♦ 6♦ 2♦', rarity: '' },
-  { name: 'ストレート', desc: '5枚連続（スート不問）', example: '10♠ 9♥ 8♣ 7♦ 6♠', rarity: '' },
-  { name: 'スリーカード', desc: '同じランク3枚', example: '8♠ 8♥ 8♦ K♣ 4♠', rarity: '' },
-  { name: 'ツーペア', desc: '2枚ペア×2組', example: 'J♠ J♥ 5♦ 5♣ 9♠', rarity: '' },
-  { name: 'ワンペア', desc: '2枚の同ランク', example: '10♠ 10♥ A♦ 7♣ 3♠', rarity: '' },
-  { name: 'ハイカード', desc: '役なし（最も高いカード）', example: 'A♠ K♥ 9♦ 6♣ 2♠', rarity: '' },
-]
+type CardSuit = 'spade' | 'heart' | 'diamond' | 'club'
+type CardData = { rank: string; suit: CardSuit }
 
-const PREFLOP_RANGE = {
-  premium: ['AA', 'KK', 'QQ', 'AKs', 'AKo'],
-  strong: ['JJ', 'TT', 'AQs', 'AQo', 'AJs', 'KQs'],
-  playable: ['99', '88', '77', 'ATs', 'AJo', 'KJs', 'QJs', 'JTs'],
-  speculative: ['66', '55', '44', '33', '22', 'KTs', 'QTs', 'J9s', 'T9s', '98s', '87s', '76s', 'A5s-A2s'],
+const SUIT_COLORS: Record<CardSuit, string> = {
+  spade: 'text-gray-800',
+  heart: 'text-red-500',
+  diamond: 'text-blue-500',
+  club: 'text-green-600',
 }
+
+const SUIT_SYMBOLS: Record<CardSuit, string> = {
+  spade: '♠',
+  heart: '♥',
+  diamond: '♦',
+  club: '♣',
+}
+
+const PlayingCard = ({ rank, suit }: CardData) => (
+  <div className={`w-9 h-12 bg-white rounded-md border border-gray-300 flex flex-col items-center justify-center shadow-sm ${SUIT_COLORS[suit]}`}>
+    <span className="text-sm font-bold leading-none">{rank}</span>
+    <span className="text-base leading-none">{SUIT_SYMBOLS[suit]}</span>
+  </div>
+)
+
+const CardHand = ({ cards }: { cards: CardData[] }) => (
+  <div className="flex gap-1 justify-center py-2">
+    {cards.map((c, i) => (
+      <PlayingCard key={i} {...c} />
+    ))}
+  </div>
+)
+
+const HAND_RANKINGS: { name: string; desc: string; cards: CardData[]; isRare: boolean }[] = [
+  { name: 'ロイヤルフラッシュ', desc: '同じスートのA-K-Q-J-10', cards: [
+    { rank: 'A', suit: 'spade' }, { rank: 'K', suit: 'spade' }, { rank: 'Q', suit: 'spade' }, { rank: 'J', suit: 'spade' }, { rank: '10', suit: 'spade' }
+  ], isRare: true },
+  { name: 'ストレートフラッシュ', desc: '同じスートの5枚連続', cards: [
+    { rank: '9', suit: 'heart' }, { rank: '8', suit: 'heart' }, { rank: '7', suit: 'heart' }, { rank: '6', suit: 'heart' }, { rank: '5', suit: 'heart' }
+  ], isRare: true },
+  { name: 'フォーカード', desc: '同じランク4枚', cards: [
+    { rank: 'K', suit: 'spade' }, { rank: 'K', suit: 'heart' }, { rank: 'K', suit: 'diamond' }, { rank: 'K', suit: 'club' }, { rank: '2', suit: 'spade' }
+  ], isRare: true },
+  { name: 'フルハウス', desc: '3枚＋2枚の同ランク', cards: [
+    { rank: 'Q', suit: 'spade' }, { rank: 'Q', suit: 'heart' }, { rank: 'Q', suit: 'diamond' }, { rank: '7', suit: 'club' }, { rank: '7', suit: 'heart' }
+  ], isRare: false },
+  { name: 'フラッシュ', desc: '同じスート5枚', cards: [
+    { rank: 'A', suit: 'diamond' }, { rank: 'J', suit: 'diamond' }, { rank: '8', suit: 'diamond' }, { rank: '6', suit: 'diamond' }, { rank: '2', suit: 'diamond' }
+  ], isRare: false },
+  { name: 'ストレート', desc: '5枚連続（スート不問）', cards: [
+    { rank: '10', suit: 'spade' }, { rank: '9', suit: 'heart' }, { rank: '8', suit: 'club' }, { rank: '7', suit: 'diamond' }, { rank: '6', suit: 'spade' }
+  ], isRare: false },
+  { name: 'スリーカード', desc: '同じランク3枚', cards: [
+    { rank: '8', suit: 'spade' }, { rank: '8', suit: 'heart' }, { rank: '8', suit: 'diamond' }, { rank: 'K', suit: 'club' }, { rank: '4', suit: 'spade' }
+  ], isRare: false },
+  { name: 'ツーペア', desc: '2枚ペア×2組', cards: [
+    { rank: 'J', suit: 'spade' }, { rank: 'J', suit: 'heart' }, { rank: '5', suit: 'diamond' }, { rank: '5', suit: 'club' }, { rank: '9', suit: 'spade' }
+  ], isRare: false },
+  { name: 'ワンペア', desc: '2枚の同ランク', cards: [
+    { rank: '10', suit: 'spade' }, { rank: '10', suit: 'heart' }, { rank: 'A', suit: 'diamond' }, { rank: '7', suit: 'club' }, { rank: '3', suit: 'spade' }
+  ], isRare: false },
+  { name: 'ハイカード', desc: '役なし（最も高いカード）', cards: [
+    { rank: 'A', suit: 'spade' }, { rank: 'K', suit: 'heart' }, { rank: '9', suit: 'diamond' }, { rank: '6', suit: 'club' }, { rank: '2', suit: 'spade' }
+  ], isRare: false },
+]
 
 const TERMS: { term: string; desc: string; category: string }[] = [
   { term: 'ブラインド', desc: '強制ベット。SB（スモールブラインド）とBB（ビッグブラインド）がある。', category: '基本' },
@@ -54,7 +99,7 @@ const TERMS: { term: string; desc: string; category: string }[] = [
 ]
 
 const TOC_ITEMS = [
-  { id: 'hand', label: 'ハンドランキング', desc: '役の強さを覚えよう' },
+  { id: 'hand', label: '役の強さ', desc: '役とハンドレンジを覚えよう' },
   { id: 'flow', label: 'ゲームの進行', desc: '1ハンドの流れを理解' },
   { id: 'position', label: 'ポジション', desc: '席順と有利不利' },
   { id: 'action', label: 'アクション', desc: 'ベット・レイズ・フォールド' },
@@ -120,20 +165,113 @@ const GameFlowDiagram = ({ step }: { step: number }) => {
   )
 }
 
+const SAMPLE_BOARD: CardData[] = [
+  { rank: 'K', suit: 'heart' },
+  { rank: '9', suit: 'spade' },
+  { rank: '4', suit: 'diamond' },
+  { rank: '2', suit: 'club' },
+  { rank: 'J', suit: 'heart' },
+]
+
 const CommunityCards = ({ count }: { count: number }) => (
   <div className="flex justify-center gap-1 py-2">
-    {[0, 1, 2, 3, 4].map((i) => (
-      <div
-        key={i}
-        className={`w-8 h-11 rounded border-2 flex items-center justify-center text-lg ${
-          i < count
-            ? 'bg-white border-gray-300 text-black'
-            : 'bg-swan-card border-swan-border text-swan-muted'
-        }`}
-      >
-        {i < count ? '🂠' : '?'}
-      </div>
+    {SAMPLE_BOARD.slice(0, 5).map((card, i) => (
+      i < count ? (
+        <PlayingCard key={i} {...card} />
+      ) : (
+        <div key={i} className="w-9 h-12 rounded-md border-2 border-swan-border bg-swan-card flex items-center justify-center text-swan-muted text-lg">
+          ?
+        </div>
+      )
     ))}
+  </div>
+)
+
+const RANKS = ['A', 'K', 'Q', 'J', 'T', '9', '8', '7', '6', '5', '4', '3', '2']
+
+const getHandColor = (row: number, col: number): string => {
+  const r1 = RANKS[row]
+  const r2 = RANKS[col]
+
+  if (row === col) {
+    const pair = r1 + r1
+    if (['AA', 'KK', 'QQ'].includes(pair)) return 'bg-blue-900 text-white'
+    if (['JJ', 'TT', '99'].includes(pair)) return 'bg-red-500 text-white'
+    if (['88', '77'].includes(pair)) return 'bg-yellow-400 text-black'
+    if (['66', '55'].includes(pair)) return 'bg-green-500 text-white'
+    if (['44', '33', '22'].includes(pair)) return 'bg-cyan-400 text-black'
+  }
+
+  if (row < col) {
+    const suited = r1 + r2 + 's'
+    if (suited === 'AKs') return 'bg-blue-900 text-white'
+    if (['AQs', 'AJs', 'ATs', 'KQs'].includes(suited)) return 'bg-red-500 text-white'
+    if (['KJs', 'QJs', 'JTs'].includes(suited)) return 'bg-yellow-400 text-black'
+    if (['A9s', 'A8s', 'A7s', 'A6s', 'A5s', 'A4s', 'A3s', 'A2s', 'KTs', 'K9s', 'QTs'].includes(suited)) return 'bg-green-500 text-white'
+    if (['Q9s', 'J9s', 'T9s', 'T8s', '98s'].includes(suited)) return 'bg-cyan-400 text-black'
+    if (['K8s', 'K7s', 'K6s', 'K5s', 'K4s', 'K3s', 'K2s', 'Q8s', 'Q7s', 'Q6s', 'Q5s', 'Q4s', 'Q3s', 'J8s', 'J7s', 'J6s', 'T7s', '97s', '87s', '76s', '65s', '54s'].includes(suited)) return 'bg-white text-black'
+    if (['Q2s', 'J5s', 'J4s', 'J3s', 'J2s', 'T6s', 'T5s', 'T4s', 'T3s', 'T2s', '96s', '95s', '86s', '85s', '75s', '74s', '64s', '53s', '43s'].includes(suited)) return 'bg-pink-400 text-black'
+    return 'bg-gray-600 text-gray-300'
+  }
+
+  if (row > col) {
+    const offsuit = r2 + r1 + 'o'
+    if (offsuit === 'AKo') return 'bg-blue-900 text-white'
+    if (offsuit === 'AQo') return 'bg-red-500 text-white'
+    if (['KQo', 'AJo'].includes(offsuit)) return 'bg-yellow-400 text-black'
+    if (['KJo', 'ATo'].includes(offsuit)) return 'bg-green-500 text-white'
+    if (['QJo', 'KTo', 'A9o', 'JTo'].includes(offsuit)) return 'bg-cyan-400 text-black'
+    if (['A8o', 'A7o', 'A6o', 'K9o', 'QTo', 'Q9o', 'J9o', 'T9o'].includes(offsuit)) return 'bg-white text-black'
+    if (['A2o', 'A3o', 'A4o', 'A5o', 'K8o', 'K7o', 'K6o', 'K5o', 'Q8o', 'Q7o', 'J8o', 'T8o', '97o', '87o', '98o'].includes(offsuit)) return 'bg-pink-400 text-black'
+    return 'bg-gray-600 text-gray-300'
+  }
+
+  return 'bg-gray-600 text-gray-300'
+}
+
+const HandRangeGrid = () => (
+  <div className="space-y-3">
+    <div className="overflow-x-auto">
+      <div className="grid gap-0.5" style={{ gridTemplateColumns: `auto repeat(13, minmax(22px, 1fr))` }}>
+        <div />
+        {RANKS.map((r) => (
+          <div key={`h-${r}`} className="text-center text-[9px] font-bold text-swan-sub py-0.5">{r}</div>
+        ))}
+        {RANKS.map((r1, row) => (
+          <>
+            <div key={`v-${r1}`} className="text-center text-[9px] font-bold text-swan-sub pr-0.5 flex items-center justify-center">{r1}</div>
+            {RANKS.map((r2, col) => {
+              const hand = row === col ? r1 + r1 : row < col ? r1 + r2 + 's' : r2 + r1 + 'o'
+              return (
+                <div
+                  key={`${row}-${col}`}
+                  className={`aspect-square flex items-center justify-center text-[7px] font-medium rounded-sm ${getHandColor(row, col)}`}
+                >
+                  {hand.replace('s', '').replace('o', '')}
+                </div>
+              )
+            })}
+          </>
+        ))}
+      </div>
+    </div>
+    <div className="flex items-center gap-2 text-[10px] text-swan-sub">
+      <span>強い</span>
+      <div className="flex-1 flex h-3 rounded overflow-hidden">
+        <div className="flex-1 bg-blue-900" />
+        <div className="flex-1 bg-red-500" />
+        <div className="flex-1 bg-yellow-400" />
+        <div className="flex-1 bg-green-500" />
+        <div className="flex-1 bg-cyan-400" />
+        <div className="flex-1 bg-white border-y border-swan-border" />
+        <div className="flex-1 bg-pink-400" />
+        <div className="flex-1 bg-gray-600" />
+      </div>
+      <span>弱い</span>
+    </div>
+    <p className="text-[9px] text-swan-muted">
+      上三角 = suited（同スート）/ 下三角 = offsuit（別スート）/ 対角線 = ペア
+    </p>
   </div>
 )
 
@@ -235,68 +373,45 @@ export const GuidePage = () => {
         {section === 'hand' && (
           <div className="space-y-4" id="hand">
             <div className="bg-swan-card border border-swan-border rounded-xl p-4">
-              <h3 className="font-bold text-swan-text mb-3">🃏 ハンドランキング（役の強さ）</h3>
+              <h3 className="font-bold text-swan-text mb-3">🃏 役の強さ</h3>
               <p className="text-xs text-swan-sub mb-4">
                 上から順に強い。5枚のカードで最も強い役を作ろう！
               </p>
-              <div className="space-y-2">
+              <div className="space-y-3">
                 {HAND_RANKINGS.map((h, i) => (
                   <div
                     key={h.name}
-                    className={`flex items-center gap-2 p-2 rounded-lg ${
-                      i < 3 ? 'bg-yellow-500/10 border border-yellow-500/30' : 'bg-swan-dark'
+                    className={`p-3 rounded-lg ${
+                      h.isRare ? 'bg-yellow-500/10 border border-yellow-500/30' : 'bg-swan-dark'
                     }`}
                   >
-                    <span className={`w-6 h-6 flex items-center justify-center rounded-full text-xs font-bold shrink-0 ${
-                      i < 3 ? 'bg-yellow-500 text-black' : 'bg-swan-muted text-swan-text'
-                    }`}>
-                      {i + 1}
-                    </span>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2">
-                        <p className="font-semibold text-swan-text text-sm">{h.name}</p>
-                        {h.rarity && (
-                          <span className="text-[10px] text-yellow-400 bg-yellow-500/20 px-1.5 rounded">
-                            {h.rarity}
-                          </span>
-                        )}
-                      </div>
-                      <p className="text-[10px] text-swan-sub">{h.desc}</p>
+                    <div className="flex items-center gap-2 mb-2">
+                      <span className={`w-6 h-6 flex items-center justify-center rounded-full text-xs font-bold shrink-0 ${
+                        h.isRare ? 'bg-yellow-500 text-black' : 'bg-swan-muted text-swan-text'
+                      }`}>
+                        {i + 1}
+                      </span>
+                      <p className="font-semibold text-swan-text text-sm">{h.name}</p>
+                      {h.isRare && (
+                        <span className="text-[10px] text-yellow-400 bg-yellow-500/20 px-1.5 rounded">
+                          超激レア！
+                        </span>
+                      )}
                     </div>
-                    <p className="text-[10px] text-swan-muted font-mono shrink-0">{h.example}</p>
+                    <p className="text-[10px] text-swan-sub mb-2">{h.desc}</p>
+                    <CardHand cards={h.cards} />
                   </div>
                 ))}
               </div>
             </div>
 
-            <Accordion title="プリフロップハンドレンジ（参考）">
-              <div className="space-y-3">
-                <p className="text-xs text-swan-sub">
-                  最初の2枚（ホールカード）で参加するかの目安。ポジションが後ろほど広く参加できる。
-                </p>
-                <div className="space-y-2">
-                  <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-2">
-                    <p className="text-xs text-yellow-400 font-semibold mb-1">🔥 プレミアム（どこからでもレイズ）</p>
-                    <p className="text-sm text-swan-text font-mono">{PREFLOP_RANGE.premium.join(' ')}</p>
-                  </div>
-                  <div className="bg-orange-500/10 border border-orange-500/30 rounded-lg p-2">
-                    <p className="text-xs text-orange-400 font-semibold mb-1">💪 ストロング</p>
-                    <p className="text-sm text-swan-text font-mono">{PREFLOP_RANGE.strong.join(' ')}</p>
-                  </div>
-                  <div className="bg-green-500/10 border border-green-500/30 rounded-lg p-2">
-                    <p className="text-xs text-green-400 font-semibold mb-1">👍 プレイアブル（中〜後ろポジション）</p>
-                    <p className="text-sm text-swan-text font-mono">{PREFLOP_RANGE.playable.join(' ')}</p>
-                  </div>
-                  <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-2">
-                    <p className="text-xs text-blue-400 font-semibold mb-1">🎲 投機的（後ろ/安く見れる時）</p>
-                    <p className="text-sm text-swan-text font-mono">{PREFLOP_RANGE.speculative.join(' ')}</p>
-                  </div>
-                </div>
-                <p className="text-[10px] text-swan-muted">
-                  s = suited（同スート）、o = offsuit（別スート）
-                </p>
-              </div>
-            </Accordion>
+            <div className="bg-swan-card border border-swan-border rounded-xl p-4">
+              <h3 className="font-bold text-swan-text mb-3">📊 ハンドレンジ表</h3>
+              <p className="text-xs text-swan-sub mb-4">
+                最初の2枚（ホールカード）で参加するかの目安。色が濃いほど強いハンド。
+              </p>
+              <HandRangeGrid />
+            </div>
           </div>
         )}
 
