@@ -1,8 +1,9 @@
 import { useEffect, useState, useRef, useCallback } from 'react'
+import { Link } from 'react-router-dom'
 import jsQR from 'jsqr'
 import { AppShell } from '@/components/layout/AppShell'
 import { FeatherIcon } from '@/components/ui/FeatherIcon'
-import { Star, Camera, X } from '@/components/ui/Icons'
+import { Star, Camera, X, ChevronDown, ChevronUp } from '@/components/ui/Icons'
 import { useAuth } from '@/lib/hooks/useAuth'
 import {
   subscribeUserBingoCards,
@@ -10,6 +11,36 @@ import {
   selfStampBingoCell,
 } from '@/lib/firebase/firestore'
 import type { UserBingoCard } from '@/types'
+
+const GLOSSARY_TERMS = [
+  'ブラインド', 'ポジション', 'UTG', 'BTN', 'CO', 'MP', 'SB', 'BB',
+  'レイズ', '3bet', '4bet', 'コンティニュエーションベット', 'Cbet',
+  'チェックレイズ', 'ドンクベット', 'ポットオッズ', 'アウツ', 'エクイティ',
+  'ドロー', 'セット', 'トリップス', 'ナッツ', 'セミブラフ', 'バリュー',
+  'ティルト', 'リバイ', 'リエントリー', 'フォールド', 'コール', 'ベット',
+  'オールイン', 'プリフロップ', 'フロップ', 'ターン', 'リバー', 'ショーダウン',
+  'フラッシュ', 'ストレート', 'フルハウス', 'ワンペア', 'ツーペア', 'スリーカード',
+  'フォーカード', 'ストレートフラッシュ', 'ロイヤルフラッシュ', 'ハイカード',
+]
+
+const highlightTerms = (text: string): React.ReactNode => {
+  const pattern = new RegExp(`(${GLOSSARY_TERMS.join('|')})`, 'g')
+  const parts = text.split(pattern)
+  return parts.map((part, i) => {
+    if (GLOSSARY_TERMS.includes(part)) {
+      return (
+        <Link
+          key={i}
+          to="/guide?section=terms"
+          className="underline decoration-swan-accent/50 hover:text-swan-accent"
+        >
+          {part}
+        </Link>
+      )
+    }
+    return part
+  })
+}
 
 type Mode = 'view' | 'scan' | 'stamp' | 'stamped'
 
@@ -126,6 +157,50 @@ const BingoGrid = ({
   )
 }
 
+const MissionList = ({ userCard }: { userCard: UserBingoCard }) => {
+  const [expanded, setExpanded] = useState(false)
+  const completedSet = new Set(userCard.completedCells)
+
+  const sortedMissions = [...userCard.missions]
+    .filter(m => m.cellIndex !== 12)
+    .sort((a, b) => a.cellIndex - b.cellIndex)
+    .map((m, idx) => ({ ...m, number: idx + 1 }))
+
+  return (
+    <div className="border-t border-swan-border pt-3">
+      <button
+        onClick={() => setExpanded(!expanded)}
+        className="w-full flex items-center justify-between text-sm text-swan-sub hover:text-swan-text transition-colors"
+      >
+        <span>ミッション一覧</span>
+        {expanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+      </button>
+      {expanded && (
+        <div className="mt-3 space-y-1.5 max-h-60 overflow-y-auto">
+          {sortedMissions.map((m) => {
+            const isCompleted = completedSet.has(m.cellIndex)
+            return (
+              <div
+                key={m.cellIndex}
+                className={`flex items-start gap-2 text-xs ${isCompleted ? 'opacity-50' : ''}`}
+              >
+                <span className={`shrink-0 w-5 h-5 rounded flex items-center justify-center text-[10px] font-bold ${
+                  isCompleted ? 'bg-green-500/20 text-green-400' : 'bg-swan-dark text-swan-sub'
+                }`}>
+                  {m.number}
+                </span>
+                <span className={`flex-1 ${isCompleted ? 'line-through' : ''}`}>
+                  {highlightTerms(m.text)}
+                </span>
+              </div>
+            )
+          })}
+        </div>
+      )}
+    </div>
+  )
+}
+
 const BingoCardDetail = ({
   userCard,
   onDelete,
@@ -168,6 +243,8 @@ const BingoCardDetail = ({
       </div>
 
       <BingoGrid userCard={userCard} />
+
+      <MissionList userCard={userCard} />
 
       <div className="flex justify-around text-center pt-2 border-t border-swan-border">
         <div>

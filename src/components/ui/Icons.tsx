@@ -41,6 +41,9 @@ export {
   Minus,
   BookOpen,
   Shuffle,
+  Crown,
+  Gift,
+  Trash2,
 } from 'lucide-react'
 
 import type { SVGProps } from 'react'

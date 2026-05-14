@@ -22,6 +22,8 @@ export interface User {
   equippedFrame?: string  // FRAME_DEFS のキー
   equippedOverlay?: string  // OVERLAY_DEFS のキー
   equippedPointIcon?: string  // POINT_ICON_DEFS のキー（デフォルト: feather）
+  luckyHand?: string      // 今日のラッキーハンド（例: "AKs", "77"）
+  luckyHandExpiry?: Timestamp  // ラッキーハンドの有効期限（その日の終わり）
   createdAt: Timestamp
 }
 
@@ -90,8 +92,19 @@ export interface UserTitle {
   uid: string
   title: string
   tier: 'common' | 'rare' | 'elite' | 'prime'
-  achievementId: string
+  achievementId?: string  // 実績由来の場合
+  grantedBy?: string      // 管理者付与の場合
   acquiredAt: Timestamp
+}
+
+// 管理者が作成する非売品称号テンプレート
+export interface AdminTitle {
+  id: string
+  title: string
+  tier: 'common' | 'rare' | 'elite' | 'prime'
+  description: string
+  createdBy: string
+  createdAt: Timestamp
 }
 
 export interface MatchRanking {

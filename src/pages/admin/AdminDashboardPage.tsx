@@ -5,7 +5,7 @@ import { subscribePendingUsers, subscribeMatches } from '@/lib/firebase/firestor
 import type { User, Match } from '@/types'
 import {
   Users, Camera, CalendarDays, SpadeIcon, ShoppingBag,
-  FeatherPtIcon, ChevronRight, Home, Award, Layers,
+  FeatherPtIcon, ChevronRight, Home, Award, Layers, Crown,
 } from '@/components/ui/Icons'
 import type { LucideIcon } from 'lucide-react'
 import type { SVGProps } from 'react'
@@ -49,6 +49,7 @@ export const AdminDashboardPage = () => {
     { to: '/admin/points',       icon: FeatherPtIcon, label: 'ポイント調整' },
     { to: '/admin/achievements', icon: Award,         label: '実績管理' },
     { to: '/admin/bingo',        icon: Layers,        label: 'ビンゴカード管理' },
+    { to: '/admin/titles',       icon: Crown,         label: '称号管理' },
   ]
 
   return (

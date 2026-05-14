@@ -35,6 +35,7 @@ import { PointsPage } from '@/pages/admin/PointsPage'
 import { AchievementsAdminPage } from '@/pages/admin/AchievementsAdminPage'
 import { BingoAdminPage } from '@/pages/admin/BingoAdminPage'
 import { BingoStampPage } from '@/pages/admin/BingoStampPage'
+import { TitlesAdminPage } from '@/pages/admin/TitlesAdminPage'
 
 export const App = () => (
   <BrowserRouter>
@@ -73,6 +74,7 @@ export const App = () => (
         <Route path="/admin/achievements" element={<RequireAuth requireAdmin><AchievementsAdminPage /></RequireAuth>} />
         <Route path="/admin/bingo" element={<RequireAuth requireAdmin><BingoAdminPage /></RequireAuth>} />
         <Route path="/admin/bingo/stamp" element={<RequireAuth requireAdmin><BingoStampPage /></RequireAuth>} />
+        <Route path="/admin/titles" element={<RequireAuth requireAdmin><TitlesAdminPage /></RequireAuth>} />
 
         {/* ── Fallback ── */}
         <Route path="*" element={<Navigate to="/" replace />} />

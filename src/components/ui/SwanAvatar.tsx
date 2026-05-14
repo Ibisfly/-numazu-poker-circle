@@ -65,6 +65,9 @@ const GoldWrapper: React.FC<{ size: number; color: string; children: ReactNode }
         borderRadius: '50%',
         overflow: 'hidden',
         background: color,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
       }}>
         {children}
       </div>
@@ -153,6 +156,9 @@ const MetallicWrapper: React.FC<{ size: number; color: string; children: ReactNo
         borderRadius: '50%',
         overflow: 'hidden',
         background: color,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
       }}>
         {children}
       </div>
@@ -283,6 +289,9 @@ const FlameWrapper: React.FC<{ size: number; color: string; children: ReactNode 
         overflow: 'hidden',
         background: color,
         zIndex: 1,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
       }}>
         {children}
       </div>
@@ -387,6 +396,9 @@ const createChipWrapper = (
             overflow: 'hidden',
             background: color,
             boxShadow: `0 0 0 1px ${secondaryColor}`,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
           }}
         >
           {children}

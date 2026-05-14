@@ -339,6 +339,12 @@ export const subscribePendingUsers = (cb: (users: User[]) => void) =>
     (snap) => cb(snap.docs.map((d) => d.data() as User))
   )
 
+export const subscribeActiveUsers = (cb: (users: User[]) => void) =>
+  onSnapshot(
+    query(collection(db, 'users'), where('status', '==', 'active'), orderBy('playerName')),
+    (snap) => cb(snap.docs.map((d) => d.data() as User))
+  )
+
 export const subscribeAllUsers = (cb: (users: User[]) => void) =>
   onSnapshot(
     query(collection(db, 'users'), orderBy('createdAt', 'desc')),
@@ -368,6 +374,28 @@ export const disableUser = (uid: string) =>
 export const changeUserRole = (uid: string, role: 'admin' | 'member') =>
   updateDoc(doc(db, 'users', uid), { role })
 
+// ── Lucky Hand Generation ──────────────────────────────────────────────────
+
+const generateLuckyHand = (): string => {
+  const ranks = ['A', 'K', 'Q', 'J', 'T', '9', '8', '7', '6', '5', '4', '3', '2']
+  const pocketPairs = ranks.map(r => `${r}${r}`)
+  const suitedHands: string[] = []
+  for (let i = 0; i < ranks.length; i++) {
+    for (let j = i + 1; j < ranks.length; j++) {
+      suitedHands.push(`${ranks[i]}${ranks[j]}s`)
+    }
+  }
+  const allHands = [...pocketPairs, ...suitedHands]
+  return allHands[Math.floor(Math.random() * allHands.length)]
+}
+
+const getMidnightExpiry = (): Timestamp => {
+  const now = new Date()
+  const midnight = new Date(now)
+  midnight.setHours(23, 59, 59, 999)
+  return Timestamp.fromDate(midnight)
+}
+
 // ── Admin: Attendance Scan ─────────────────────────────────────────────────
 
 export const recordAttendance = async (
@@ -384,6 +412,9 @@ export const recordAttendance = async (
     )
   )
   if (!existing.empty) throw new Error('既にスキャン済みです')
+
+  const luckyHand = generateLuckyHand()
+  const luckyHandExpiry = getMidnightExpiry()
 
   const batch = writeBatch(db)
   const attendRef = doc(collection(db, 'attendances'))
@@ -407,6 +438,8 @@ export const recordAttendance = async (
     totalPoints: increment(pointAwarded),
     yearPoints: increment(pointAwarded),
     ownedPoints: increment(pointAwarded),
+    luckyHand,
+    luckyHandExpiry,
   })
   const notifRef = doc(collection(db, 'notifications'))
   batch.set(notifRef, {
@@ -1453,6 +1486,54 @@ export const assignBingoCardOnAttendance = async (
 
   // 新しいカードを配布（古いカードは自動削除）
   return assignBingoCard(uid, eventId, bingoCard)
+}
+
+// ── Admin Titles（管理者付与の非売品称号）────────────────────────────────────
+
+export const subscribeAdminTitles = (
+  cb: (titles: import('@/types').AdminTitle[]) => void
+) =>
+  onSnapshot(
+    query(collection(db, 'adminTitles'), orderBy('createdAt', 'desc')),
+    (snap) =>
+      cb(snap.docs.map((d) => ({ id: d.id, ...d.data() } as import('@/types').AdminTitle)))
+  )
+
+export const createAdminTitle = (data: Omit<import('@/types').AdminTitle, 'id' | 'createdAt'>) =>
+  addDoc(collection(db, 'adminTitles'), { ...data, createdAt: serverTimestamp() })
+
+export const deleteAdminTitle = (id: string) =>
+  deleteDoc(doc(db, 'adminTitles', id))
+
+export const grantTitleToUser = async (
+  uid: string,
+  title: string,
+  tier: 'common' | 'rare' | 'elite' | 'prime',
+  adminUid: string
+) => {
+  const batch = writeBatch(db)
+
+  // UserTitle として付与
+  const titleRef = doc(collection(db, 'userTitles'))
+  batch.set(titleRef, {
+    uid,
+    title,
+    tier,
+    grantedBy: adminUid,
+    acquiredAt: serverTimestamp(),
+  })
+
+  // 通知を送信
+  const notifRef = doc(collection(db, 'notifications'))
+  batch.set(notifRef, {
+    uid,
+    type: 'achievement',
+    message: `管理者から名誉を称えて特別な称号「${title}」が届きました！`,
+    isRead: false,
+    createdAt: serverTimestamp(),
+  })
+
+  await batch.commit()
 }
 
 export { Timestamp, serverTimestamp }

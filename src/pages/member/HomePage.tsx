@@ -2,12 +2,37 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { AppShell } from '@/components/layout/AppShell'
 import { FeatherIcon } from '@/components/ui/FeatherIcon'
-import { CreditCard, ShoppingBag, BeginnerIcon, BookOpen, Layers } from '@/components/ui/Icons'
+import { CreditCard, ShoppingBag, BeginnerIcon, BookOpen, Layers, Star } from '@/components/ui/Icons'
 import { FlyingSwanProgress } from '@/components/ui/FlyingSwanProgress'
 import { DEFAULT_AVATAR_COLOR } from '@/components/ui/SwanAvatar'
 import { useAuth } from '@/lib/hooks/useAuth'
 import { subscribeMatches } from '@/lib/firebase/firestore'
 import type { Match } from '@/types'
+
+const SUIT_COLORS: Record<string, string> = {
+  s: 'text-gray-800',
+  h: 'text-red-500',
+  d: 'text-blue-500',
+  c: 'text-green-600',
+}
+const SUIT_SYMBOLS: Record<string, string> = {
+  s: '♠', h: '♥', d: '♦', c: '♣',
+}
+
+const LuckyHandCard = ({ rank, suit }: { rank: string; suit: string }) => (
+  <div className={`w-10 h-14 bg-white rounded-md border border-gray-300 flex flex-col items-center justify-center shadow-sm ${SUIT_COLORS[suit]}`}>
+    <span className="text-sm font-bold leading-none">{rank}</span>
+    <span className="text-lg leading-none">{SUIT_SYMBOLS[suit]}</span>
+  </div>
+)
+
+const parseLuckyHand = (hand: string): { rank1: string; rank2: string; suited: boolean } | null => {
+  if (!hand || hand.length < 2) return null
+  const rank1 = hand[0]
+  const rank2 = hand[1]
+  const suited = hand.endsWith('s')
+  return { rank1, rank2, suited }
+}
 
 export const HomePage = () => {
   const { user } = useAuth()
@@ -62,6 +87,29 @@ export const HomePage = () => {
             </div>
           </Link>
         )}
+
+        {/* ラッキーハンド（有効期限内のみ表示） */}
+        {(() => {
+          const expiry = user.luckyHandExpiry?.toDate()
+          const isValid = expiry && expiry > new Date()
+          const parsed = isValid ? parseLuckyHand(user.luckyHand ?? '') : null
+          if (!parsed) return null
+          return (
+            <div className="bg-gradient-to-r from-yellow-500/20 via-amber-500/20 to-yellow-500/20 border border-yellow-500/40 rounded-xl p-4">
+              <div className="flex items-center gap-3">
+                <Star size={20} className="text-yellow-400" />
+                <div className="flex-1">
+                  <p className="text-xs text-yellow-400 font-semibold uppercase tracking-wide">Today's Lucky Hand</p>
+                  <p className="text-swan-sub text-[10px]">今日のラッキーハンド</p>
+                </div>
+                <div className="flex gap-1">
+                  <LuckyHandCard rank={parsed.rank1} suit={parsed.suited ? 'h' : 's'} />
+                  <LuckyHandCard rank={parsed.rank2} suit={parsed.suited ? 'h' : 'd'} />
+                </div>
+              </div>
+            </div>
+          )
+        })()}
 
         {/* ③ クイックリンク */}
         <div className="grid grid-cols-2 gap-3">
