@@ -28,6 +28,30 @@ import { logOut } from '@/lib/firebase/auth'
 import type { PointLog, UserAchievement, UserItem, Item, UserTitle } from '@/types'
 import { ACHIEVEMENTS } from '@/lib/achievements'
 
+function generateProfilePuzzlePath(
+  top: 'flat' | 'in' | 'out',
+  right: 'flat' | 'in' | 'out',
+  bottom: 'flat' | 'in' | 'out',
+  left: 'flat' | 'in' | 'out'
+): string {
+  const tabSize = 12
+  const tabOffset = 35
+  let d = 'M 10 10 '
+  if (top === 'flat') d += 'L 90 10 '
+  else if (top === 'out') d += `L ${tabOffset} 10 Q ${tabOffset} ${10 - tabSize} 50 ${10 - tabSize} Q ${100 - tabOffset} ${10 - tabSize} ${100 - tabOffset} 10 L 90 10 `
+  else d += `L ${tabOffset} 10 Q ${tabOffset} ${10 + tabSize} 50 ${10 + tabSize} Q ${100 - tabOffset} ${10 + tabSize} ${100 - tabOffset} 10 L 90 10 `
+  if (right === 'flat') d += 'L 90 90 '
+  else if (right === 'out') d += `L 90 ${tabOffset} Q ${90 + tabSize} ${tabOffset} ${90 + tabSize} 50 Q ${90 + tabSize} ${100 - tabOffset} 90 ${100 - tabOffset} L 90 90 `
+  else d += `L 90 ${tabOffset} Q ${90 - tabSize} ${tabOffset} ${90 - tabSize} 50 Q ${90 - tabSize} ${100 - tabOffset} 90 ${100 - tabOffset} L 90 90 `
+  if (bottom === 'flat') d += 'L 10 90 '
+  else if (bottom === 'out') d += `L ${100 - tabOffset} 90 Q ${100 - tabOffset} ${90 + tabSize} 50 ${90 + tabSize} Q ${tabOffset} ${90 + tabSize} ${tabOffset} 90 L 10 90 `
+  else d += `L ${100 - tabOffset} 90 Q ${100 - tabOffset} ${90 - tabSize} 50 ${90 - tabSize} Q ${tabOffset} ${90 - tabSize} ${tabOffset} 90 L 10 90 `
+  if (left === 'flat') d += 'L 10 10'
+  else if (left === 'out') d += `L 10 ${100 - tabOffset} Q ${10 - tabSize} ${100 - tabOffset} ${10 - tabSize} 50 Q ${10 - tabSize} ${tabOffset} 10 ${tabOffset} L 10 10`
+  else d += `L 10 ${100 - tabOffset} Q ${10 + tabSize} ${100 - tabOffset} ${10 + tabSize} 50 Q ${10 + tabSize} ${tabOffset} 10 ${tabOffset} L 10 10`
+  return d + ' Z'
+}
+
 // 装飾選択UI 共通コンポーネント
 const DecoSection = ({
   label, noneLabel, current, options, onSelect, renderPreview,
@@ -512,24 +536,44 @@ export const ProfilePage = () => {
             <h3 className="text-sm font-semibold text-swan-sub">実績 ({achievements.length}/{ACHIEVEMENTS.length})</h3>
             <Link to="/achievements" className="text-xs text-swan-accent">すべて見る</Link>
           </div>
-          <div className="grid grid-cols-5 gap-1.5">
-            {ACHIEVEMENTS.slice(0, 20).map((def) => {
+          <div className="grid grid-cols-5 gap-0" style={{ margin: '-4px' }}>
+            {ACHIEVEMENTS.slice(0, 20).map((def, index) => {
               const unlocked = achievements.find((ua) => ua.achievementId === def.id)
+              const row = Math.floor(index / 5)
+              const col = index % 5
+              const hasTop = row > 0
+              const hasBottom = row < 3
+              const hasLeft = col > 0
+              const hasRight = col < 4
+              const topType = hasTop ? ((row + col + 1) % 2 === 0 ? 'in' : 'out') : 'flat'
+              const bottomType = hasBottom ? ((row + col) % 2 === 0 ? 'out' : 'in') : 'flat'
+              const leftType = hasLeft ? ((row + col + 1) % 2 === 0 ? 'in' : 'out') : 'flat'
+              const rightType = hasRight ? ((row + col) % 2 === 0 ? 'out' : 'in') : 'flat'
+              const PUZZLE_COLORS = ['#f59e0b', '#ef4444', '#22c55e', '#3b82f6', '#a855f7', '#ec4899', '#14b8a6', '#f97316']
+              const color = PUZZLE_COLORS[index % PUZZLE_COLORS.length]
               return (
                 <div
                   key={def.id}
-                  className={`aspect-square rounded-lg flex items-center justify-center transition-all ${
-                    unlocked
-                      ? 'bg-gradient-to-br from-yellow-500/30 to-amber-600/30 border border-yellow-500/50 shadow-sm shadow-yellow-500/20'
-                      : 'bg-swan-dark border border-swan-border'
-                  }`}
+                  className="relative aspect-square"
                   title={unlocked ? def.name : '???'}
+                  style={{ filter: !unlocked ? 'grayscale(100%) brightness(0.4)' : 'none' }}
                 >
-                  {unlocked ? (
-                    <AchievementIcon achievementId={def.id} size={22} />
-                  ) : (
-                    <div className="w-5 h-5 rounded-full bg-swan-border/50" />
-                  )}
+                  <svg viewBox="0 0 100 100" className="w-full h-full">
+                    <defs>
+                      <clipPath id={`profile-puzzle-${index}`}>
+                        <path d={generateProfilePuzzlePath(topType, rightType, bottomType, leftType)} />
+                      </clipPath>
+                    </defs>
+                    <rect x="0" y="0" width="100" height="100" fill={unlocked ? color : '#374151'} clipPath={`url(#profile-puzzle-${index})`} />
+                    <path d={generateProfilePuzzlePath(topType, rightType, bottomType, leftType)} fill="none" stroke={unlocked ? 'rgba(255,255,255,0.3)' : 'rgba(255,255,255,0.1)'} strokeWidth="2" />
+                  </svg>
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    {unlocked ? (
+                      <AchievementIcon achievementId={def.id} size={18} />
+                    ) : (
+                      <div className="w-4 h-4 rounded-full bg-swan-border/50" />
+                    )}
+                  </div>
                 </div>
               )
             })}
