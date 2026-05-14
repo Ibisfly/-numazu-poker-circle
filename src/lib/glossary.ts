@@ -1,0 +1,56 @@
+export interface GlossaryTerm {
+  term: string
+  desc: string
+  category: string
+}
+
+export const POKER_TERMS: GlossaryTerm[] = [
+  { term: 'ブラインド', desc: '強制ベット。SB（スモールブラインド）とBB（ビッグブラインド）がある。', category: '基本' },
+  { term: 'ポジション', desc: 'テーブルでの席順。後ろのポジションほど有利（情報が多い）。', category: '基本' },
+  { term: 'UTG', desc: 'Under The Gun。BBの左、最初にアクションする最も不利なポジション。', category: 'ポジション' },
+  { term: 'BTN', desc: 'ボタン。ディーラーポジション。ポストフロップで最後にアクションできる最も有利な席。', category: 'ポジション' },
+  { term: 'CO', desc: 'カットオフ。ボタンの1つ右。2番目に有利なポジション。', category: 'ポジション' },
+  { term: 'MP', desc: 'ミドルポジション。UTGとCOの間。', category: 'ポジション' },
+  { term: 'SB', desc: 'スモールブラインド。BTNの左隣。', category: 'ポジション' },
+  { term: 'BB', desc: 'ビッグブラインド。SBの左隣。', category: 'ポジション' },
+  { term: 'レイズ', desc: '前のベットに上乗せして賭ける。', category: 'アクション' },
+  { term: '3bet', desc: 'オープンレイズに対するリレイズ。', category: 'アクション' },
+  { term: '4bet', desc: '3betに対するさらなるリレイズ。', category: 'アクション' },
+  { term: 'コンティニュエーションベット', desc: 'Cbet。プリフロップでレイズした人がフロップでもベットすること。', category: 'アクション' },
+  { term: 'Cbet', desc: 'コンティニュエーションベットの略。', category: 'アクション' },
+  { term: 'チェックレイズ', desc: 'チェックした後、相手のベットに対してレイズすること。', category: 'アクション' },
+  { term: 'ドンクベット', desc: 'プリフロップアグレッサーより先にベットすること。', category: 'アクション' },
+  { term: 'フォールド', desc: '手札を捨ててそのハンドから降りる。', category: 'アクション' },
+  { term: 'コール', desc: '前のベットと同額を出す。', category: 'アクション' },
+  { term: 'ベット', desc: 'チップを賭ける。', category: 'アクション' },
+  { term: 'オールイン', desc: '手持ちのチップを全て賭ける。', category: 'アクション' },
+  { term: 'ポットオッズ', desc: 'コール額に対するポットの比率。コールすべきかの判断材料。', category: '戦略' },
+  { term: 'アウツ', desc: '自分のハンドを完成させるカードの枚数。', category: '戦略' },
+  { term: 'エクイティ', desc: '現時点でポットを獲得する確率。', category: '戦略' },
+  { term: 'セミブラフ', desc: 'まだ完成していないが改善の可能性があるハンドでブラフすること。', category: '戦略' },
+  { term: 'バリュー', desc: '勝っている時に相手からチップを引き出すベット。', category: '戦略' },
+  { term: 'ドロー', desc: 'あと1枚でフラッシュやストレートが完成する状態。', category: 'ハンド' },
+  { term: 'セット', desc: 'ポケットペアとボードで作るスリーカード。', category: 'ハンド' },
+  { term: 'トリップス', desc: 'ボードのペアと手札で作るスリーカード。', category: 'ハンド' },
+  { term: 'ナッツ', desc: 'その状況で可能な最強のハンド。', category: 'ハンド' },
+  { term: 'プリフロップ', desc: 'フロップが開かれる前のベッティングラウンド。', category: 'ラウンド' },
+  { term: 'フロップ', desc: '最初の3枚のコミュニティカードが開かれるラウンド。', category: 'ラウンド' },
+  { term: 'ターン', desc: '4枚目のコミュニティカードが開かれるラウンド。', category: 'ラウンド' },
+  { term: 'リバー', desc: '5枚目（最後）のコミュニティカードが開かれるラウンド。', category: 'ラウンド' },
+  { term: 'ショーダウン', desc: '残ったプレイヤーが手札を見せて勝者を決める。', category: 'ラウンド' },
+  { term: 'フラッシュ', desc: '同じスート5枚の役。', category: '役' },
+  { term: 'ストレート', desc: '5枚連続の役（スート不問）。', category: '役' },
+  { term: 'フルハウス', desc: '3枚＋2枚の同ランクの役。', category: '役' },
+  { term: 'ワンペア', desc: '2枚の同ランクの役。', category: '役' },
+  { term: 'ツーペア', desc: '2枚ペア×2組の役。', category: '役' },
+  { term: 'スリーカード', desc: '同じランク3枚の役。', category: '役' },
+  { term: 'フォーカード', desc: '同じランク4枚の役。', category: '役' },
+  { term: 'ストレートフラッシュ', desc: '同じスートの5枚連続の役。', category: '役' },
+  { term: 'ロイヤルフラッシュ', desc: '同じスートのA-K-Q-J-10の役。最強。', category: '役' },
+  { term: 'ハイカード', desc: '役なし。最も高いカードで勝負。', category: '役' },
+  { term: 'ティルト', desc: '感情的になってプレイが乱れている状態。', category: 'その他' },
+  { term: 'リバイ', desc: 'リングゲームでチップを追加購入すること。', category: 'その他' },
+  { term: 'リエントリー', desc: 'トーナメントで飛んだ後、再度参加すること（許可されている場合）。', category: 'その他' },
+]
+
+export const GLOSSARY_TERM_NAMES = POKER_TERMS.map(t => t.term)

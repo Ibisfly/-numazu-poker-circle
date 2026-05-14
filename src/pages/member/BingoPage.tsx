@@ -10,24 +10,14 @@ import {
   deleteUserBingoCard,
   selfStampBingoCell,
 } from '@/lib/firebase/firestore'
+import { GLOSSARY_TERM_NAMES } from '@/lib/glossary'
 import type { UserBingoCard } from '@/types'
 
-const GLOSSARY_TERMS = [
-  'ブラインド', 'ポジション', 'UTG', 'BTN', 'CO', 'MP', 'SB', 'BB',
-  'レイズ', '3bet', '4bet', 'コンティニュエーションベット', 'Cbet',
-  'チェックレイズ', 'ドンクベット', 'ポットオッズ', 'アウツ', 'エクイティ',
-  'ドロー', 'セット', 'トリップス', 'ナッツ', 'セミブラフ', 'バリュー',
-  'ティルト', 'リバイ', 'リエントリー', 'フォールド', 'コール', 'ベット',
-  'オールイン', 'プリフロップ', 'フロップ', 'ターン', 'リバー', 'ショーダウン',
-  'フラッシュ', 'ストレート', 'フルハウス', 'ワンペア', 'ツーペア', 'スリーカード',
-  'フォーカード', 'ストレートフラッシュ', 'ロイヤルフラッシュ', 'ハイカード',
-]
-
 const highlightTerms = (text: string): React.ReactNode => {
-  const pattern = new RegExp(`(${GLOSSARY_TERMS.join('|')})`, 'g')
+  const pattern = new RegExp(`(${GLOSSARY_TERM_NAMES.join('|')})`, 'g')
   const parts = text.split(pattern)
   return parts.map((part, i) => {
-    if (GLOSSARY_TERMS.includes(part)) {
+    if (GLOSSARY_TERM_NAMES.includes(part)) {
       return (
         <Link
           key={i}

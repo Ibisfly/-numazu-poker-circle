@@ -1,6 +1,7 @@
 import { useState, useRef } from 'react'
 import { AppShell } from '@/components/layout/AppShell'
 import { ChevronDown, ChevronRight } from '@/components/ui/Icons'
+import { POKER_TERMS } from '@/lib/glossary'
 
 type Section = 'toc' | 'hand' | 'flow' | 'position' | 'action' | 'terms'
 
@@ -69,34 +70,7 @@ const HAND_RANKINGS: { name: string; desc: string; cards: CardData[]; isRare: bo
   ], isRare: false },
 ]
 
-const TERMS: { term: string; desc: string; category: string }[] = [
-  { term: 'ブラインド', desc: '強制ベット。SB（スモールブラインド）とBB（ビッグブラインド）がある。', category: '基本' },
-  { term: 'ポジション', desc: 'テーブルでの席順。後ろのポジションほど有利（情報が多い）。', category: '基本' },
-  { term: 'UTG', desc: 'Under The Gun。BBの左、最初にアクションする最も不利なポジション。', category: 'ポジション' },
-  { term: 'BTN', desc: 'ボタン。ディーラーポジション。ポストフロップで最後にアクションできる最も有利な席。', category: 'ポジション' },
-  { term: 'CO', desc: 'カットオフ。ボタンの1つ右。2番目に有利なポジション。', category: 'ポジション' },
-  { term: 'MP', desc: 'ミドルポジション。UTGとCOの間。', category: 'ポジション' },
-  { term: 'SB', desc: 'スモールブラインド。BTNの左隣。', category: 'ポジション' },
-  { term: 'BB', desc: 'ビッグブラインド。SBの左隣。', category: 'ポジション' },
-  { term: 'レイズ', desc: '前のベットに上乗せして賭ける。', category: 'アクション' },
-  { term: '3bet', desc: 'オープンレイズに対するリレイズ。', category: 'アクション' },
-  { term: '4bet', desc: '3betに対するさらなるリレイズ。', category: 'アクション' },
-  { term: 'コンティニュエーションベット', desc: 'Cbet。プリフロップでレイズした人がフロップでもベットすること。', category: 'アクション' },
-  { term: 'チェックレイズ', desc: 'チェックした後、相手のベットに対してレイズすること。', category: 'アクション' },
-  { term: 'ドンクベット', desc: 'プリフロップアグレッサーより先にベットすること。', category: 'アクション' },
-  { term: 'ポットオッズ', desc: 'コール額に対するポットの比率。コールすべきかの判断材料。', category: '戦略' },
-  { term: 'アウツ', desc: '自分のハンドを完成させるカードの枚数。', category: '戦略' },
-  { term: 'エクイティ', desc: '現時点でポットを獲得する確率。', category: '戦略' },
-  { term: 'ドロー', desc: 'あと1枚でフラッシュやストレートが完成する状態。', category: 'ハンド' },
-  { term: 'セット', desc: 'ポケットペアとボードで作るスリーカード。', category: 'ハンド' },
-  { term: 'トリップス', desc: 'ボードのペアと手札で作るスリーカード。', category: 'ハンド' },
-  { term: 'ナッツ', desc: 'その状況で可能な最強のハンド。', category: 'ハンド' },
-  { term: 'セミブラフ', desc: 'まだ完成していないが改善の可能性があるハンドでブラフすること。', category: '戦略' },
-  { term: 'バリュー', desc: '勝っている時に相手からチップを引き出すベット。', category: '戦略' },
-  { term: 'ティルト', desc: '感情的になってプレイが乱れている状態。', category: 'その他' },
-  { term: 'リバイ', desc: 'リングゲームでチップを追加購入すること。', category: 'その他' },
-  { term: 'リエントリー', desc: 'トーナメントで飛んだ後、再度参加すること（許可されている場合）。', category: 'その他' },
-]
+const TERMS = POKER_TERMS
 
 const TOC_ITEMS = [
   { id: 'hand', label: '役の強さ', desc: '役とハンドレンジを覚えよう' },
