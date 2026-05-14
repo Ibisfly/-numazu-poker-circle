@@ -108,9 +108,13 @@ export const ScanPage = () => {
       if (!targetUser) throw new Error('ユーザーが見つかりません')
       if (targetUser.status !== 'active') throw new Error(`${targetUser.playerName} は有効なメンバーではありません`)
       await recordAttendance(selectedEvent.id, targetUser.uid, selectedEvent.attendancePoint, adminUser.uid)
-      setResult({ success: true, message: `✓ ${targetUser.playerName} に ${selectedEvent.attendancePoint}pt 付与しました` })
+      let msg = `✓ ${targetUser.playerName} に ${selectedEvent.attendancePoint}pt 付与しました\n🎴 今日のラッキーハンドを配布！`
       checkAndUnlockAchievements(targetUser.uid).catch(() => {})
-      assignBingoCardOnAttendance(targetUser.uid, selectedEvent.id).catch(() => {})
+      const bingoCardId = await assignBingoCardOnAttendance(targetUser.uid, selectedEvent.id).catch(() => null)
+      if (bingoCardId) {
+        msg += '\n🎯 ビンゴカードを配布しました！'
+      }
+      setResult({ success: true, message: msg })
       stopScan()
     } catch (e: unknown) {
       setResult({ success: false, message: e instanceof Error ? e.message : 'エラーが発生しました' })
@@ -134,9 +138,13 @@ export const ScanPage = () => {
       if (!targetUser) throw new Error('ユーザーが見つかりません')
       if (targetUser.status !== 'active') throw new Error('有効なメンバーではありません')
       await recordAttendance(selectedEvent.id, targetUser.uid, selectedEvent.attendancePoint, adminUser.uid)
+      let msg = `✓ ${targetUser.playerName} に ${selectedEvent.attendancePoint}pt 付与しました\n🎴 今日のラッキーハンドを配布！`
       checkAndUnlockAchievements(targetUser.uid).catch(() => {})
-      assignBingoCardOnAttendance(targetUser.uid, selectedEvent.id).catch(() => {})
-      setResult({ success: true, message: `✓ ${targetUser.playerName} に ${selectedEvent.attendancePoint}pt 付与しました` })
+      const bingoCardId = await assignBingoCardOnAttendance(targetUser.uid, selectedEvent.id).catch(() => null)
+      if (bingoCardId) {
+        msg += '\n🎯 ビンゴカードを配布しました！'
+      }
+      setResult({ success: true, message: msg })
       setManualUid('')
     } catch (e: unknown) {
       setResult({ success: false, message: e instanceof Error ? e.message : 'エラーが発生しました' })
@@ -232,7 +240,7 @@ export const ScanPage = () => {
 
         {/* 結果表示 */}
         {result && (
-          <div className={`rounded-xl p-4 text-sm font-medium ${
+          <div className={`rounded-xl p-4 text-sm font-medium whitespace-pre-line ${
             result.success
               ? 'bg-green-500/20 text-green-400 border border-green-500/30'
               : 'bg-red-500/20 text-red-400 border border-red-500/30'

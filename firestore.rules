@@ -189,5 +189,11 @@ service cloud.firestore {
       allow read: if isAdmin();
       allow write: if isAdmin();
     }
+
+    // ── adminTitles（管理者が作成する非売品称号）─────────────────────────────
+    match /adminTitles/{titleId} {
+      allow read: if isAdmin();
+      allow write: if isAdmin();
+    }
   }
 }
