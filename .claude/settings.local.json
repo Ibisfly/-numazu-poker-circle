@@ -12,7 +12,14 @@
       "Bash(gh repo *)",
       "PowerShell(npm create *)",
       "Read(//c/Users/abeno/my_project/timer/**)",
-      "Bash(npx tailwindcss *)"
+      "Bash(npx tailwindcss *)",
+      "PowerShell(Copy-Item *)",
+      "Bash(cd /d \"C:\\\\Users\\\\abeno\\\\my_project\\\\circles\")",
+      "Bash(npx tsc *)",
+      "PowerShell(npx tsc --noEmit 2>&1 | Select-Object -First 50)",
+      "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\abeno\\\\my_project\\\\circles\" -Recurse -Directory)",
+      "Bash(Select-Object -First 30)",
+      "Bash(Format-Table FullName)"
     ]
   }
 }

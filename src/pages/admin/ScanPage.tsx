@@ -110,9 +110,15 @@ export const ScanPage = () => {
       await recordAttendance(selectedEvent.id, targetUser.uid, selectedEvent.attendancePoint, adminUser.uid)
       let msg = `✓ ${targetUser.playerName} に ${selectedEvent.attendancePoint}pt 付与しました\n🎴 今日のラッキーハンドを配布！`
       checkAndUnlockAchievements(targetUser.uid).catch(() => {})
-      const bingoCardId = await assignBingoCardOnAttendance(targetUser.uid, selectedEvent.id).catch(() => null)
-      if (bingoCardId) {
-        msg += '\n🎯 ビンゴカードを配布しました！'
+      try {
+        const bingoCardId = await assignBingoCardOnAttendance(targetUser.uid, selectedEvent.id)
+        if (bingoCardId) {
+          msg += '\n🎯 ビンゴカードを配布しました！'
+        } else {
+          msg += '\n(ビンゴカード: イベント未設定または配布済み)'
+        }
+      } catch (bingoErr) {
+        msg += `\n⚠️ ビンゴエラー: ${bingoErr instanceof Error ? bingoErr.message : '不明'}`
       }
       setResult({ success: true, message: msg })
       stopScan()
@@ -140,9 +146,15 @@ export const ScanPage = () => {
       await recordAttendance(selectedEvent.id, targetUser.uid, selectedEvent.attendancePoint, adminUser.uid)
       let msg = `✓ ${targetUser.playerName} に ${selectedEvent.attendancePoint}pt 付与しました\n🎴 今日のラッキーハンドを配布！`
       checkAndUnlockAchievements(targetUser.uid).catch(() => {})
-      const bingoCardId = await assignBingoCardOnAttendance(targetUser.uid, selectedEvent.id).catch(() => null)
-      if (bingoCardId) {
-        msg += '\n🎯 ビンゴカードを配布しました！'
+      try {
+        const bingoCardId = await assignBingoCardOnAttendance(targetUser.uid, selectedEvent.id)
+        if (bingoCardId) {
+          msg += '\n🎯 ビンゴカードを配布しました！'
+        } else {
+          msg += '\n(ビンゴカード: イベント未設定または配布済み)'
+        }
+      } catch (bingoErr) {
+        msg += `\n⚠️ ビンゴエラー: ${bingoErr instanceof Error ? bingoErr.message : '不明'}`
       }
       setResult({ success: true, message: msg })
       setManualUid('')

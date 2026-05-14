@@ -54,6 +54,22 @@ useEffect(() => {
 `firestore.rules` で ACL を実装する。クライアントサイドのロールチェックは UX 用途のみ（信頼しない）。
 管理者専用操作はすべてサーバーサイドルールで `isAdmin()` によりガードされていること。
 
+## 複合クエリとインデックス
+
+`where()` + `orderBy()` を使う複合クエリを追加・変更した場合、**必ず `firestore.indexes.json` を確認・更新**すること。
+
+```ts
+// この形式のクエリには複合インデックスが必要
+query(
+  collection(db, 'userBingoCards'),
+  where('uid', '==', uid),
+  orderBy('assignedAt', 'desc')  // ← このフィールド名がインデックスと一致しているか確認
+)
+```
+
+インデックス不一致はサイレントに失敗し、データが取得できなくなる。
+新規インデックス追加後は `firebase deploy --only firestore:indexes` を実行し、構築完了まで数分待つこと。
+
 ## 環境変数
 
 Firebase 設定値は `VITE_FIREBASE_*` プレフィックスの環境変数から読み込む。
