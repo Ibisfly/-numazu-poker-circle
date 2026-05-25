@@ -9,7 +9,7 @@
 }
 
 html, body {
-  background-color: #0a0a0a;
+  background-color: #0f1114;
   color: #e8e8e8;
   font-family: 'Noto Sans JP', system-ui, sans-serif;
   overscroll-behavior: none;
@@ -142,6 +142,6 @@ html, body {
 
 /* セレクトボックスのスタイル */
 select option {
-  background-color: #1a1a1a;
+  background-color: #1e2228;
   color: #e8e8e8;
 }

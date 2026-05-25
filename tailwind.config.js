@@ -5,19 +5,30 @@ export default {
     "./src/**/*.{js,ts,jsx,tsx}",
   ],
   theme: {
+    borderRadius: {
+      'none': '0',
+      'sm': '0',
+      'DEFAULT': '2px',
+      'md': '2px',
+      'lg': '3px',
+      'xl': '4px',
+      '2xl': '4px',
+      '3xl': '6px',
+      'full': '9999px',
+    },
     extend: {
       colors: {
         swan: {
-          black: '#0a0a0a',
-          dark: '#111111',
-          card: '#1a1a1a',
-          border: '#2a2a2a',
-          muted: '#3a3a3a',
+          black: '#0f1114',
+          dark: '#181b20',
+          card: '#1e2228',
+          border: '#2d3139',
+          muted: '#3d424a',
           accent: '#c8a96e',
           gold: '#d4af37',
           silver: '#c0c0c0',
           text: '#e8e8e8',
-          sub: '#888888',
+          sub: '#8b9099',
         },
       },
       fontFamily: {

@@ -547,10 +547,22 @@ export const GuidePage = () => {
                       <span className="block text-swan-accent font-mono font-bold">相手の 3〜4倍</span>
                     </div>
                   </div>
-                  <p className="text-[10px] text-swan-muted mt-2 flex items-center gap-1">
-                    <span className="w-3 h-3 rounded-sm bg-yellow-400"></span>
-                    ハンドレンジ表の黄色以上のハンドが参加目安！
-                  </p>
+                  <div className="mt-2 space-y-1">
+                    <p className="text-[10px] text-swan-sub flex items-center gap-1">
+                      <span className="w-3 h-3 rounded-sm bg-cyan-400"></span>
+                      オープンは<span className="text-cyan-400 font-semibold">水色</span>以上が目安
+                    </p>
+                    <p className="text-[10px] text-swan-sub flex items-center gap-1">
+                      <span className="w-3 h-3 rounded-sm bg-yellow-400"></span>
+                      3betは<span className="text-yellow-400 font-semibold">黄色</span>以上が目安
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => setSection('hand')}
+                    className="mt-2 text-[10px] text-swan-accent underline underline-offset-2"
+                  >
+                    → ハンドレンジ表を見る
+                  </button>
                 </div>
 
                 <div className="bg-swan-card/50 rounded-lg p-3">
@@ -572,7 +584,7 @@ export const GuidePage = () => {
                     </div>
                     <div className="bg-swan-dark rounded px-2 py-1.5 text-center">
                       <span className="text-swan-muted block">大</span>
-                      <span className="text-red-400 font-mono font-bold">100%</span>
+                      <span className="text-red-400 font-mono font-bold">100%~</span>
                     </div>
                   </div>
                 </div>
@@ -596,10 +608,16 @@ export const GuidePage = () => {
                       </p>
                     </div>
                   </div>
-                  <p className="text-[10px] text-swan-muted mt-2 flex items-center gap-1">
+                  <p className="text-[10px] text-swan-sub mt-2 flex items-center gap-1">
                     <span className="w-3 h-3 rounded-sm bg-green-500"></span>
-                    ハンドレンジ表の緑以上のハンドが目安！
+                    オールインは<span className="text-green-400 font-semibold">緑</span>以上が目安
                   </p>
+                  <button
+                    onClick={() => setSection('hand')}
+                    className="mt-1 text-[10px] text-swan-accent underline underline-offset-2"
+                  >
+                    → ハンドレンジ表を見る
+                  </button>
                 </div>
               </div>
             </div>
