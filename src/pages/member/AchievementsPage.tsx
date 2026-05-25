@@ -3,20 +3,47 @@ import { useNavigate } from 'react-router-dom'
 import { AppShell } from '@/components/layout/AppShell'
 import { Lock } from '@/components/ui/Icons'
 import { useAuth } from '@/lib/hooks/useAuth'
-import { subscribeUserAchievements } from '@/lib/firebase/firestore'
+import { subscribeUserAchievements, subscribeAchievementStats } from '@/lib/firebase/firestore'
 import type { UserAchievement } from '@/types'
 import { ACHIEVEMENTS } from '@/lib/achievements'
 import { AchievementIcon } from '@/components/ui/AchievementIcons'
+
+const RarityBadge = ({ percent }: { percent: number }) => {
+  let color = 'text-swan-sub'
+  let label = ''
+
+  if (percent <= 5) {
+    color = 'text-yellow-400'
+    label = 'レア'
+  } else if (percent <= 15) {
+    color = 'text-purple-400'
+    label = '希少'
+  } else if (percent <= 30) {
+    color = 'text-cyan-400'
+    label = ''
+  }
+
+  return (
+    <span className={`text-[10px] ${color}`}>
+      {percent.toFixed(1)}%{label && ` ${label}`}
+    </span>
+  )
+}
 
 export const AchievementsPage = () => {
   const { user } = useAuth()
   const navigate = useNavigate()
   const [userAchievements, setUserAchievements] = useState<UserAchievement[]>([])
+  const [achievementStats, setAchievementStats] = useState<Map<string, { count: number; total: number }>>(new Map())
 
   useEffect(() => {
     if (!user) return
     return subscribeUserAchievements(user.uid, setUserAchievements)
   }, [user])
+
+  useEffect(() => {
+    return subscribeAchievementStats(setAchievementStats)
+  }, [])
 
   const unlockedMap = new Map(userAchievements.map((ua) => [ua.achievementId, ua]))
   const unlockedCount = userAchievements.length
@@ -46,6 +73,8 @@ export const AchievementsPage = () => {
             const unlocked = unlockedMap.get(ach.id)
             const isSecret = ach.isSecret ?? false
             const isLocked = !unlocked
+            const stats = achievementStats.get(ach.id)
+            const percent = stats && stats.total > 0 ? (stats.count / stats.total) * 100 : 0
 
             return (
               <div
@@ -72,30 +101,44 @@ export const AchievementsPage = () => {
                     )}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <h3 className={`font-bold text-sm ${unlocked ? 'text-swan-text' : 'text-swan-sub'}`}>
-                        {isSecret && isLocked ? '???' : ach.name}
-                      </h3>
-                      {isSecret && (
-                        <span
-                          className={`text-[10px] px-1.5 py-0.5 rounded-full border ${
-                            unlocked
-                              ? 'text-purple-400 border-purple-400/40'
-                              : 'text-purple-400/60 border-purple-400/30'
-                          }`}
-                        >
-                          SECRET
-                        </span>
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <h3 className={`font-bold text-sm ${unlocked ? 'text-swan-text' : 'text-swan-sub'}`}>
+                          {isSecret && isLocked ? '???' : ach.name}
+                        </h3>
+                        {isSecret && (
+                          <span
+                            className={`text-[10px] px-1.5 py-0.5 rounded-full border ${
+                              unlocked
+                                ? 'text-purple-400 border-purple-400/40'
+                                : 'text-purple-400/60 border-purple-400/30'
+                            }`}
+                          >
+                            SECRET
+                          </span>
+                        )}
+                      </div>
+                      {stats && stats.total > 0 && (
+                        <RarityBadge percent={percent} />
                       )}
                     </div>
                     <p className="text-xs text-swan-sub mt-1">
                       {isSecret && isLocked ? 'シークレット実績' : ach.description}
                     </p>
-                    {unlocked && (
-                      <p className="text-[10px] text-swan-accent mt-1.5">
-                        解除: {unlocked.unlockedAt?.toDate().toLocaleDateString('ja-JP')}
-                      </p>
-                    )}
+                    <div className="flex items-center justify-between mt-1.5">
+                      {unlocked ? (
+                        <p className="text-[10px] text-swan-accent">
+                          解除: {unlocked.unlockedAt?.toDate().toLocaleDateString('ja-JP')}
+                        </p>
+                      ) : (
+                        <span />
+                      )}
+                      {stats && stats.total > 0 && (
+                        <p className="text-[10px] text-swan-muted">
+                          {stats.count}/{stats.total}人が取得
+                        </p>
+                      )}
+                    </div>
                   </div>
                 </div>
               </div>

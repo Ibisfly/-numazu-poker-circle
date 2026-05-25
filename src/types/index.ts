@@ -66,7 +66,7 @@ export type MatchCategory = 'tournament' | 'ring'
 export interface Match {
   id: string
   title: string
-  matchCategory: MatchCategory  // トーナメント or リングゲーム
+  matchCategory: MatchCategory  // トーナメント or プレミアリング
   entryFee: number
   capacity: number
   status: MatchStatus
@@ -79,7 +79,7 @@ export interface Match {
   hasReentry?: boolean
   hasBounty?: boolean
   reentries?: Record<string, number>  // uid → リエントリー回数
-  // リングゲームオプション
+  // プレミアリングオプション
   hasRebuy?: boolean
   rebuys?: Record<string, number>     // uid → リバイ回数
   // 外部タイマーアプリ連携

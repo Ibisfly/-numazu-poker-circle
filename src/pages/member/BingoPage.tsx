@@ -13,15 +13,19 @@ import {
 import { GLOSSARY_TERM_NAMES } from '@/lib/glossary'
 import type { UserBingoCard } from '@/types'
 
+const escapeRegex = (str: string) => str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+
 const highlightTerms = (text: string): React.ReactNode => {
-  const pattern = new RegExp(`(${GLOSSARY_TERM_NAMES.join('|')})`, 'g')
+  if (!text) return text
+  const escapedTerms = GLOSSARY_TERM_NAMES.map(escapeRegex)
+  const pattern = new RegExp(`(${escapedTerms.join('|')})`, 'g')
   const parts = text.split(pattern)
   return parts.map((part, i) => {
     if (GLOSSARY_TERM_NAMES.includes(part)) {
       return (
         <Link
           key={i}
-          to="/guide?section=terms"
+          to={`/guide?section=terms&term=${encodeURIComponent(part)}`}
           className="underline decoration-swan-accent/50 hover:text-swan-accent"
         >
           {part}
@@ -96,14 +100,82 @@ const StampOverlay = ({ show }: { show: boolean }) => {
   )
 }
 
+type MissionDetail = {
+  cellIndex: number
+  text: string
+  isCompleted: boolean
+}
+
+const MissionDetailModal = ({
+  mission,
+  onClose,
+}: {
+  mission: MissionDetail
+  onClose: () => void
+}) => {
+  const cellNumber = mission.cellIndex < 12 ? mission.cellIndex + 1 : mission.cellIndex
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70" onClick={onClose}>
+      <div
+        className="bg-swan-card border border-swan-border rounded-2xl p-5 max-w-sm w-full space-y-4 animate-scale-in"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <span className={`w-7 h-7 rounded-lg flex items-center justify-center text-sm font-bold ${
+              mission.isCompleted ? 'bg-green-500/20 text-green-400' : 'bg-swan-dark text-swan-sub'
+            }`}>
+              {cellNumber}
+            </span>
+            <span className="text-sm text-swan-sub">
+              {mission.isCompleted ? '達成済み' : '未達成'}
+            </span>
+          </div>
+          <button onClick={onClose} className="p-1 text-swan-sub hover:text-swan-text">
+            <X size={20} />
+          </button>
+        </div>
+
+        <div className={`text-swan-text leading-relaxed ${mission.isCompleted ? 'opacity-60' : ''}`}>
+          {highlightTerms(mission.text)}
+        </div>
+
+        {mission.isCompleted && (
+          <div className="flex items-center justify-center gap-2 py-2 bg-green-500/10 rounded-lg">
+            <span className="text-green-400">✓</span>
+            <span className="text-sm text-green-400">クリア！</span>
+          </div>
+        )}
+
+        <button
+          onClick={onClose}
+          className="w-full py-2.5 bg-swan-dark text-swan-text rounded-xl font-medium"
+        >
+          閉じる
+        </button>
+      </div>
+      <style>{`
+        @keyframes scale-in {
+          0% { transform: scale(0.9); opacity: 0; }
+          100% { transform: scale(1); opacity: 1; }
+        }
+        .animate-scale-in { animation: scale-in 0.2s ease-out forwards; }
+      `}</style>
+    </div>
+  )
+}
+
 const BingoGrid = ({
   userCard,
   onCellClick,
+  onCellTap,
   selectable,
   stampingCell,
 }: {
   userCard: UserBingoCard
   onCellClick?: (index: number) => void
+  onCellTap?: (index: number) => void
   selectable?: boolean
   stampingCell?: number | null
 }) => {
@@ -118,17 +190,24 @@ const BingoGrid = ({
         const canSelect = selectable && !isCompleted && !isFree
         const isStamping = stampingCell === i
 
+        const handleClick = () => {
+          if (canSelect && onCellClick) {
+            onCellClick(i)
+          } else if (!isFree && onCellTap) {
+            onCellTap(i)
+          }
+        }
+
         return (
           <button
             key={i}
-            onClick={() => canSelect && onCellClick?.(i)}
-            disabled={!canSelect}
+            onClick={handleClick}
             className={`relative aspect-square rounded-lg flex items-center justify-center text-center p-1 text-[10px] leading-tight transition-all ${
               isFree
                 ? 'bg-swan-accent/20 border border-swan-accent/50'
                 : canSelect
                 ? 'bg-swan-dark border border-swan-border text-swan-sub hover:border-swan-accent active:scale-95'
-                : 'bg-swan-card border border-swan-border text-swan-sub'
+                : 'bg-swan-card border border-swan-border text-swan-sub hover:bg-swan-dark active:scale-95'
             }`}
           >
             {isFree ? (
@@ -204,10 +283,23 @@ const BingoCardDetail = ({
   const bingoCount = userCard.claimedBingoLines.length
   const progress = Math.round((completedCount / 25) * 100)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+  const [selectedMission, setSelectedMission] = useState<MissionDetail | null>(null)
+  const completedSet = new Set(userCard.completedCells)
 
   const handleDelete = () => {
     onDelete()
     setShowDeleteConfirm(false)
+  }
+
+  const handleCellTap = (cellIndex: number) => {
+    const mission = userCard.missions.find((m) => m.cellIndex === cellIndex)
+    if (mission) {
+      setSelectedMission({
+        cellIndex,
+        text: mission.text,
+        isCompleted: completedSet.has(cellIndex),
+      })
+    }
   }
 
   return (
@@ -232,7 +324,14 @@ const BingoCardDetail = ({
         />
       </div>
 
-      <BingoGrid userCard={userCard} />
+      <BingoGrid userCard={userCard} onCellTap={handleCellTap} />
+
+      {selectedMission && (
+        <MissionDetailModal
+          mission={selectedMission}
+          onClose={() => setSelectedMission(null)}
+        />
+      )}
 
       <MissionList userCard={userCard} />
 
@@ -448,7 +547,7 @@ export const BingoPage = () => {
             <div className="bg-gradient-to-r from-purple-500/20 to-pink-500/20 rounded-xl p-4 border border-purple-500/30">
               <h3 className="font-bold text-swan-text mb-1">🎯 Ring de BINGOとは？</h3>
               <p className="text-xs text-swan-sub">
-                リングゲーム中にミッションをクリアしてビンゴを目指そう！
+                プレミアリング中にミッションをクリアしてビンゴを目指そう！
                 テーブルのQRをスキャンして、達成したマスにスタンプを押そう。
               </p>
             </div>

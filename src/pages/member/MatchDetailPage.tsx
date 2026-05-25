@@ -146,7 +146,7 @@ export const MatchDetailPage = () => {
           {cat === 'tournament' ? (
             <span className="text-xs font-bold text-purple-400 bg-purple-400/10 border border-purple-400/30 px-2 py-1 rounded-full">トーナメント</span>
           ) : (
-            <span className="text-xs font-bold text-cyan-400 bg-cyan-400/10 border border-cyan-400/30 px-2 py-1 rounded-full">リングゲーム</span>
+            <span className="text-xs font-bold text-cyan-400 bg-cyan-400/10 border border-cyan-400/30 px-2 py-1 rounded-full">プレミアリング</span>
           )}
           {match.hasReentry && <span className="text-xs text-purple-400 border border-purple-400/30 px-2 py-1 rounded-full">リエントリー可</span>}
           {match.hasBounty  && <span className="text-xs text-orange-400 border border-orange-400/30 px-2 py-1 rounded-full">バウンティ</span>}

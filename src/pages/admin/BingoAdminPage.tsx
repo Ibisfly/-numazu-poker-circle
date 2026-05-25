@@ -47,9 +47,9 @@ export const BingoAdminPage = () => {
 
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
-  const [pointsPerCell, setPointsPerCell] = useState(10)
-  const [pointsPerBingo, setPointsPerBingo] = useState(100)
-  const [pointsForCompletion, setPointsForCompletion] = useState(200)
+  const [pointsPerCell, setPointsPerCell] = useState(2)
+  const [pointsPerBingo, setPointsPerBingo] = useState(20)
+  const [pointsForCompletion, setPointsForCompletion] = useState(50)
   const [missions, setMissions] = useState<BingoMission[]>(DEFAULT_MISSIONS)
   const [isAvailable, setIsAvailable] = useState(true)
   const [saving, setSaving] = useState(false)

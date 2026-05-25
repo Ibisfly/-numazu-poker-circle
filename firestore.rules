@@ -98,6 +98,7 @@ service cloud.firestore {
         || (isActiveUser()
             && resource.data.uid == request.auth.uid
             && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['usedAt']));
+      allow delete: if isAdmin();
     }
 
     // ── achievements（マスタ） ───────────────────────────────────────────────
@@ -136,11 +137,12 @@ service cloud.firestore {
 
     // ── notifications ────────────────────────────────────────────────────────
     match /notifications/{notificationId} {
-      allow read: if isActiveUser() && resource.data.uid == request.auth.uid;
+      allow read: if (isActiveUser() && resource.data.uid == request.auth.uid) || isAdmin();
       allow update: if isActiveUser() && resource.data.uid == request.auth.uid
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['isRead']);
       // create: 管理者またはアクティブユーザーが自分宛に作成可
       allow create: if isAdmin() || isActiveUser();
+      allow delete: if isAdmin();
     }
 
     // ── settings（アプリ設定）───────────────────────────────────────────────

@@ -272,6 +272,62 @@ export const subscribeUserAchievements = (
       cb(snap.docs.map((d) => ({ id: d.id, ...d.data() } as UserAchievement)))
   )
 
+export const subscribeAchievementStats = (
+  cb: (stats: Map<string, { count: number; total: number }>) => void
+) => {
+  let memberUids: string[] = []
+  let achievementsByUser: Map<string, string[]> = new Map()
+
+  const recalculate = () => {
+    const newStats = new Map<string, { count: number; total: number }>()
+    const total = memberUids.length
+
+    const achievementCounts = new Map<string, number>()
+    for (const uid of memberUids) {
+      const userAchievements = achievementsByUser.get(uid) || []
+      for (const achId of userAchievements) {
+        achievementCounts.set(achId, (achievementCounts.get(achId) || 0) + 1)
+      }
+    }
+
+    for (const [achId, count] of achievementCounts) {
+      newStats.set(achId, { count, total })
+    }
+
+    cb(newStats)
+  }
+
+  const unsub1 = onSnapshot(
+    query(collection(db, 'users'), where('role', '==', 'member'), where('status', '==', 'active')),
+    (snap) => {
+      memberUids = snap.docs.map((d) => d.id)
+      recalculate()
+    }
+  )
+
+  const unsub2 = onSnapshot(
+    collection(db, 'userAchievements'),
+    (snap) => {
+      achievementsByUser = new Map()
+      for (const doc of snap.docs) {
+        const data = doc.data()
+        const uid = data.uid as string
+        const achId = data.achievementId as string
+        if (!achievementsByUser.has(uid)) {
+          achievementsByUser.set(uid, [])
+        }
+        achievementsByUser.get(uid)!.push(achId)
+      }
+      recalculate()
+    }
+  )
+
+  return () => {
+    unsub1()
+    unsub2()
+  }
+}
+
 export const unlockAchievement = async (uid: string, achievementId: string) => {
   const existing = await getDocs(
     query(

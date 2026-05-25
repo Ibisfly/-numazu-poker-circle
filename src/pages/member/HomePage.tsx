@@ -107,6 +107,9 @@ export const HomePage = () => {
                   <LuckyHandCard rank={parsed.rank2} suit={parsed.suited ? 'h' : 'd'} />
                 </div>
               </div>
+              <p className="text-[9px] text-swan-muted mt-2 text-center">
+                ※ {parsed.suited ? 'スーテッドであればスートは不問' : 'ポケットペアのスートは不問'}
+              </p>
             </div>
           )
         })()}

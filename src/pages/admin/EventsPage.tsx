@@ -9,7 +9,7 @@ import { ChevronLeft, Plus, Pencil, X, Layers } from '@/components/ui/Icons'
 import { FeatherPtIcon } from '@/components/ui/Icons'
 
 // フォームの初期値
-const EMPTY = { title: '', date: '', attendancePoint: '50', bingoCardId: '' }
+const EMPTY = { title: '', date: '', attendancePoint: '200', bingoCardId: '' }
 
 export const EventsPage = () => {
   const { user } = useAuth()

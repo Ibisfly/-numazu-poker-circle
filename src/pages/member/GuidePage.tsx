@@ -1,6 +1,7 @@
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { AppShell } from '@/components/layout/AppShell'
-import { ChevronDown, ChevronRight } from '@/components/ui/Icons'
+import { ChevronRight } from '@/components/ui/Icons'
 import { POKER_TERMS } from '@/lib/glossary'
 
 type Section = 'toc' | 'hand' | 'flow' | 'position' | 'action' | 'terms'
@@ -171,32 +172,30 @@ const getHandColor = (row: number, col: number): string => {
     const pair = r1 + r1
     if (['AA', 'KK', 'QQ'].includes(pair)) return 'bg-blue-900 text-white'
     if (['JJ', 'TT', '99'].includes(pair)) return 'bg-red-500 text-white'
-    if (['88', '77'].includes(pair)) return 'bg-yellow-400 text-black'
-    if (['66', '55'].includes(pair)) return 'bg-green-500 text-white'
-    if (['44', '33', '22'].includes(pair)) return 'bg-cyan-400 text-black'
+    if (['88', '77', '66'].includes(pair)) return 'bg-yellow-400 text-black'
+    if (['55', '44'].includes(pair)) return 'bg-green-500 text-white'
+    if (['33', '22'].includes(pair)) return 'bg-cyan-400 text-black'
   }
 
   if (row < col) {
     const suited = r1 + r2 + 's'
     if (suited === 'AKs') return 'bg-blue-900 text-white'
     if (['AQs', 'AJs', 'ATs', 'KQs'].includes(suited)) return 'bg-red-500 text-white'
-    if (['KJs', 'QJs', 'JTs'].includes(suited)) return 'bg-yellow-400 text-black'
-    if (['A9s', 'A8s', 'A7s', 'A6s', 'A5s', 'A4s', 'A3s', 'A2s', 'KTs', 'K9s', 'QTs'].includes(suited)) return 'bg-green-500 text-white'
-    if (['Q9s', 'J9s', 'T9s', 'T8s', '98s'].includes(suited)) return 'bg-cyan-400 text-black'
-    if (['K8s', 'K7s', 'K6s', 'K5s', 'K4s', 'K3s', 'K2s', 'Q8s', 'Q7s', 'Q6s', 'Q5s', 'Q4s', 'Q3s', 'J8s', 'J7s', 'J6s', 'T7s', '97s', '87s', '76s', '65s', '54s'].includes(suited)) return 'bg-white text-black'
-    if (['Q2s', 'J5s', 'J4s', 'J3s', 'J2s', 'T6s', 'T5s', 'T4s', 'T3s', 'T2s', '96s', '95s', '86s', '85s', '75s', '74s', '64s', '53s', '43s'].includes(suited)) return 'bg-pink-400 text-black'
+    if (['KJs', 'QJs', 'JTs', 'A9s', 'A8s', 'A5s', 'KTs', 'K9s', 'QTs'].includes(suited)) return 'bg-yellow-400 text-black'
+    if (['A7s', 'A6s', 'A4s', 'A3s', 'A2s', 'Q9s', 'J9s', 'T9s', 'T8s', '98s', 'K8s', 'Q8s', 'K7s'].includes(suited)) return 'bg-green-500 text-white'
+    if (['K6s', 'K5s', 'K4s', 'K3s', 'K2s', 'Q7s', 'Q6s', 'Q5s', 'Q4s', 'Q3s', 'J8s', 'J7s', 'J6s', 'T7s', '97s', '87s', '76s', '65s', '54s'].includes(suited)) return 'bg-cyan-400 text-black'
+    if (['Q2s', 'J5s', 'J4s', 'J3s', 'J2s', 'T6s', 'T5s', 'T4s', 'T3s', 'T2s', '96s', '95s', '86s', '85s', '75s', '74s', '64s', '53s', '43s'].includes(suited)) return 'bg-white text-black'
     return 'bg-gray-600 text-gray-300'
   }
 
   if (row > col) {
     const offsuit = r2 + r1 + 'o'
     if (offsuit === 'AKo') return 'bg-blue-900 text-white'
-    if (offsuit === 'AQo') return 'bg-red-500 text-white'
-    if (['KQo', 'AJo'].includes(offsuit)) return 'bg-yellow-400 text-black'
-    if (['KJo', 'ATo'].includes(offsuit)) return 'bg-green-500 text-white'
-    if (['QJo', 'KTo', 'A9o', 'JTo'].includes(offsuit)) return 'bg-cyan-400 text-black'
-    if (['A8o', 'A7o', 'A6o', 'K9o', 'QTo', 'Q9o', 'J9o', 'T9o'].includes(offsuit)) return 'bg-white text-black'
-    if (['A2o', 'A3o', 'A4o', 'A5o', 'K8o', 'K7o', 'K6o', 'K5o', 'Q8o', 'Q7o', 'J8o', 'T8o', '97o', '87o', '98o'].includes(offsuit)) return 'bg-pink-400 text-black'
+    if (['AQo', 'KQo'].includes(offsuit)) return 'bg-red-500 text-white'
+    if (['AJo', 'KJo', 'ATo'].includes(offsuit)) return 'bg-yellow-400 text-black'
+    if (['QJo', 'KTo', 'A9o'].includes(offsuit)) return 'bg-green-500 text-white'
+    if (['JTo', 'A8o', 'A7o', 'A6o', 'K9o', 'QTo', 'Q9o', 'J9o', 'T9o'].includes(offsuit)) return 'bg-cyan-400 text-black'
+    if (['A2o', 'A3o', 'A4o', 'A5o', 'K8o', 'K7o', 'K6o', 'K5o', 'Q8o', 'Q7o', 'J8o', 'T8o', '97o', '87o', '98o'].includes(offsuit)) return 'bg-white text-black'
     return 'bg-gray-600 text-gray-300'
   }
 
@@ -238,7 +237,6 @@ const HandRangeGrid = () => (
         <div className="flex-1 bg-green-500" />
         <div className="flex-1 bg-cyan-400" />
         <div className="flex-1 bg-white border-y border-swan-border" />
-        <div className="flex-1 bg-pink-400" />
         <div className="flex-1 bg-gray-600" />
       </div>
       <span>弱い</span>
@@ -249,26 +247,33 @@ const HandRangeGrid = () => (
   </div>
 )
 
-const Accordion = ({ title, children, defaultOpen = false, id }: { title: string; children: React.ReactNode; defaultOpen?: boolean; id?: string }) => {
-  const [open, setOpen] = useState(defaultOpen)
-  return (
-    <div id={id} className="border border-swan-border rounded-xl overflow-hidden scroll-mt-20">
-      <button
-        onClick={() => setOpen(!open)}
-        className="w-full flex items-center justify-between px-4 py-3 bg-swan-card text-left"
-      >
-        <span className="font-semibold text-swan-text">{title}</span>
-        {open ? <ChevronDown size={20} className="text-swan-sub" /> : <ChevronRight size={20} className="text-swan-sub" />}
-      </button>
-      {open && <div className="px-4 py-3 bg-swan-dark">{children}</div>}
-    </div>
-  )
-}
-
 export const GuidePage = () => {
+  const [searchParams] = useSearchParams()
   const [section, setSection] = useState<Section>('toc')
   const [termSearch, setTermSearch] = useState('')
   const contentRef = useRef<HTMLDivElement>(null)
+  const [highlightedTerm, setHighlightedTerm] = useState<string | null>(null)
+
+  useEffect(() => {
+    const sectionParam = searchParams.get('section')
+    const termParam = searchParams.get('term')
+
+    if (sectionParam && ['toc', 'hand', 'flow', 'position', 'action', 'terms'].includes(sectionParam)) {
+      setSection(sectionParam as Section)
+    }
+
+    if (termParam) {
+      setSection('terms')
+      setHighlightedTerm(termParam)
+      setTimeout(() => {
+        const termElement = document.getElementById(`term-${termParam}`)
+        if (termElement) {
+          termElement.scrollIntoView({ behavior: 'smooth', block: 'center' })
+          setTimeout(() => setHighlightedTerm(null), 2000)
+        }
+      }, 200)
+    }
+  }, [searchParams])
 
   const scrollToSection = (id: string) => {
     setSection(id as Section)
@@ -518,26 +523,86 @@ export const GuidePage = () => {
               </div>
             ))}
 
-            <Accordion title="ベットサイズの目安">
-              <div className="space-y-2 text-sm">
-                <div className="flex justify-between items-center py-2 border-b border-swan-border">
-                  <span className="text-swan-text">プリフロップオープン</span>
-                  <span className="text-swan-accent font-mono">2.5〜3BB</span>
+            <div className="bg-gradient-to-br from-swan-accent/10 to-yellow-500/10 border border-swan-accent/30 rounded-xl p-4 space-y-4">
+              <h3 className="font-bold text-swan-accent flex items-center gap-2">
+                📐 ベットサイズの目安
+              </h3>
+
+              <div className="space-y-3">
+                <div className="bg-swan-card/50 rounded-lg p-3">
+                  <div className="flex items-center gap-2 mb-2">
+                    <span className="w-6 h-6 rounded-full bg-blue-500 text-white text-xs font-bold flex items-center justify-center">1</span>
+                    <span className="font-semibold text-swan-text">プリフロップ</span>
+                  </div>
+                  <p className="text-sm text-swan-sub mb-2">
+                    基本的に<span className="text-swan-accent font-semibold">レイズして参加</span>しよう！
+                  </p>
+                  <div className="grid grid-cols-2 gap-2 text-xs">
+                    <div className="bg-swan-dark rounded px-2 py-1.5">
+                      <span className="text-swan-muted">オープン</span>
+                      <span className="block text-swan-accent font-mono font-bold">BB × 2〜3倍</span>
+                    </div>
+                    <div className="bg-swan-dark rounded px-2 py-1.5">
+                      <span className="text-swan-muted">3bet</span>
+                      <span className="block text-swan-accent font-mono font-bold">相手の 3〜4倍</span>
+                    </div>
+                  </div>
+                  <p className="text-[10px] text-swan-muted mt-2 flex items-center gap-1">
+                    <span className="w-3 h-3 rounded-sm bg-yellow-400"></span>
+                    ハンドレンジ表の黄色以上のハンドが参加目安！
+                  </p>
                 </div>
-                <div className="flex justify-between items-center py-2 border-b border-swan-border">
-                  <span className="text-swan-text">3bet</span>
-                  <span className="text-swan-accent font-mono">3〜4倍</span>
+
+                <div className="bg-swan-card/50 rounded-lg p-3">
+                  <div className="flex items-center gap-2 mb-2">
+                    <span className="w-6 h-6 rounded-full bg-green-500 text-white text-xs font-bold flex items-center justify-center">2</span>
+                    <span className="font-semibold text-swan-text">ポストフロップのベット</span>
+                  </div>
+                  <p className="text-sm text-swan-sub mb-2">
+                    ポットの<span className="text-swan-accent font-semibold">33%〜100%</span>を目安に！
+                  </p>
+                  <div className="grid grid-cols-3 gap-1 text-xs">
+                    <div className="bg-swan-dark rounded px-2 py-1.5 text-center">
+                      <span className="text-swan-muted block">小</span>
+                      <span className="text-green-400 font-mono font-bold">33%</span>
+                    </div>
+                    <div className="bg-swan-dark rounded px-2 py-1.5 text-center">
+                      <span className="text-swan-muted block">中</span>
+                      <span className="text-yellow-400 font-mono font-bold">50〜75%</span>
+                    </div>
+                    <div className="bg-swan-dark rounded px-2 py-1.5 text-center">
+                      <span className="text-swan-muted block">大</span>
+                      <span className="text-red-400 font-mono font-bold">100%</span>
+                    </div>
+                  </div>
                 </div>
-                <div className="flex justify-between items-center py-2 border-b border-swan-border">
-                  <span className="text-swan-text">Cbet（フロップ）</span>
-                  <span className="text-swan-accent font-mono">ポットの1/3〜2/3</span>
-                </div>
-                <div className="flex justify-between items-center py-2">
-                  <span className="text-swan-text">バリューベット</span>
-                  <span className="text-swan-accent font-mono">ポットの1/2〜3/4</span>
+
+                <div className="bg-swan-card/50 rounded-lg p-3">
+                  <div className="flex items-center gap-2 mb-2">
+                    <span className="w-6 h-6 rounded-full bg-red-500 text-white text-xs font-bold flex items-center justify-center">3</span>
+                    <span className="font-semibold text-swan-text">オールイン</span>
+                  </div>
+                  <div className="space-y-2 text-sm">
+                    <div className="flex items-start gap-2">
+                      <span className="text-red-400 font-bold shrink-0">▸</span>
+                      <p className="text-swan-sub">
+                        プリフロップで<span className="text-red-400 font-semibold">10BB以下</span>なら即オールイン！
+                      </p>
+                    </div>
+                    <div className="flex items-start gap-2">
+                      <span className="text-red-400 font-bold shrink-0">▸</span>
+                      <p className="text-swan-sub">
+                        フロップ以降、スタックが<span className="text-red-400 font-semibold">ポットの半分以下</span>ならオールイン！
+                      </p>
+                    </div>
+                  </div>
+                  <p className="text-[10px] text-swan-muted mt-2 flex items-center gap-1">
+                    <span className="w-3 h-3 rounded-sm bg-green-500"></span>
+                    ハンドレンジ表の緑以上のハンドが目安！
+                  </p>
                 </div>
               </div>
-            </Accordion>
+            </div>
           </div>
         )}
 
@@ -562,7 +627,15 @@ export const GuidePage = () => {
                 </h4>
                 <div className="space-y-1">
                   {terms.map((t) => (
-                    <div key={t.term} className="bg-swan-card border border-swan-border rounded-lg px-3 py-2">
+                    <div
+                      key={t.term}
+                      id={`term-${t.term}`}
+                      className={`bg-swan-card border rounded-lg px-3 py-2 transition-all scroll-mt-24 ${
+                        highlightedTerm === t.term
+                          ? 'border-swan-accent ring-2 ring-swan-accent/50'
+                          : 'border-swan-border'
+                      }`}
+                    >
                       <p className="font-semibold text-swan-text text-sm">{t.term}</p>
                       <p className="text-xs text-swan-sub">{t.desc}</p>
                     </div>

@@ -55,7 +55,7 @@ export const MemberProfilePage = () => {
         if (!match) continue
 
         if (match.matchCategory === 'ring') {
-          // リングゲーム（プレミアリング）
+          // プレミアリング
           const cashbacks: { uid: string; amount: number }[] = result.cashbacks ?? []
           const entry = cashbacks.find((c) => c.uid === uid)
           if (entry) {

@@ -42,7 +42,7 @@ export const MatchListPage = () => {
                     {(match.matchCategory ?? 'tournament') === 'tournament' ? (
                       <span className="text-xs font-bold text-purple-400 bg-purple-400/10 border border-purple-400/30 px-1.5 py-0.5 rounded-full">トーナメント</span>
                     ) : (
-                      <span className="text-xs font-bold text-cyan-400 bg-cyan-400/10 border border-cyan-400/30 px-1.5 py-0.5 rounded-full">リングゲーム</span>
+                      <span className="text-xs font-bold text-cyan-400 bg-cyan-400/10 border border-cyan-400/30 px-1.5 py-0.5 rounded-full">プレミアリング</span>
                     )}
                     {match.hasReentry && <span className="text-xs text-purple-400">リエントリー可</span>}
                     {match.hasBounty  && <span className="text-xs text-orange-400">バウンティ</span>}

@@ -114,7 +114,7 @@ const CategoryBadge = ({ cat }: { cat: MatchCategory }) =>
     </span>
   ) : (
     <span className="text-xs font-bold text-cyan-400 bg-cyan-400/10 border border-cyan-400/30 px-2 py-0.5 rounded-full">
-      リングゲーム
+      プレミアリング
     </span>
   )
 
@@ -144,7 +144,12 @@ export const MatchesAdminPage = () => {
   // 作成フォーム
   const [formCat, setFormCat] = useState<MatchCategory>('tournament')
   const [formTitle, setFormTitle] = useState('')
-  const [formFee, setFormFee] = useState('100')
+  const [formFee, setFormFee] = useState('0')
+
+  const handleCategoryChange = (cat: MatchCategory) => {
+    setFormCat(cat)
+    setFormFee(cat === 'tournament' ? '0' : '100')
+  }
   const [formCapacity, setFormCapacity] = useState('8')
   const [formDate, setFormDate] = useState('')
   const [formDist, setFormDist] = useState<DistributionRule[]>(DEFAULT_DIST)
@@ -293,7 +298,7 @@ export const MatchesAdminPage = () => {
                   <button
                     key={c}
                     type="button"
-                    onClick={() => setFormCat(c)}
+                    onClick={() => handleCategoryChange(c)}
                     className={`flex-1 py-2 rounded-xl text-sm font-bold border transition-colors ${
                       formCat === c
                         ? c === 'tournament'
@@ -302,7 +307,7 @@ export const MatchesAdminPage = () => {
                         : 'border-swan-border text-swan-sub'
                     }`}
                   >
-                    {c === 'tournament' ? '🏆 トーナメント' : '♠ リングゲーム'}
+                    {c === 'tournament' ? '🏆 トーナメント' : '♠ プレミアリング'}
                   </button>
                 ))}
               </div>
@@ -377,7 +382,7 @@ export const MatchesAdminPage = () => {
               </>
             )}
 
-            {/* リングゲーム専用 */}
+            {/* プレミアリング専用 */}
             {formCat === 'ring' && (
               <div>
                 <p className="text-xs text-cyan-400 bg-cyan-400/10 border border-cyan-400/20 rounded-lg px-3 py-2 mb-3">
@@ -456,7 +461,7 @@ export const MatchesAdminPage = () => {
           </div>
         )}
 
-        {/* ── リングゲーム精算モーダル ── */}
+        {/* ── プレミアリング精算モーダル ── */}
         {settlingRing && (
           <div className="fixed inset-0 bg-black/80 z-50 flex items-end">
             <div className="bg-swan-dark border-t border-cyan-500/30 w-full max-w-md mx-auto rounded-t-2xl p-6 space-y-4 max-h-[80vh] overflow-y-auto">
