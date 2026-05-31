@@ -28,12 +28,16 @@ export interface User {
   createdAt: Timestamp
 }
 
+export type EventStatus = 'scheduled' | 'active' | 'finished'
+
 export interface Event {
   id: string
   title: string
   date: Timestamp
   attendancePoint: number
   bingoCardId?: string       // このイベントで配布するビンゴカードID
+  status: EventStatus        // scheduled → active → finished
+  finishedAt?: Timestamp     // 終了日時
   createdBy: string
   createdAt: Timestamp
 }
@@ -76,6 +80,8 @@ export interface Match {
   scheduledAt: Timestamp
   createdBy: string
   createdAt: Timestamp
+  // イベント紐付け
+  eventId?: string              // 紐付けイベントID（未設定は野良マッチ）
   // トーナメントオプション
   hasReentry?: boolean
   reentryFee?: number  // リエントリー費用（未設定時はentryFeeと同額）
@@ -268,5 +274,44 @@ export interface UserBingoCard {
   completedAt?: Timestamp     // 全マス完了時（廃止予定、finishedAtに移行）
   finishedAt?: Timestamp      // ビンゴ終了日時（ユーザーが「終了する」を押した日時）
   firstBingoClaimed?: boolean // 初回ビンゴポイント受取済みフラグ（廃止予定）
+}
+
+// ── イベントサマリー ─────────────────────────────────────────────────────────────
+
+export interface TournamentResultSummary {
+  matchId: string
+  title: string
+  rank: number
+  earnedPoints: number
+}
+
+export interface RingResultSummary {
+  matchId: string
+  title: string
+  entryFee: number
+  cashback: number
+  netPoints: number  // cashback - entryFee - rebuyFees
+}
+
+export interface BingoResultSummary {
+  bingoCardId: string
+  name: string
+  completedCells: number
+  bingoCount: number
+  earnedPoints: number
+}
+
+export interface EventParticipantSummary {
+  id: string
+  eventId: string
+  eventTitle: string
+  uid: string
+  attendancePoints: number
+  tournamentResults: TournamentResultSummary[]
+  ringResults: RingResultSummary[]
+  bingoResults: BingoResultSummary[]
+  totalEarnedPoints: number
+  isRead: boolean
+  createdAt: Timestamp
 }
 

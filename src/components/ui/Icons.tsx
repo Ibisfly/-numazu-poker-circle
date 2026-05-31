@@ -44,6 +44,8 @@ export {
   Crown,
   Gift,
   Trash2,
+  Play,
+  CheckCircle,
 } from 'lucide-react'
 
 import type { SVGProps } from 'react'

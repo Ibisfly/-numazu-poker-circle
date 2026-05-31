@@ -106,6 +106,7 @@ export const MemberProfilePage = () => {
             color={member.avatarColor ?? DEFAULT_AVATAR_COLOR}
             size={72}
             frame={member.equippedFrame}
+            variant={member.avatarVariant}
           />
           <div className="flex-1">
             <h2 className="text-xl font-bold flex items-center gap-2 flex-wrap">

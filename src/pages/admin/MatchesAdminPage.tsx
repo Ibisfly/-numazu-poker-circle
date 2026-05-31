@@ -4,12 +4,12 @@ import { AdminShell } from './AdminDashboardPage'
 import {
   subscribeMatches, createMatch, updateMatch, deleteMatch,
   settleMatch, settleRingGame, subscribeAllUsers, checkAndUnlockAchievements,
-  getTimerProvisionalRankings, getTimerSessionState,
+  getTimerProvisionalRankings, getTimerSessionState, subscribeActiveEvents,
 } from '@/lib/firebase/firestore'
 import { useAuth } from '@/lib/hooks/useAuth'
-import type { Match, MatchStatus, User, DistributionRule, MatchCategory } from '@/types'
+import type { Match, MatchStatus, User, DistributionRule, MatchCategory, Event } from '@/types'
 import { Timestamp } from 'firebase/firestore'
-import { ChevronLeft, Plus, FeatherPtIcon } from '@/components/ui/Icons'
+import { ChevronLeft, Plus, FeatherPtIcon, Pencil } from '@/components/ui/Icons'
 
 // ── タイマーアプリ連携セクション ──────────────────────────────────────────
 const TimerAppSection = ({ match }: { match: Match }) => {
@@ -139,12 +139,14 @@ export const MatchesAdminPage = () => {
   const { user: adminUser } = useAuth()
   const [matches, setMatches] = useState<Match[]>([])
   const [allUsers, setAllUsers] = useState<User[]>([])
+  const [activeEvents, setActiveEvents] = useState<Event[]>([])
   const [showForm, setShowForm] = useState(false)
 
   // 作成フォーム
   const [formCat, setFormCat] = useState<MatchCategory>('tournament')
   const [formTitle, setFormTitle] = useState('')
   const [formFee, setFormFee] = useState('0')
+  const [formEventId, setFormEventId] = useState('')
 
   const handleCategoryChange = (cat: MatchCategory) => {
     setFormCat(cat)
@@ -159,6 +161,9 @@ export const MatchesAdminPage = () => {
   const [formRebuyFee, setFormRebuyFee] = useState('')
   const [saving, setSaving] = useState(false)
 
+  // マッチ編集
+  const [editingMatch, setEditingMatch] = useState<Match | null>(null)
+
   // トーナメント精算
   const [deletingMatchId, setDeletingMatchId] = useState<string | null>(null)
   const [settlingMatch, setSettlingMatch] = useState<Match | null>(null)
@@ -171,7 +176,8 @@ export const MatchesAdminPage = () => {
   useEffect(() => {
     const u1 = subscribeMatches(setMatches)
     const u2 = subscribeAllUsers(setAllUsers)
-    return () => { u1(); u2() }
+    const u3 = subscribeActiveEvents(setActiveEvents)
+    return () => { u1(); u2(); u3() }
   }, [])
 
   const getUserName = (uid: string) =>
@@ -193,6 +199,7 @@ export const MatchesAdminPage = () => {
         participants: [],
         scheduledAt: Timestamp.fromDate(new Date(formDate)),
         createdBy: adminUser.uid,
+        eventId: formEventId || undefined,
         ...(formCat === 'tournament' && {
           hasReentry: formReentry,
           reentryFee: formReentry ? (parseInt(formReentryFee) || parseInt(formFee)) : undefined,
@@ -203,11 +210,28 @@ export const MatchesAdminPage = () => {
         }),
       })
       setShowForm(false)
-      setFormTitle(''); setFormCat('tournament'); setFormReentry(false); setFormReentryFee(''); setFormRebuy(false); setFormRebuyFee('')
+      setFormTitle(''); setFormCat('tournament'); setFormReentry(false); setFormReentryFee(''); setFormRebuy(false); setFormRebuyFee(''); setFormEventId('')
       setFormDist(DEFAULT_DIST)
     } finally {
       setSaving(false)
     }
+  }
+
+  // ── マッチ編集保存 ──────────────────────────────────────────────────────────
+  const handleSaveEdit = async () => {
+    if (!editingMatch) return
+    setSaving(true)
+    try {
+      await updateMatch(editingMatch.id, { eventId: formEventId || undefined })
+      setEditingMatch(null)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const openEdit = (match: Match) => {
+    setFormEventId(match.eventId ?? '')
+    setEditingMatch(match)
   }
 
   // ── トーナメント精算開始 ──────────────────────────────────────────────────
@@ -346,6 +370,26 @@ export const MatchesAdminPage = () => {
                 className="w-full bg-swan-black border border-swan-border rounded-lg px-3 py-2 text-sm text-swan-text focus:outline-none" />
             </div>
 
+            {/* イベント紐付け */}
+            <div>
+              <label className="text-xs text-swan-sub mb-1 block">イベント紐付け</label>
+              <select
+                value={formEventId}
+                onChange={(e) => setFormEventId(e.target.value)}
+                className="w-full bg-swan-black border border-swan-border rounded-lg px-3 py-2 text-sm text-swan-text focus:outline-none"
+              >
+                <option value="">紐付けなし（野良マッチ）</option>
+                {activeEvents.map((ev) => (
+                  <option key={ev.id} value={ev.id}>
+                    {ev.title} ({ev.date?.toDate().toLocaleDateString('ja-JP')})
+                  </option>
+                ))}
+              </select>
+              {activeEvents.length === 0 && (
+                <p className="text-xs text-swan-muted mt-1">開催中のイベントがありません</p>
+              )}
+            </div>
+
             {/* トーナメント専用 */}
             {formCat === 'tournament' && (
               <>
@@ -463,6 +507,45 @@ export const MatchesAdminPage = () => {
           </div>
         )}
 
+        {/* ── マッチ編集モーダル ── */}
+        {editingMatch && (
+          <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center px-6">
+            <div className="bg-swan-dark border border-swan-border rounded-2xl p-6 w-full max-w-xs space-y-4">
+              <p className="font-bold">マッチ編集：{editingMatch.title}</p>
+              <div>
+                <label className="text-xs text-swan-sub mb-1 block">イベント紐付け</label>
+                <select
+                  value={formEventId}
+                  onChange={(e) => setFormEventId(e.target.value)}
+                  className="w-full bg-swan-black border border-swan-border rounded-lg px-3 py-2 text-sm text-swan-text focus:outline-none"
+                >
+                  <option value="">紐付けなし（野良マッチ）</option>
+                  {activeEvents.map((ev) => (
+                    <option key={ev.id} value={ev.id}>
+                      {ev.title} ({ev.date?.toDate().toLocaleDateString('ja-JP')})
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="flex gap-2">
+                <button
+                  onClick={handleSaveEdit}
+                  disabled={saving}
+                  className="flex-1 bg-swan-accent text-black font-bold py-2 rounded-xl text-sm disabled:opacity-50"
+                >
+                  {saving ? '保存中...' : '保存'}
+                </button>
+                <button
+                  onClick={() => setEditingMatch(null)}
+                  className="flex-1 bg-swan-muted text-swan-sub py-2 rounded-xl text-sm"
+                >
+                  キャンセル
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* ── トーナメント精算モーダル ── */}
         {settlingMatch && (
           <div className="fixed inset-0 bg-black/80 z-50 flex items-end">
@@ -556,6 +639,7 @@ export const MatchesAdminPage = () => {
         <div className="space-y-3">
           {matches.map((match) => {
             const cat = match.matchCategory ?? 'tournament'
+            const linkedEvent = activeEvents.find((e) => e.id === match.eventId)
             return (
               <div key={match.id} className="bg-swan-card border border-swan-border rounded-xl p-4 space-y-3">
                 <div className="flex justify-between items-start">
@@ -563,13 +647,20 @@ export const MatchesAdminPage = () => {
                     <div className="flex items-center gap-2 flex-wrap mb-1">
                       <CategoryBadge cat={cat} />
                       <StatusLabel status={match.status} />
+                      {linkedEvent && (
+                        <span className="text-xs text-green-400 bg-green-400/10 border border-green-400/30 px-1.5 py-0.5 rounded">
+                          {linkedEvent.title}
+                        </span>
+                      )}
+                      {!match.eventId && (
+                        <span className="text-xs text-swan-muted">野良</span>
+                      )}
                     </div>
                     <p className="font-semibold truncate">{match.title}</p>
-                    <p className="text-xs text-swan-sub mt-0.5 flex items-center gap-1">
+                    <p className="text-xs text-swan-sub mt-0.5 flex items-center gap-1 flex-wrap">
                       {match.participants.length}/{match.capacity}名
                       <FeatherPtIcon size={10} className="text-swan-accent ml-1" />
                       {match.entryFee}
-                      {/* フラグ表示 */}
                       {match.hasReentry && (
                         <span className="ml-1 text-purple-400">
                           リエントリー可{match.reentryFee && match.reentryFee !== match.entryFee ? ` (${match.reentryFee}pt)` : ''}
@@ -582,6 +673,13 @@ export const MatchesAdminPage = () => {
                       )}
                     </p>
                   </div>
+                  <button
+                    onClick={() => openEdit(match)}
+                    className="p-1.5 text-swan-accent hover:bg-swan-accent/10 rounded-lg transition-colors shrink-0"
+                    title="編集"
+                  >
+                    <Pencil size={14} />
+                  </button>
                 </div>
 
                 <div className="flex gap-2 flex-wrap">
@@ -603,7 +701,6 @@ export const MatchesAdminPage = () => {
                       終了・精算（キャッシュバック）
                     </button>
                   )}
-                  {/* 削除（受付中 or 終了のみ） */}
                   {match.status !== 'ongoing' && (
                     <button
                       onClick={() => setDeletingMatchId(match.id)}
@@ -614,7 +711,6 @@ export const MatchesAdminPage = () => {
                   )}
                 </div>
 
-                {/* タイマーアプリ連携（将来拡張ポイント）*/}
                 <TimerAppSection match={match} />
               </div>
             )

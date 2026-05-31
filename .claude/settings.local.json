@@ -19,7 +19,9 @@
       "PowerShell(npx tsc --noEmit 2>&1 | Select-Object -First 50)",
       "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\abeno\\\\my_project\\\\circles\" -Recurse -Directory)",
       "Bash(Select-Object -First 30)",
-      "Bash(Format-Table FullName)"
+      "Bash(Format-Table FullName)",
+      "Bash(Get-ChildItem -Path public -Filter \"*.svg\")",
+      "Bash(Select-Object Name)"
     ]
   }
 }

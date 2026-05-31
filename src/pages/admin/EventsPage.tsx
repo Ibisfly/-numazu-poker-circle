@@ -1,12 +1,26 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { AdminShell } from './AdminDashboardPage'
-import { subscribeEvents, createEvent, updateEvent, deleteEvent, subscribeBingoCards } from '@/lib/firebase/firestore'
+import { subscribeEvents, createEvent, updateEvent, deleteEvent, subscribeBingoCards, startEvent, finishEvent } from '@/lib/firebase/firestore'
 import { useAuth } from '@/lib/hooks/useAuth'
-import type { Event, BingoCard } from '@/types'
+import type { Event, BingoCard, EventStatus } from '@/types'
 import { Timestamp } from 'firebase/firestore'
-import { ChevronLeft, Plus, Pencil, X, Layers } from '@/components/ui/Icons'
+import { ChevronLeft, Plus, Pencil, X, Layers, Play, CheckCircle } from '@/components/ui/Icons'
 import { FeatherPtIcon } from '@/components/ui/Icons'
+
+const StatusBadge = ({ status }: { status: EventStatus }) => {
+  const styles = {
+    scheduled: 'text-swan-sub border-swan-border',
+    active: 'text-green-400 border-green-400/50 bg-green-400/10',
+    finished: 'text-swan-muted border-swan-muted/30',
+  }
+  const labels = { scheduled: '予定', active: '開催中', finished: '終了' }
+  return (
+    <span className={`text-xs px-2 py-0.5 rounded-full border ${styles[status]}`}>
+      {labels[status]}
+    </span>
+  )
+}
 
 // フォームの初期値
 const EMPTY = { title: '', date: '', attendancePoint: '200', bingoCardId: '' }
@@ -20,6 +34,8 @@ export const EventsPage = () => {
   const [form, setForm]         = useState(EMPTY)
   const [saving, setSaving]     = useState(false)
   const [deletingId, setDeletingId] = useState<string | null>(null)
+  const [finishingEvent, setFinishingEvent] = useState<Event | null>(null)
+  const [actionLoading, setActionLoading] = useState<string | null>(null)
 
   useEffect(() => { return subscribeEvents(setEvents) }, [])
   useEffect(() => { return subscribeBingoCards(setBingoCards) }, [])
@@ -70,6 +86,26 @@ export const EventsPage = () => {
   const handleDelete = async (id: string) => {
     await deleteEvent(id)
     setDeletingId(null)
+  }
+
+  const handleStart = async (ev: Event) => {
+    setActionLoading(ev.id)
+    try {
+      await startEvent(ev.id)
+    } finally {
+      setActionLoading(null)
+    }
+  }
+
+  const handleFinish = async () => {
+    if (!finishingEvent || !user) return
+    setActionLoading(finishingEvent.id)
+    try {
+      await finishEvent(finishingEvent.id, user.uid)
+      setFinishingEvent(null)
+    } finally {
+      setActionLoading(null)
+    }
   }
 
   if (!user) return null
@@ -180,6 +216,35 @@ export const EventsPage = () => {
           </div>
         )}
 
+        {/* 終了確認モーダル */}
+        {finishingEvent && (
+          <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center px-6">
+            <div className="bg-swan-dark border border-green-500/30 rounded-2xl p-6 w-full max-w-xs text-center space-y-4">
+              <p className="font-bold text-green-400">イベントを終了しますか？</p>
+              <p className="text-xs text-swan-sub text-left">
+                ・参加者の成績サマリーを生成<br />
+                ・未終了のビンゴカードを強制終了<br />
+                ・参加者に通知を送信
+              </p>
+              <div className="flex gap-2">
+                <button
+                  onClick={handleFinish}
+                  disabled={actionLoading === finishingEvent.id}
+                  className="flex-1 bg-green-500/20 text-green-400 border border-green-500/30 font-bold py-2 rounded-xl text-sm disabled:opacity-50"
+                >
+                  {actionLoading === finishingEvent.id ? '処理中...' : '終了する'}
+                </button>
+                <button
+                  onClick={() => setFinishingEvent(null)}
+                  className="flex-1 bg-swan-muted text-swan-sub py-2 rounded-xl text-sm"
+                >
+                  キャンセル
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* イベント一覧 */}
         <div className="space-y-2">
           {events.length === 0 && (
@@ -187,12 +252,19 @@ export const EventsPage = () => {
           )}
           {events.map((ev) => {
             const bingoCard = bingoCards.find((c) => c.id === ev.bingoCardId)
+            const status = ev.status ?? 'scheduled'
+            const isLoading = actionLoading === ev.id
             return (
-            <div key={ev.id} className="bg-swan-card border border-swan-border rounded-xl px-4 py-3">
+            <div key={ev.id} className={`bg-swan-card border rounded-xl px-4 py-3 ${
+              status === 'active' ? 'border-green-500/50' : 'border-swan-border'
+            }`}>
               <div className="flex items-start justify-between">
                 <div className="min-w-0">
-                  <p className="font-medium truncate">{ev.title}</p>
-                  <div className="flex items-center gap-3 text-xs text-swan-sub mt-1">
+                  <div className="flex items-center gap-2 mb-1">
+                    <StatusBadge status={status} />
+                    <p className="font-medium truncate">{ev.title}</p>
+                  </div>
+                  <div className="flex items-center gap-3 text-xs text-swan-sub">
                     <span>{ev.date?.toDate().toLocaleDateString('ja-JP')}</span>
                     <span className="flex items-center gap-1">
                       付与: <FeatherPtIcon size={11} className="text-swan-accent" /> {ev.attendancePoint}
@@ -205,18 +277,45 @@ export const EventsPage = () => {
                   </div>
                 </div>
                 <div className="flex items-center gap-1 shrink-0 ml-2">
-                  <button
-                    onClick={() => openEdit(ev)}
-                    className="p-1.5 text-swan-accent hover:bg-swan-accent/10 rounded-lg transition-colors"
-                  >
-                    <Pencil size={14} />
-                  </button>
-                  <button
-                    onClick={() => setDeletingId(ev.id)}
-                    className="p-1.5 text-red-400/60 hover:text-red-400 hover:bg-red-400/10 rounded-lg transition-colors"
-                  >
-                    <X size={14} />
-                  </button>
+                  {status === 'scheduled' && (
+                    <>
+                      <button
+                        onClick={() => handleStart(ev)}
+                        disabled={isLoading}
+                        className="p-1.5 text-green-400 hover:bg-green-400/10 rounded-lg transition-colors disabled:opacity-50"
+                        title="開催開始"
+                      >
+                        <Play size={14} />
+                      </button>
+                      <button
+                        onClick={() => openEdit(ev)}
+                        className="p-1.5 text-swan-accent hover:bg-swan-accent/10 rounded-lg transition-colors"
+                      >
+                        <Pencil size={14} />
+                      </button>
+                      <button
+                        onClick={() => setDeletingId(ev.id)}
+                        className="p-1.5 text-red-400/60 hover:text-red-400 hover:bg-red-400/10 rounded-lg transition-colors"
+                      >
+                        <X size={14} />
+                      </button>
+                    </>
+                  )}
+                  {status === 'active' && (
+                    <button
+                      onClick={() => setFinishingEvent(ev)}
+                      disabled={isLoading}
+                      className="flex items-center gap-1 px-2 py-1 text-xs text-green-400 border border-green-400/30 rounded-lg hover:bg-green-400/10 disabled:opacity-50"
+                    >
+                      <CheckCircle size={12} />
+                      終了
+                    </button>
+                  )}
+                  {status === 'finished' && (
+                    <span className="text-xs text-swan-muted">
+                      {ev.finishedAt?.toDate().toLocaleDateString('ja-JP')}終了
+                    </span>
+                  )}
                 </div>
               </div>
             </div>

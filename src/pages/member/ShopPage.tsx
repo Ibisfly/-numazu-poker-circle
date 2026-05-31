@@ -6,19 +6,19 @@ import { useAuth } from '@/lib/hooks/useAuth'
 import {
   subscribeItems, subscribeUserItems,
   purchaseItem, purchaseBenefitItem, equipAvatarColor, equipFrame, equipOverlay,
-  equipPointIcon, purchaseCustomHandTitle,
+  equipPointIcon, equipAvatarVariant, purchaseCustomHandTitle,
 } from '@/lib/firebase/firestore'
 import type { Item, UserItem } from '@/types'
 import { Plus, Minus } from '@/components/ui/Icons'
 
 type Tab = 'cosmetic' | 'benefit'
-type CosmeticSub = 'avatar_color' | 'avatar_decoration' | 'title' | 'point_icon' | 'custom_hand_title'
+type CosmeticSub = 'avatar_color' | 'avatar_decoration' | 'avatar_variant' | 'title' | 'custom_hand_title'
 
 const COSMETIC_SUBS: { value: CosmeticSub; label: string }[] = [
   { value: 'avatar_color',      label: '背景' },
   { value: 'avatar_decoration', label: '装飾' },
+  { value: 'avatar_variant',    label: 'アイコン' },
   { value: 'title',             label: '称号' },
-  { value: 'point_icon',        label: 'アイコン' },
   { value: 'custom_hand_title', label: 'ハンド称号' },
 ]
 
@@ -47,8 +47,8 @@ export const ShopPage = () => {
       if (i.category !== 'cosmetic') return false
       if (cosmeticSub === 'avatar_color')      return i.itemSubtype === 'avatar_color'
       if (cosmeticSub === 'avatar_decoration') return i.itemSubtype === 'avatar_decoration'
+      if (cosmeticSub === 'avatar_variant')    return i.itemSubtype === 'avatar_variant'
       if (cosmeticSub === 'title')             return i.itemSubtype === 'title'
-      if (cosmeticSub === 'point_icon')        return i.itemSubtype === 'point_icon'
       if (cosmeticSub === 'custom_hand_title') return i.itemSubtype === 'custom_hand_title'
       return false
     })
@@ -81,6 +81,7 @@ export const ShopPage = () => {
       if (item.decorationType === 'frame'   && item.frameStyle) await equipFrame(user.uid, item.frameStyle)
       if (item.decorationType === 'overlay' && item.overlayId)  await equipOverlay(user.uid, item.overlayId)
       if (item.itemSubtype === 'point_icon' && item.pointIconId) await equipPointIcon(user.uid, item.pointIconId)
+      if (item.itemSubtype === 'avatar_variant' && item.avatarVariant) await equipAvatarVariant(user.uid, item.avatarVariant)
       setMsg(`「${item.name}」を購入しました！`)
     } catch (e: unknown) {
       setMsg(e instanceof Error ? e.message : '購入に失敗しました')

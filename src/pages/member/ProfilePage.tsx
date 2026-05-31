@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom'
 import { AppShell } from '@/components/layout/AppShell'
 import { FeatherIcon } from '@/components/ui/FeatherIcon'
 import { Shield, LogOut, Pencil, X, Check, BeginnerIcon, CreditCard, ChevronDown, ChevronUp } from '@/components/ui/Icons'
-import { SwanAvatar, AVATAR_COLORS, DEFAULT_AVATAR_COLOR } from '@/components/ui/SwanAvatar'
+import { SwanAvatar, AVATAR_COLORS, DEFAULT_AVATAR_COLOR, AVATAR_VARIANT_DEFS } from '@/components/ui/SwanAvatar'
 import { TitleBadge, type TitleTier } from '@/components/ui/TitleBadge'
 import { AchievementIcon } from '@/components/ui/AchievementIcons'
 import { CouponModal } from '@/components/ui/CouponModal'
@@ -21,6 +21,7 @@ import {
   equipFrame,
   equipOverlay,
   equipPointIcon,
+  equipAvatarVariant,
   subscribeItems,
 } from '@/lib/firebase/firestore'
 import { FRAME_DEFS, POINT_ICON_DEFS, DynamicPointIcon } from '@/components/ui/SwanAvatar'
@@ -114,6 +115,7 @@ export const ProfilePage = () => {
   const [editFrame, setEditFrame] = useState<string | null>(null)
   const [editOverlay, setEditOverlay] = useState<string | null>(null)
   const [editPointIcon, setEditPointIcon] = useState<string>('feather')
+  const [editVariant, setEditVariant] = useState<string>('default')
   const [saveError, setSaveError] = useState('')
   const [saving, setSaving] = useState(false)
   const [presentingItem, setPresentingItem] = useState<{ ui: UserItem; item?: Item } | null>(null)
@@ -140,6 +142,7 @@ export const ProfilePage = () => {
     setEditFrame(user.equippedFrame ?? null)
     setEditOverlay(user.equippedOverlay ?? null)
     setEditPointIcon(user.equippedPointIcon ?? 'feather')
+    setEditVariant(user.avatarVariant ?? 'default')
     setSaveError('')
     setEditing(true)
   }
@@ -165,6 +168,9 @@ export const ProfilePage = () => {
       if (editOverlay !== (user.equippedOverlay ?? null)) await equipOverlay(user.uid, editOverlay)
       if (editPointIcon !== (user.equippedPointIcon ?? 'feather')) {
         await equipPointIcon(user.uid, editPointIcon === 'feather' ? null : editPointIcon)
+      }
+      if (editVariant !== (user.avatarVariant ?? 'default')) {
+        await equipAvatarVariant(user.uid, editVariant === 'default' ? null : editVariant)
       }
       setEditing(false)
     } catch {
@@ -210,6 +216,11 @@ export const ProfilePage = () => {
   const ownedPointIconIds = [...new Set(
     purchasedItems.filter((i) => i.itemSubtype === 'point_icon' && i.pointIconId).map((i) => i.pointIconId!)
   )].filter((k) => POINT_ICON_DEFS[k])
+
+  // アバターバリエーション：購入済みバリエーションID一覧
+  const ownedVariantIds = [...new Set(
+    purchasedItems.filter((i) => i.itemSubtype === 'avatar_variant' && i.avatarVariant).map((i) => i.avatarVariant!)
+  )].filter((k) => AVATAR_VARIANT_DEFS[k])
 
   // カスタムハンド称号：userItems の customValue を持つものを取得
   const customHandTitles = userItems
@@ -271,7 +282,7 @@ export const ProfilePage = () => {
         {!editing ? (
           <div className="bg-swan-card border border-swan-border rounded-xl p-4">
             <div className="flex items-center gap-4 mb-3">
-              <SwanAvatar color={currentColor} size={64} showCard frame={user.equippedFrame} />
+              <SwanAvatar color={currentColor} size={64} frame={user.equippedFrame} variant={user.avatarVariant} />
               <div className="flex-1 min-w-0">
                 <div className="flex items-center justify-between mb-0.5">
                   <h2 className="text-lg font-bold flex items-center gap-2 truncate">
@@ -350,7 +361,7 @@ export const ProfilePage = () => {
               <p className="text-xs text-swan-sub mb-2 font-medium">アイコンカラー</p>
               {/* プレビュー */}
               <div className="flex items-center gap-3 mb-2">
-                <SwanAvatar color={editColor} size={52} frame={editFrame ?? undefined} overlay={editOverlay ?? undefined} />
+                <SwanAvatar color={editColor} size={52} frame={editFrame ?? undefined} variant={editVariant} />
                 <span className="text-xs text-swan-sub">プレビュー</span>
               </div>
               <div className="grid grid-cols-4 gap-2">
@@ -456,6 +467,39 @@ export const ProfilePage = () => {
                         }`}
                       >
                         <DynamicPointIcon iconId={iconId} size={20} />
+                        <span className="text-sm">{def.name}</span>
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* アバターバリエーション選択（購入済みバリエーションのみ表示） */}
+            {ownedVariantIds.length > 0 && (
+              <div>
+                <p className="text-xs text-swan-sub mb-2 font-medium">アイコンイラスト</p>
+                <div className="space-y-1.5">
+                  <button
+                    onClick={() => setEditVariant('default')}
+                    className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg border transition-colors ${
+                      editVariant === 'default' ? 'border-swan-accent bg-swan-accent/10' : 'border-swan-border'
+                    }`}
+                  >
+                    <SwanAvatar color={editColor} size={32} variant="default" />
+                    <span className="text-sm">オリジナル（デフォルト）</span>
+                  </button>
+                  {ownedVariantIds.map((variantId) => {
+                    const def = AVATAR_VARIANT_DEFS[variantId]
+                    return (
+                      <button
+                        key={variantId}
+                        onClick={() => setEditVariant(variantId)}
+                        className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg border transition-colors ${
+                          editVariant === variantId ? 'border-swan-accent bg-swan-accent/10' : 'border-swan-border'
+                        }`}
+                      >
+                        <SwanAvatar color={editColor} size={32} variant={variantId} />
                         <span className="text-sm">{def.name}</span>
                       </button>
                     )

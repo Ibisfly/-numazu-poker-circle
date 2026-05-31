@@ -31,6 +31,10 @@ import type {
   BingoCard,
   UserBingoCard,
   BingoMissionTemplate,
+  EventParticipantSummary,
+  TournamentResultSummary,
+  RingResultSummary,
+  BingoResultSummary,
 } from '@/types'
 
 // ── Users ──────────────────────────────────────────────────────────────────
@@ -149,14 +153,243 @@ export const subscribeEvents = (cb: (events: Event[]) => void) =>
     (snap) => cb(snap.docs.map((d) => ({ id: d.id, ...d.data() } as Event)))
   )
 
-export const createEvent = (data: Omit<Event, 'id' | 'createdAt'>) =>
-  addDoc(collection(db, 'events'), { ...data, createdAt: serverTimestamp() })
+export const createEvent = (data: Omit<Event, 'id' | 'createdAt' | 'status'>) =>
+  addDoc(collection(db, 'events'), { ...data, status: 'scheduled', createdAt: serverTimestamp() })
 
 export const updateEvent = (eventId: string, data: Partial<Omit<Event, 'id' | 'createdAt' | 'createdBy'>>) =>
   updateDoc(doc(db, 'events', eventId), data as Record<string, unknown>)
 
 export const deleteEvent = (eventId: string) =>
   deleteDoc(doc(db, 'events', eventId))
+
+export const startEvent = (eventId: string) =>
+  updateDoc(doc(db, 'events', eventId), { status: 'active' })
+
+export const subscribeActiveEvents = (cb: (events: Event[]) => void) =>
+  onSnapshot(
+    query(collection(db, 'events'), where('status', '==', 'active'), orderBy('date', 'desc')),
+    (snap) => cb(snap.docs.map((d) => ({ id: d.id, ...d.data() } as Event)))
+  )
+
+export const finishEvent = async (eventId: string, adminUid: string) => {
+  const eventSnap = await getDoc(doc(db, 'events', eventId))
+  if (!eventSnap.exists()) throw new Error('イベントが見つかりません')
+  const event = { id: eventSnap.id, ...eventSnap.data() } as Event
+
+  // 参加者（来店者）を取得
+  const attendancesSnap = await getDocs(
+    query(collection(db, 'attendances'), where('eventId', '==', eventId))
+  )
+  const participantUids = [...new Set(attendancesSnap.docs.map((d) => d.data().uid as string))]
+
+  if (participantUids.length === 0) {
+    await updateDoc(doc(db, 'events', eventId), {
+      status: 'finished',
+      finishedAt: serverTimestamp(),
+    })
+    return
+  }
+
+  // このイベントに紐づくマッチを取得
+  const matchesSnap = await getDocs(
+    query(collection(db, 'matches'), where('eventId', '==', eventId))
+  )
+  const matches = matchesSnap.docs.map((d) => ({ id: d.id, ...d.data() } as Match))
+
+  // マッチ結果を取得
+  const matchIds = matches.map((m) => m.id)
+  const resultsSnap = matchIds.length > 0
+    ? await getDocs(collection(db, 'matchResults'))
+    : { docs: [] }
+  type MatchResultDoc = {
+    id: string
+    matchId: string
+    rankings?: { uid: string; rank: number; earnedPoints: number }[]
+    cashbacks?: { uid: string; amount: number }[]
+  }
+  const matchResults: MatchResultDoc[] = resultsSnap.docs
+    .map((d) => ({ id: d.id, ...d.data() } as MatchResultDoc))
+    .filter((r) => matchIds.includes(r.matchId))
+
+  // このイベントで配布されたビンゴカードを取得
+  const bingoCardsSnap = await getDocs(
+    query(collection(db, 'userBingoCards'), where('eventId', '==', eventId))
+  )
+  const userBingoCards = bingoCardsSnap.docs.map((d) => ({ id: d.id, ...d.data() } as UserBingoCard))
+
+  const batch = writeBatch(db)
+
+  // 未終了のビンゴカードを強制終了してポイント付与
+  for (const card of userBingoCards) {
+    if (card.finishedAt) continue
+
+    const completedCellCount = card.completedCells.filter((c) => c !== 12).length
+    const bingoLineCount = card.claimedBingoLines.length
+    const isFullCompletion = card.completedCells.length === 25
+
+    let totalPoints = 0
+    const pointBreakdown: string[] = []
+
+    const cellPoints = completedCellCount * card.pointsPerCell
+    if (cellPoints > 0) {
+      totalPoints += cellPoints
+      pointBreakdown.push(`マス達成(${completedCellCount}マス): ${cellPoints}pt`)
+    }
+    if (bingoLineCount > 0 && card.pointsPerBingo > 0) {
+      totalPoints += card.pointsPerBingo
+      pointBreakdown.push(`初BINGO: ${card.pointsPerBingo}pt`)
+    }
+    if (isFullCompletion && (card.pointsForCompletion ?? 0) > 0) {
+      totalPoints += card.pointsForCompletion ?? 0
+      pointBreakdown.push(`全埋め: ${card.pointsForCompletion}pt`)
+    }
+
+    batch.update(doc(db, 'userBingoCards', card.id), {
+      finishedAt: serverTimestamp(),
+    })
+
+    if (totalPoints > 0) {
+      const logRef = doc(collection(db, 'pointLogs'))
+      batch.set(logRef, {
+        uid: card.uid,
+        type: 'manual',
+        amount: totalPoints,
+        description: `ビンゴ「${card.bingoCardName}」イベント終了時自動精算 (${pointBreakdown.join(' / ')})`,
+        relatedId: card.id,
+        createdAt: serverTimestamp(),
+        createdBy: adminUid,
+      })
+      batch.update(doc(db, 'users', card.uid), {
+        totalPoints: increment(totalPoints),
+        yearPoints: increment(totalPoints),
+        ownedPoints: increment(totalPoints),
+      })
+    }
+  }
+
+  // 参加者ごとにサマリーを作成
+  for (const uid of participantUids) {
+    const attendance = attendancesSnap.docs.find((d) => d.data().uid === uid)
+    const attendancePoints = attendance?.data().pointAwarded ?? 0
+
+    // トーナメント成績
+    const tournamentResults: TournamentResultSummary[] = []
+    for (const match of matches.filter((m) => m.matchCategory === 'tournament')) {
+      const result = matchResults.find((r) => r.matchId === match.id)
+      if (!result || !result.rankings) continue
+      const ranking = result.rankings.find((r) => r.uid === uid)
+      if (ranking) {
+        tournamentResults.push({
+          matchId: match.id,
+          title: match.title,
+          rank: ranking.rank,
+          earnedPoints: ranking.earnedPoints,
+        })
+      }
+    }
+
+    // リング成績
+    const ringResults: RingResultSummary[] = []
+    for (const match of matches.filter((m) => m.matchCategory === 'ring')) {
+      const result = matchResults.find((r) => r.matchId === match.id)
+      if (!result || !result.cashbacks) continue
+      const cb = result.cashbacks.find((c) => c.uid === uid)
+      if (cb) {
+        const rebuyCount = match.rebuys?.[uid] ?? 0
+        const rebuyFee = match.rebuyFee ?? match.entryFee
+        const totalEntryFee = match.entryFee + rebuyCount * rebuyFee
+        ringResults.push({
+          matchId: match.id,
+          title: match.title,
+          entryFee: totalEntryFee,
+          cashback: cb.amount,
+          netPoints: cb.amount - totalEntryFee,
+        })
+      }
+    }
+
+    // ビンゴ成績
+    const bingoResults: BingoResultSummary[] = []
+    for (const card of userBingoCards.filter((c) => c.uid === uid)) {
+      const completedCellCount = card.completedCells.filter((c) => c !== 12).length
+      const bingoLineCount = card.claimedBingoLines.length
+      const isFullCompletion = card.completedCells.length === 25
+
+      let earnedPoints = completedCellCount * card.pointsPerCell
+      if (bingoLineCount > 0) earnedPoints += card.pointsPerBingo
+      if (isFullCompletion) earnedPoints += card.pointsForCompletion ?? 0
+
+      bingoResults.push({
+        bingoCardId: card.bingoCardId,
+        name: card.bingoCardName,
+        completedCells: completedCellCount,
+        bingoCount: bingoLineCount,
+        earnedPoints,
+      })
+    }
+
+    const totalEarnedPoints = attendancePoints +
+      tournamentResults.reduce((s, r) => s + r.earnedPoints, 0) +
+      ringResults.reduce((s, r) => s + r.netPoints, 0) +
+      bingoResults.reduce((s, r) => s + r.earnedPoints, 0)
+
+    const summaryRef = doc(collection(db, 'eventParticipantSummaries'))
+    const summary: Omit<EventParticipantSummary, 'id'> = {
+      eventId,
+      eventTitle: event.title,
+      uid,
+      attendancePoints,
+      tournamentResults,
+      ringResults,
+      bingoResults,
+      totalEarnedPoints,
+      isRead: false,
+      createdAt: serverTimestamp() as Timestamp,
+    }
+    batch.set(summaryRef, summary)
+
+    // 通知
+    const notifRef = doc(collection(db, 'notifications'))
+    batch.set(notifRef, {
+      uid,
+      type: 'point_awarded',
+      message: `「${event.title}」が終了しました。本日の成績をホームで確認できます。`,
+      isRead: false,
+      createdAt: serverTimestamp(),
+    })
+  }
+
+  // イベントを終了
+  batch.update(doc(db, 'events', eventId), {
+    status: 'finished',
+    finishedAt: serverTimestamp(),
+  })
+
+  await batch.commit()
+}
+
+export const subscribeUnreadEventSummaries = (uid: string, cb: (summaries: EventParticipantSummary[]) => void) =>
+  onSnapshot(
+    query(
+      collection(db, 'eventParticipantSummaries'),
+      where('uid', '==', uid),
+      where('isRead', '==', false)
+    ),
+    (snap) => cb(snap.docs.map((d) => ({ id: d.id, ...d.data() } as EventParticipantSummary)))
+  )
+
+export const markEventSummaryAsRead = (summaryId: string) =>
+  updateDoc(doc(db, 'eventParticipantSummaries', summaryId), { isRead: true })
+
+export const subscribeUserEventSummaries = (uid: string, cb: (summaries: EventParticipantSummary[]) => void) =>
+  onSnapshot(
+    query(
+      collection(db, 'eventParticipantSummaries'),
+      where('uid', '==', uid),
+      orderBy('createdAt', 'desc')
+    ),
+    (snap) => cb(snap.docs.map((d) => ({ id: d.id, ...d.data() } as EventParticipantSummary)))
+  )
 
 // ── Matches ────────────────────────────────────────────────────────────────
 

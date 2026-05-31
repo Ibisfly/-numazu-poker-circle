@@ -21,7 +21,7 @@ export const CardPage = () => {
               <p className="text-swan-accent font-bold tracking-widest text-sm">NUMAZU POKER</p>
               <p className="text-swan-sub text-xs">CIRCLE</p>
             </div>
-            <SwanAvatar color={user.avatarColor ?? DEFAULT_AVATAR_COLOR} size={36} showCard={false} />
+            <SwanAvatar color={user.avatarColor ?? DEFAULT_AVATAR_COLOR} size={36} variant={user.avatarVariant} />
           </div>
 
           {/* QRコード */}

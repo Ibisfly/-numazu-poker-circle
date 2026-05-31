@@ -471,6 +471,29 @@ export const FRAME_DEFS: Record<string, FrameDef> = {
 // 将来拡張用にエクスポートのみ維持
 export const OVERLAY_DEFS: Record<string, { name: string; description: string; component: React.FC<{ size: number }> }> = {}
 
+// ── アバターバリエーション定義 ─────────────────────────────────────────────
+export interface AvatarVariantDef {
+  id: string
+  name: string
+  description: string
+  imagePath: string
+}
+
+export const AVATAR_VARIANT_DEFS: Record<string, AvatarVariantDef> = {
+  default: {
+    id: 'default',
+    name: 'オリジナル',
+    description: 'デフォルトの黒鳥アイコン',
+    imagePath: '/logo.svg',
+  },
+  variant2: {
+    id: 'variant2',
+    name: 'バリエーション2',
+    description: '別デザインの黒鳥アイコン',
+    imagePath: '/logo3.svg',
+  },
+}
+
 // ── SwanAvatar コンポーネント ──────────────────────────────────────────────
 interface SwanAvatarProps {
   color?:    string
@@ -478,6 +501,7 @@ interface SwanAvatarProps {
   showCard?: boolean  // 互換性維持
   frame?:    string
   overlay?:  string   // 互換性維持（現在は無効）
+  variant?:  string   // アバターバリエーション
   className?: string
 }
 
@@ -487,13 +511,15 @@ export const SwanAvatar = ({
   color   = DEFAULT_AVATAR_COLOR,
   size    = 48,
   frame,
+  variant = 'default',
   className = '',
 }: SwanAvatarProps) => {
   const frameDef = frame ? FRAME_DEFS[frame] : undefined
+  const variantDef = AVATAR_VARIANT_DEFS[variant] ?? AVATAR_VARIANT_DEFS.default
 
   const avatarContent = (
     <img
-      src="/logo.svg"
+      src={variantDef.imagePath}
       alt="NUMAZU POKER CIRCLE"
       style={{ width: '80%', height: '80%', objectFit: 'contain', display: 'block' }}
       draggable={false}

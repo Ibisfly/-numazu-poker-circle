@@ -74,8 +74,8 @@ export const RankingPage = () => {
               <SwanAvatar
                 color={rankedUsers[1].avatarColor ?? DEFAULT_AVATAR_COLOR}
                 size={48}
-                showCard={false}
                 frame={rankedUsers[1].equippedFrame}
+                variant={rankedUsers[1].avatarVariant}
               />
               <p className="text-xs font-semibold text-swan-text mt-1 truncate max-w-full text-center">
                 {rankedUsers[1].playerName}
@@ -90,8 +90,8 @@ export const RankingPage = () => {
               <SwanAvatar
                 color={rankedUsers[0].avatarColor ?? DEFAULT_AVATAR_COLOR}
                 size={56}
-                showCard={false}
                 frame={rankedUsers[0].equippedFrame}
+                variant={rankedUsers[0].avatarVariant}
               />
               <p className="text-xs font-bold text-swan-accent mt-1 truncate max-w-full text-center">
                 {rankedUsers[0].playerName}
@@ -106,8 +106,8 @@ export const RankingPage = () => {
               <SwanAvatar
                 color={rankedUsers[2].avatarColor ?? DEFAULT_AVATAR_COLOR}
                 size={44}
-                showCard={false}
                 frame={rankedUsers[2].equippedFrame}
+                variant={rankedUsers[2].avatarVariant}
               />
               <p className="text-xs font-semibold text-swan-text mt-1 truncate max-w-full text-center">
                 {rankedUsers[2].playerName}
@@ -143,8 +143,8 @@ export const RankingPage = () => {
                   <SwanAvatar
                     color={u.avatarColor ?? DEFAULT_AVATAR_COLOR}
                     size={40}
-                    showCard={false}
                     frame={u.equippedFrame}
+                    variant={u.avatarVariant}
                   />
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-1.5">

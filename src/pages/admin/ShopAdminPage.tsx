@@ -8,7 +8,7 @@ import { db } from '@/lib/firebase/config'
 import { useAuth } from '@/lib/hooks/useAuth'
 import type { Item, UserItem, ItemCategory, User } from '@/types'
 import { ChevronLeft, Plus, Eye, EyeOff, Pencil, FeatherPtIcon, X } from '@/components/ui/Icons'
-import { SwanAvatar } from '@/components/ui/SwanAvatar'
+import { SwanAvatar, AVATAR_VARIANT_DEFS } from '@/components/ui/SwanAvatar'
 
 const formatCode = (id: string) =>
   `${id.slice(0, 4).toUpperCase()}-${id.slice(4, 8).toUpperCase()}`
@@ -30,8 +30,9 @@ export const ShopAdminPage = () => {
   const [formDesc, setFormDesc] = useState('')
   const [formImageUrl, setFormImageUrl] = useState('')
   const [formAvatarColor, setFormAvatarColor] = useState('')
-  const [formSubtype, setFormSubtype] = useState<'none' | 'title' | 'avatar_color' | 'avatar_decoration' | 'point_icon' | 'custom_hand_title'>('none')
+  const [formSubtype, setFormSubtype] = useState<'none' | 'title' | 'avatar_color' | 'avatar_decoration' | 'point_icon' | 'custom_hand_title' | 'avatar_variant'>('none')
   const [formPointIconId, setFormPointIconId] = useState('')
+  const [formAvatarVariant, setFormAvatarVariant] = useState('')
   const [formTitleTier, setFormTitleTier] = useState<'common' | 'rare' | 'elite' | 'prime'>('common')
   const [formDecoType, setFormDecoType] = useState<'frame' | 'overlay' | ''>('')
   const [formFrameStyle, setFormFrameStyle] = useState('')
@@ -65,6 +66,7 @@ export const ShopAdminPage = () => {
       setFormFrameStyle(item.frameStyle ?? '')
       setFormOverlayId(item.overlayId ?? '')
       setFormPointIconId(item.pointIconId ?? '')
+      setFormAvatarVariant(item.avatarVariant ?? '')
     } else {
       setEditItem(null)
       setFormName('')
@@ -79,6 +81,7 @@ export const ShopAdminPage = () => {
       setFormFrameStyle('')
       setFormOverlayId('')
       setFormPointIconId('')
+      setFormAvatarVariant('')
     }
     setUploadProgress(null)
     setShowForm(true)
@@ -118,6 +121,7 @@ export const ShopAdminPage = () => {
         ...(formSubtype === 'avatar_decoration' && formDecoType === 'frame'   && formFrameStyle && { frameStyle: formFrameStyle }),
         ...(formSubtype === 'avatar_decoration' && formDecoType === 'overlay' && formOverlayId  && { overlayId:  formOverlayId }),
         ...(formSubtype === 'point_icon' && formPointIconId && { pointIconId: formPointIconId }),
+        ...(formSubtype === 'avatar_variant' && formAvatarVariant && { avatarVariant: formAvatarVariant }),
         ...(formSubtype === 'custom_hand_title' && { allowMultiplePurchase: true, titleTier: 'rare' as const }),
       }
       if (editItem) {
@@ -255,12 +259,13 @@ export const ShopAdminPage = () => {
                     <label className="text-xs text-swan-sub block mb-1">種別</label>
                     <select
                       value={formSubtype}
-                      onChange={(e) => setFormSubtype(e.target.value as 'none' | 'title' | 'avatar_color' | 'avatar_decoration' | 'point_icon' | 'custom_hand_title')}
+                      onChange={(e) => setFormSubtype(e.target.value as 'none' | 'title' | 'avatar_color' | 'avatar_decoration' | 'point_icon' | 'custom_hand_title' | 'avatar_variant')}
                       className="w-full bg-swan-black border border-swan-border rounded-lg px-3 py-2 text-sm text-swan-text"
                     >
                       <option value="none">種別なし（非表示）</option>
                       <option value="avatar_color">アイコン(背景)</option>
                       <option value="avatar_decoration">アイコン(装飾)</option>
+                      <option value="avatar_variant">アイコン(イラスト)</option>
                       <option value="point_icon">ポイントアイコン</option>
                       <option value="title">称号</option>
                       <option value="custom_hand_title">ハンド称号（複数購入可）</option>
@@ -352,6 +357,35 @@ export const ShopAdminPage = () => {
                       </div>
                     )}
 
+                    {formSubtype === 'avatar_variant' && (
+                      <div className="mt-2 space-y-1.5 p-3 bg-swan-black rounded-lg border border-swan-border">
+                        <label className="text-xs text-swan-sub block">
+                          アバターバリエーションID
+                        </label>
+                        <select
+                          value={formAvatarVariant}
+                          onChange={(e) => setFormAvatarVariant(e.target.value)}
+                          className="w-full bg-swan-card border border-swan-border rounded px-2 py-1.5 text-xs text-swan-text focus:outline-none"
+                        >
+                          <option value="">選択してください</option>
+                          {Object.entries(AVATAR_VARIANT_DEFS)
+                            .filter(([k]) => k !== 'default')
+                            .map(([key, def]) => (
+                              <option key={key} value={key}>{def.name}</option>
+                            ))}
+                        </select>
+                        {formAvatarVariant && (
+                          <div className="flex items-center gap-3 mt-2">
+                            <SwanAvatar size={40} variant={formAvatarVariant} />
+                            <span className="text-xs text-swan-sub">プレビュー</span>
+                          </div>
+                        )}
+                        <p className="text-xs text-swan-sub">
+                          黒鳥アイコンのイラストを変更できるアイテム
+                        </p>
+                      </div>
+                    )}
+
                     {formSubtype === 'custom_hand_title' && (
                       <div className="mt-2 p-3 bg-amber-500/10 border border-amber-500/30 rounded-lg">
                         <p className="text-xs text-amber-400">
@@ -423,6 +457,7 @@ export const ShopAdminPage = () => {
                     const genre = item.category === 'benefit'  ? '特典'
                       : item.itemSubtype === 'avatar_color'      ? 'アイコン(背景)'
                       : item.itemSubtype === 'avatar_decoration' ? 'アイコン(装飾)'
+                      : item.itemSubtype === 'avatar_variant'    ? 'アイコン(イラスト)'
                       : item.itemSubtype === 'point_icon'        ? 'ポイントアイコン'
                       : item.itemSubtype === 'title'             ? '称号'
                       : item.itemSubtype === 'custom_hand_title' ? 'ハンド称号'

@@ -57,8 +57,8 @@ export const MembersDirectoryPage = () => {
                 <SwanAvatar
                   color={u.avatarColor ?? DEFAULT_AVATAR_COLOR}
                   size={36}
-                  showCard={false}
                   frame={u.equippedFrame}
+                  variant={u.avatarVariant}
                 />
                 <div className="flex-1 min-w-0">
                   <p className={`font-semibold text-sm truncate flex items-center gap-1.5 ${isMe ? 'text-swan-accent' : 'text-swan-text'}`}>
