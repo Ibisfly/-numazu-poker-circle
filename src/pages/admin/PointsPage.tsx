@@ -31,18 +31,30 @@ export const PointsPage = () => {
     })
   }, [])
 
+  const selectedUser = allUsers.find((u) => u.uid === selectedUid)
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!adminUser || !selectedUid || !amount || !reason.trim()) return
     setMsg('')
     const delta = type === 'add' ? parseInt(amount) : -parseInt(amount)
-    if (type === 'subtract') {
-      const target = allUsers.find((u) => u.uid === selectedUid)
-      if (target && (target.ownedPoints ?? 0) < parseInt(amount)) {
-        setMsg('残高不足: 対象メンバーのポイントが不足しています')
-        return
+
+    if (type === 'subtract' && selectedUser) {
+      const amountNum = parseInt(amount)
+      if (target === 'owned' || target === 'both') {
+        if ((selectedUser.ownedPoints ?? 0) < amountNum) {
+          setMsg('残高不足: 保有ポイントが不足しています')
+          return
+        }
+      }
+      if (target === 'total') {
+        if ((selectedUser.totalPoints ?? 0) < amountNum) {
+          setMsg('残高不足: 累計ポイントが不足しています')
+          return
+        }
       }
     }
+
     setSaving(true)
     try {
       await addPointLog(selectedUid, delta, 'manual', reason.trim(), adminUser.uid, undefined, target)
@@ -100,10 +112,29 @@ export const PointsPage = () => {
               <option value="">-- メンバーを選択 --</option>
               {allUsers.map((u) => (
                 <option key={u.uid} value={u.uid}>
-                  {u.playerName} (現在: {u.totalPoints.toLocaleString()}pt)
+                  {u.playerName} / 保有:{(u.ownedPoints ?? 0).toLocaleString()} 累積:{u.totalPoints.toLocaleString()}
                 </option>
               ))}
             </select>
+            {selectedUser && (
+              <div className="mt-2 bg-swan-dark rounded-lg p-3 text-sm">
+                <p className="font-semibold text-swan-text mb-1">{selectedUser.playerName}</p>
+                <div className="grid grid-cols-3 gap-2 text-xs">
+                  <div>
+                    <span className="text-swan-sub">保有</span>
+                    <p className="font-bold text-swan-accent">{(selectedUser.ownedPoints ?? 0).toLocaleString()}</p>
+                  </div>
+                  <div>
+                    <span className="text-swan-sub">累計</span>
+                    <p className="font-bold text-purple-400">{selectedUser.totalPoints.toLocaleString()}</p>
+                  </div>
+                  <div>
+                    <span className="text-swan-sub">年間</span>
+                    <p className="font-bold text-cyan-400">{selectedUser.yearPoints.toLocaleString()}</p>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
 
           <div>
