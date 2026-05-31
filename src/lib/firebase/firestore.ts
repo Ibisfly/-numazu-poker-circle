@@ -975,6 +975,8 @@ export const settleRingGame = async (
         createdBy: adminUid,
       })
       batch.update(doc(db, 'users', uid), {
+        totalPoints: increment(amount),
+        yearPoints: increment(amount),
         ownedPoints: increment(amount),
       })
     }
@@ -1470,6 +1472,8 @@ export const cancelMatchEntry = async (match: Match, uid: string) => {
     createdBy: uid,
   })
   batch.update(doc(db, 'users', uid), {
+    totalPoints: increment(refundAmount),
+    yearPoints: increment(refundAmount),
     ownedPoints: increment(refundAmount),
   })
 

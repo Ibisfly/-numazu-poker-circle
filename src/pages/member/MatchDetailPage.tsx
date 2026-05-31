@@ -75,6 +75,8 @@ export const MatchDetailPage = () => {
         createdBy: user.uid,
       })
       batch.update(doc(db, 'users', user.uid), {
+        totalPoints: increment(-match.entryFee),
+        yearPoints: increment(-match.entryFee),
         ownedPoints: increment(-match.entryFee),
       })
       await batch.commit()
