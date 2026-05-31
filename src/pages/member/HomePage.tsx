@@ -2,12 +2,12 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { AppShell } from '@/components/layout/AppShell'
 import { FeatherIcon } from '@/components/ui/FeatherIcon'
-import { CreditCard, ShoppingBag, BeginnerIcon, BookOpen, Layers, Star } from '@/components/ui/Icons'
+import { CreditCard, ShoppingBag, BeginnerIcon, BookOpen, Layers, Star, Trophy, X } from '@/components/ui/Icons'
 import { FlyingSwanProgress } from '@/components/ui/FlyingSwanProgress'
 import { DEFAULT_AVATAR_COLOR } from '@/components/ui/SwanAvatar'
 import { useAuth } from '@/lib/hooks/useAuth'
-import { subscribeMatches } from '@/lib/firebase/firestore'
-import type { Match } from '@/types'
+import { subscribeMatches, subscribeUnreadEventSummaries, markEventSummaryAsRead } from '@/lib/firebase/firestore'
+import type { Match, EventParticipantSummary } from '@/types'
 
 const SUIT_COLORS: Record<string, string> = {
   s: 'text-gray-800',
@@ -37,6 +37,8 @@ const parseLuckyHand = (hand: string): { rank1: string; rank2: string; suited: b
 export const HomePage = () => {
   const { user } = useAuth()
   const [upcomingMatch, setUpcomingMatch] = useState<Match | null>(null)
+  const [eventSummaries, setEventSummaries] = useState<EventParticipantSummary[]>([])
+  const [expandedSummary, setExpandedSummary] = useState<string | null>(null)
 
   useEffect(() => {
     return subscribeMatches((matches) => {
@@ -44,6 +46,16 @@ export const HomePage = () => {
       setUpcomingMatch(recruiting ?? null)
     })
   }, [])
+
+  useEffect(() => {
+    if (!user) return
+    return subscribeUnreadEventSummaries(user.uid, (summaries) => {
+      setEventSummaries(summaries)
+      if (summaries.length > 0) {
+        summaries.forEach((s) => markEventSummaryAsRead(s.id))
+      }
+    })
+  }, [user])
 
   if (!user) return null
 
@@ -68,6 +80,100 @@ export const HomePage = () => {
             </p>
           </div>
         </div>
+
+        {/* イベントサマリー */}
+        {eventSummaries.map((summary) => (
+          <div key={summary.id} className="bg-gradient-to-br from-swan-card to-swan-dark border border-swan-accent/50 rounded-xl overflow-hidden">
+            <div
+              className="p-4 cursor-pointer"
+              onClick={() => setExpandedSummary(expandedSummary === summary.id ? null : summary.id)}
+            >
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Trophy size={20} className="text-swan-accent" />
+                  <div>
+                    <p className="text-xs text-swan-accent font-semibold">本日の成績</p>
+                    <p className="font-bold text-swan-text">{summary.eventTitle}</p>
+                  </div>
+                </div>
+                <div className="text-right">
+                  <p className="text-xs text-swan-sub">獲得ポイント</p>
+                  <p className={`text-lg font-bold flex items-center gap-1 justify-end ${
+                    summary.totalEarnedPoints >= 0 ? 'text-green-400' : 'text-red-400'
+                  }`}>
+                    {summary.totalEarnedPoints >= 0 ? '+' : ''}
+                    {summary.totalEarnedPoints.toLocaleString()}
+                    <FeatherIcon size={14} />
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {expandedSummary === summary.id && (
+              <div className="px-4 pb-4 space-y-3 border-t border-swan-border/50 pt-3">
+                {/* 来店ポイント */}
+                <div className="flex justify-between text-sm">
+                  <span className="text-swan-sub">来店ポイント</span>
+                  <span className="text-swan-text">+{summary.attendancePoints}</span>
+                </div>
+
+                {/* トーナメント */}
+                {summary.tournamentResults.length > 0 && (
+                  <div className="space-y-1">
+                    <p className="text-xs text-purple-400 font-semibold">トーナメント</p>
+                    {summary.tournamentResults.map((r) => (
+                      <div key={r.matchId} className="flex justify-between text-sm pl-2">
+                        <span className="text-swan-sub">{r.title} ({r.rank}位)</span>
+                        <span className={r.earnedPoints >= 0 ? 'text-green-400' : 'text-red-400'}>
+                          {r.earnedPoints >= 0 ? '+' : ''}{r.earnedPoints}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* リング */}
+                {summary.ringResults.length > 0 && (
+                  <div className="space-y-1">
+                    <p className="text-xs text-cyan-400 font-semibold">プレミアリング</p>
+                    {summary.ringResults.map((r) => (
+                      <div key={r.matchId} className="flex justify-between text-sm pl-2">
+                        <span className="text-swan-sub">{r.title}</span>
+                        <span className={r.netPoints >= 0 ? 'text-green-400' : 'text-red-400'}>
+                          {r.netPoints >= 0 ? '+' : ''}{r.netPoints}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* ビンゴ */}
+                {summary.bingoResults.length > 0 && (
+                  <div className="space-y-1">
+                    <p className="text-xs text-yellow-400 font-semibold">ビンゴ</p>
+                    {summary.bingoResults.map((r) => (
+                      <div key={r.bingoCardId} className="flex justify-between text-sm pl-2">
+                        <span className="text-swan-sub">{r.name} ({r.completedCells}マス/{r.bingoCount}ビンゴ)</span>
+                        <span className="text-green-400">+{r.earnedPoints}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    setEventSummaries((prev) => prev.filter((s) => s.id !== summary.id))
+                  }}
+                  className="w-full mt-2 py-2 text-xs text-swan-sub border border-swan-border rounded-lg hover:bg-swan-dark flex items-center justify-center gap-1"
+                >
+                  <X size={12} />
+                  閉じる
+                </button>
+              </div>
+            )}
+          </div>
+        ))}
 
         {/* ② 初心者向けガイドブック誘導 */}
         {user.isBeginner && (

@@ -23,10 +23,11 @@ import {
   equipPointIcon,
   equipAvatarVariant,
   subscribeItems,
+  subscribeUserEventSummaries,
 } from '@/lib/firebase/firestore'
 import { FRAME_DEFS, POINT_ICON_DEFS, DynamicPointIcon } from '@/components/ui/SwanAvatar'
 import { logOut } from '@/lib/firebase/auth'
-import type { PointLog, UserAchievement, UserItem, Item, UserTitle } from '@/types'
+import type { PointLog, UserAchievement, UserItem, Item, UserTitle, EventParticipantSummary } from '@/types'
 import { ACHIEVEMENTS } from '@/lib/achievements'
 
 function generateProfilePuzzlePath(
@@ -120,6 +121,8 @@ export const ProfilePage = () => {
   const [saving, setSaving] = useState(false)
   const [presentingItem, setPresentingItem] = useState<{ ui: UserItem; item?: Item } | null>(null)
   const [historyExpanded, setHistoryExpanded] = useState(false)
+  const [eventSummaries, setEventSummaries] = useState<EventParticipantSummary[]>([])
+  const [eventHistoryExpanded, setEventHistoryExpanded] = useState(false)
 
   useEffect(() => {
     if (!user) return
@@ -128,7 +131,8 @@ export const ProfilePage = () => {
     const u3 = subscribeUserItems(user.uid, setUserItems)
     const u4 = subscribeItems(setAllItems)
     const u5 = subscribeUserTitles(user.uid, setUserTitles)
-    return () => { u1(); u2(); u3(); u4(); u5() }
+    const u6 = subscribeUserEventSummaries(user.uid, setEventSummaries)
+    return () => { u1(); u2(); u3(); u4(); u5(); u6() }
   }, [user])
 
   const openEdit = () => {
@@ -664,6 +668,68 @@ export const ProfilePage = () => {
             </div>
           )}
         </div>
+
+        {/* イベント履歴（折りたたみ） */}
+        {eventSummaries.length > 0 && (
+          <div className="bg-swan-card border border-swan-border rounded-xl overflow-hidden">
+            <button
+              onClick={() => setEventHistoryExpanded(!eventHistoryExpanded)}
+              className="w-full flex items-center justify-between px-4 py-3 hover:bg-swan-dark/50 transition-colors"
+            >
+              <span className="text-sm font-semibold text-swan-sub">
+                イベント履歴 ({eventSummaries.length}件)
+              </span>
+              {eventHistoryExpanded ? (
+                <ChevronUp size={18} className="text-swan-sub" />
+              ) : (
+                <ChevronDown size={18} className="text-swan-sub" />
+              )}
+            </button>
+            {eventHistoryExpanded && (
+              <div className="border-t border-swan-border divide-y divide-swan-border">
+                {eventSummaries.map((summary) => (
+                  <div key={summary.id} className="px-4 py-3 space-y-2">
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <p className="font-semibold text-sm">{summary.eventTitle}</p>
+                        <p className="text-xs text-swan-sub">
+                          {summary.createdAt?.toDate().toLocaleDateString('ja-JP')}
+                        </p>
+                      </div>
+                      <p className={`font-bold flex items-center gap-1 ${
+                        summary.totalEarnedPoints >= 0 ? 'text-green-400' : 'text-red-400'
+                      }`}>
+                        {summary.totalEarnedPoints >= 0 ? '+' : ''}
+                        {summary.totalEarnedPoints.toLocaleString()}
+                        <FeatherIcon size={12} />
+                      </p>
+                    </div>
+                    <div className="text-xs text-swan-sub space-y-0.5">
+                      {summary.attendancePoints > 0 && (
+                        <p>来店: +{summary.attendancePoints}</p>
+                      )}
+                      {summary.tournamentResults.map((r) => (
+                        <p key={r.matchId}>
+                          {r.title} ({r.rank}位): {r.earnedPoints >= 0 ? '+' : ''}{r.earnedPoints}
+                        </p>
+                      ))}
+                      {summary.ringResults.map((r) => (
+                        <p key={r.matchId}>
+                          {r.title}: {r.netPoints >= 0 ? '+' : ''}{r.netPoints}
+                        </p>
+                      ))}
+                      {summary.bingoResults.map((r) => (
+                        <p key={r.bingoCardId}>
+                          {r.name}: +{r.earnedPoints}
+                        </p>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
 
         {/* 会員証へのリンク */}
         <Link
