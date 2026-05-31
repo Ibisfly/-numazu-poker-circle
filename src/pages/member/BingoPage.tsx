@@ -9,6 +9,8 @@ import {
   subscribeUserBingoCards,
   deleteUserBingoCard,
   selfStampBingoCell,
+  finishBingoCard,
+  resetBingoCardProgress,
 } from '@/lib/firebase/firestore'
 import { GLOSSARY_TERM_NAMES } from '@/lib/glossary'
 import type { UserBingoCard } from '@/types'
@@ -274,21 +276,46 @@ const BingoCardDetail = ({
   userCard,
   onDelete,
   onScan,
+  onFinish,
+  onReset,
 }: {
   userCard: UserBingoCard
   onDelete: () => void
   onScan: () => void
+  onFinish: () => void
+  onReset: () => void
 }) => {
-  const completedCount = userCard.completedCells.length
+  const completedCount = userCard.completedCells.filter(c => c !== 12).length
   const bingoCount = userCard.claimedBingoLines.length
-  const progress = Math.round((completedCount / 25) * 100)
+  const progress = Math.round((completedCount / 24) * 100)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+  const [showFinishConfirm, setShowFinishConfirm] = useState(false)
+  const [showResetConfirm, setShowResetConfirm] = useState(false)
   const [selectedMission, setSelectedMission] = useState<MissionDetail | null>(null)
   const completedSet = new Set(userCard.completedCells)
+
+  const isFinished = !!userCard.finishedAt
+
+  // 終了時に受け取れるポイントを計算
+  const estimatedCellPoints = completedCount * userCard.pointsPerCell
+  const estimatedBingoPoints = bingoCount > 0 ? userCard.pointsPerBingo : 0
+  const isFullCompletion = userCard.completedCells.length === 25
+  const estimatedCompletionPoints = isFullCompletion ? (userCard.pointsForCompletion ?? 0) : 0
+  const estimatedTotal = estimatedCellPoints + estimatedBingoPoints + estimatedCompletionPoints
 
   const handleDelete = () => {
     onDelete()
     setShowDeleteConfirm(false)
+  }
+
+  const handleFinish = () => {
+    onFinish()
+    setShowFinishConfirm(false)
+  }
+
+  const handleReset = () => {
+    onReset()
+    setShowResetConfirm(false)
   }
 
   const handleCellTap = (cellIndex: number) => {
@@ -308,7 +335,8 @@ const BingoCardDetail = ({
         <div>
           <h3 className="font-bold text-swan-text">{userCard.bingoCardName}</h3>
           <p className="text-xs text-swan-sub mt-0.5">
-            {completedCount}/25マス完了 ・ {bingoCount}ビンゴ
+            {completedCount}/24マス完了 ・ {bingoCount}ビンゴ
+            {isFinished && <span className="ml-1 text-green-400">（終了済み）</span>}
           </p>
         </div>
         <div className="text-right">
@@ -356,33 +384,129 @@ const BingoCardDetail = ({
         </div>
       </div>
 
-      {userCard.completedAt ? (
-        <div className="text-center py-2 bg-swan-accent/20 rounded-lg">
-          <p className="text-swan-accent font-bold">🎉 コンプリート！</p>
+      {isFinished ? (
+        <div className="text-center py-3 bg-green-500/10 border border-green-500/30 rounded-lg space-y-1">
+          <p className="text-green-400 font-bold">✓ ビンゴ終了済み</p>
+          <p className="text-xs text-swan-sub">ポイントは付与済みです</p>
         </div>
       ) : (
-        <div className="flex gap-2">
-          <button
-            onClick={onScan}
-            className="flex-1 bg-swan-accent text-black font-semibold py-2.5 rounded-xl flex items-center justify-center gap-2"
-          >
-            <Camera size={18} />
-            スタンプを押す
-          </button>
+        <>
+          {/* 予想獲得ポイント表示 */}
+          {estimatedTotal > 0 && (
+            <div className="bg-swan-dark/50 rounded-lg p-3 text-center">
+              <p className="text-xs text-swan-sub">終了時に獲得できるポイント</p>
+              <p className="text-lg font-bold text-swan-accent flex items-center justify-center gap-1">
+                +{estimatedTotal.toLocaleString()} <FeatherIcon size={16} />
+              </p>
+              <p className="text-xs text-swan-muted mt-1">
+                {[
+                  estimatedCellPoints > 0 && `マス: ${estimatedCellPoints}`,
+                  estimatedBingoPoints > 0 && `BINGO: ${estimatedBingoPoints}`,
+                  estimatedCompletionPoints > 0 && `全埋め: ${estimatedCompletionPoints}`,
+                ].filter(Boolean).join(' / ')}
+              </p>
+            </div>
+          )}
+
+          <div className="flex gap-2">
+            <button
+              onClick={onScan}
+              className="flex-1 bg-swan-accent text-black font-semibold py-2.5 rounded-xl flex items-center justify-center gap-2"
+            >
+              <Camera size={18} />
+              スタンプを押す
+            </button>
+          </div>
+
+          <div className="flex gap-2">
+            <button
+              onClick={() => setShowFinishConfirm(true)}
+              className="flex-1 bg-green-500/20 text-green-400 border border-green-500/30 font-semibold py-2 rounded-xl"
+            >
+              ビンゴを終了する
+            </button>
+            <button
+              onClick={() => setShowResetConfirm(true)}
+              className="flex-1 bg-swan-dark text-swan-sub border border-swan-border py-2 rounded-xl"
+            >
+              進行度をリセット
+            </button>
+          </div>
+
           <button
             onClick={() => setShowDeleteConfirm(true)}
-            className="px-4 py-2.5 rounded-xl border border-swan-border text-swan-sub hover:border-red-500 hover:text-red-400 transition-colors"
+            className="w-full py-2 text-sm text-swan-muted hover:text-red-400 transition-colors"
           >
-            破棄
+            カードを破棄する
           </button>
+        </>
+      )}
+
+      {/* 終了確認 */}
+      {showFinishConfirm && (
+        <div className="bg-green-500/10 border border-green-500/30 rounded-xl p-4 space-y-3">
+          <p className="text-sm text-green-400 text-center font-bold">
+            ビンゴを終了しますか？
+          </p>
+          <p className="text-xs text-swan-sub text-center">
+            現在の進行状況でポイントを獲得します。<br />
+            終了後はスタンプを押せなくなります。
+          </p>
+          <div className="bg-swan-dark rounded-lg p-2 text-center">
+            <p className="text-swan-accent font-bold flex items-center justify-center gap-1">
+              +{estimatedTotal.toLocaleString()} <FeatherIcon size={14} />
+            </p>
+          </div>
+          <div className="flex gap-2">
+            <button
+              onClick={() => setShowFinishConfirm(false)}
+              className="flex-1 bg-swan-dark text-swan-text py-2 rounded-lg"
+            >
+              キャンセル
+            </button>
+            <button
+              onClick={handleFinish}
+              className="flex-1 bg-green-500 text-white py-2 rounded-lg font-semibold"
+            >
+              終了する
+            </button>
+          </div>
         </div>
       )}
 
+      {/* リセット確認 */}
+      {showResetConfirm && (
+        <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-xl p-4 space-y-3">
+          <p className="text-sm text-yellow-400 text-center font-bold">
+            進行度をリセットしますか？
+          </p>
+          <p className="text-xs text-swan-sub text-center">
+            すべてのスタンプが消えて最初からやり直しになります。<br />
+            この時点ではポイントは付与されません。
+          </p>
+          <div className="flex gap-2">
+            <button
+              onClick={() => setShowResetConfirm(false)}
+              className="flex-1 bg-swan-dark text-swan-text py-2 rounded-lg"
+            >
+              キャンセル
+            </button>
+            <button
+              onClick={handleReset}
+              className="flex-1 bg-yellow-500 text-black py-2 rounded-lg font-semibold"
+            >
+              リセットする
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* 破棄確認 */}
       {showDeleteConfirm && (
         <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-4 space-y-3">
           <p className="text-sm text-red-400 text-center">
             このビンゴカードを破棄しますか？<br />
-            進行状況は失われます。
+            進行状況は失われ、ポイントも獲得できません。
           </p>
           <div className="flex gap-2">
             <button
@@ -426,11 +550,35 @@ export const BingoPage = () => {
     return subscribeUserBingoCards(user.uid, setUserCards)
   }, [user])
 
-  const activeCards = userCards.filter((c) => !c.completedAt)
-  const completedCards = userCards.filter((c) => c.completedAt)
+  const activeCards = userCards.filter((c) => !c.finishedAt)
+  const finishedCards = userCards.filter((c) => c.finishedAt)
 
   const handleDelete = async (cardId: string) => {
     await deleteUserBingoCard(cardId)
+  }
+
+  const handleFinish = async (cardId: string) => {
+    try {
+      const result = await finishBingoCard(cardId)
+      if (result.totalPoints > 0) {
+        setMessage(`✅ ビンゴ終了！ +${result.totalPoints}pt を獲得しました`)
+      } else {
+        setMessage('✅ ビンゴを終了しました')
+      }
+      setTimeout(() => setMessage(''), 3000)
+    } catch (e) {
+      setMessage(e instanceof Error ? e.message : 'エラーが発生しました')
+    }
+  }
+
+  const handleReset = async (cardId: string) => {
+    try {
+      await resetBingoCardProgress(cardId)
+      setMessage('進行度をリセットしました')
+      setTimeout(() => setMessage(''), 2000)
+    } catch (e) {
+      setMessage(e instanceof Error ? e.message : 'エラーが発生しました')
+    }
   }
 
   const startScan = (card: UserBingoCard) => {
@@ -511,13 +659,10 @@ export const BingoPage = () => {
 
     try {
       const result = await selfStampBingoCell(selectedCard.id, cellIndex, scannedCode)
-      let msg = `✅ スタンプ完了！ +${result.cellPoints}pt`
+      let msg = '✅ スタンプ完了！'
       if (result.isFirstBingo) {
-        msg += ` 🎉 初BINGO達成！ +${result.totalBingoPoints}pt`
+        msg += ' 🎉 初BINGO達成！'
         setShowConfetti(true)
-      }
-      if (result.isFullCompletion && result.completionPoints > 0) {
-        msg += ` 🏆 全埋め完了！ +${result.completionPoints}pt`
       }
       setMessage(msg)
 
@@ -528,7 +673,7 @@ export const BingoPage = () => {
         setStampingCell(null)
         setMessage('')
         setStamping(false)
-      }, result.isFirstBingo ? 3500 : 2000)
+      }, result.isFirstBingo ? 3500 : 1500)
     } catch (e) {
       setMessage(e instanceof Error ? e.message : 'エラーが発生しました')
       setStamping(false)
@@ -544,18 +689,28 @@ export const BingoPage = () => {
       <div className="py-4 space-y-6">
         {mode === 'view' && (
           <>
+            {message && mode === 'view' && (
+              <div className={`text-center py-2 rounded-lg text-sm ${
+                message.includes('✅') ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'
+              }`}>
+                {message}
+              </div>
+            )}
+
             <div className="bg-gradient-to-r from-purple-500/20 to-pink-500/20 rounded-xl p-4 border border-purple-500/30">
               <h3 className="font-bold text-swan-text mb-1">🎯 Ring de BINGOとは？</h3>
               <p className="text-xs text-swan-sub">
                 プレミアリング中にミッションをクリアしてビンゴを目指そう！
                 テーブルのQRをスキャンして、達成したマスにスタンプを押そう。
+                <br />
+                <span className="text-swan-accent">「ビンゴを終了する」を押すとポイントを獲得できます。</span>
               </p>
             </div>
 
             {activeCards.length > 0 ? (
               <div>
                 <h2 className="text-sm font-semibold text-swan-sub mb-3 uppercase tracking-wide">
-                  今日のビンゴ
+                  進行中のビンゴ
                 </h2>
                 <div className="space-y-4">
                   {activeCards.map((card) => (
@@ -564,6 +719,8 @@ export const BingoPage = () => {
                       userCard={card}
                       onDelete={() => handleDelete(card.id)}
                       onScan={() => startScan(card)}
+                      onFinish={() => handleFinish(card.id)}
+                      onReset={() => handleReset(card.id)}
                     />
                   ))}
                 </div>
@@ -578,18 +735,20 @@ export const BingoPage = () => {
               </div>
             )}
 
-            {completedCards.length > 0 && (
+            {finishedCards.length > 0 && (
               <div>
                 <h2 className="text-sm font-semibold text-swan-sub mb-3 uppercase tracking-wide">
-                  コンプリート済み
+                  終了済み
                 </h2>
                 <div className="space-y-4">
-                  {completedCards.map((card) => (
+                  {finishedCards.map((card) => (
                     <BingoCardDetail
                       key={card.id}
                       userCard={card}
                       onDelete={() => handleDelete(card.id)}
                       onScan={() => {}}
+                      onFinish={() => {}}
+                      onReset={() => {}}
                     />
                   ))}
                 </div>

@@ -149,7 +149,6 @@ export const MatchDetailPage = () => {
             <span className="text-xs font-bold text-cyan-400 bg-cyan-400/10 border border-cyan-400/30 px-2 py-1 rounded-full">プレミアリング</span>
           )}
           {match.hasReentry && <span className="text-xs text-purple-400 border border-purple-400/30 px-2 py-1 rounded-full">リエントリー可</span>}
-          {match.hasBounty  && <span className="text-xs text-orange-400 border border-orange-400/30 px-2 py-1 rounded-full">バウンティ</span>}
           {match.hasRebuy   && <span className="text-xs text-cyan-400 border border-cyan-400/30 px-2 py-1 rounded-full">リバイ可</span>}
           <span className={`text-xs font-medium px-2 py-1 rounded-full border ${
             match.status === 'recruiting' ? 'text-green-400 border-green-400/30 bg-green-400/10' :

@@ -45,7 +45,6 @@ export const MatchListPage = () => {
                       <span className="text-xs font-bold text-cyan-400 bg-cyan-400/10 border border-cyan-400/30 px-1.5 py-0.5 rounded-full">プレミアリング</span>
                     )}
                     {match.hasReentry && <span className="text-xs text-purple-400">リエントリー可</span>}
-                    {match.hasBounty  && <span className="text-xs text-orange-400">バウンティ</span>}
                     {match.hasRebuy   && <span className="text-xs text-cyan-400">リバイ可</span>}
                   </div>
                   <h3 className="font-semibold text-swan-text">{match.title}</h3>

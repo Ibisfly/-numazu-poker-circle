@@ -22,6 +22,7 @@ export interface User {
   equippedFrame?: string  // FRAME_DEFS のキー
   equippedOverlay?: string  // OVERLAY_DEFS のキー
   equippedPointIcon?: string  // POINT_ICON_DEFS のキー（デフォルト: feather）
+  avatarVariant?: string  // アバターイラストのバリエーション（デフォルト: 'default'）
   luckyHand?: string      // 今日のラッキーハンド（例: "AKs", "77"）
   luckyHandExpiry?: Timestamp  // ラッキーハンドの有効期限（その日の終わり）
   createdAt: Timestamp
@@ -77,10 +78,11 @@ export interface Match {
   createdAt: Timestamp
   // トーナメントオプション
   hasReentry?: boolean
-  hasBounty?: boolean
+  reentryFee?: number  // リエントリー費用（未設定時はentryFeeと同額）
   reentries?: Record<string, number>  // uid → リエントリー回数
   // プレミアリングオプション
   hasRebuy?: boolean
+  rebuyFee?: number    // リバイ費用（未設定時はentryFeeと同額）
   rebuys?: Record<string, number>     // uid → リバイ回数
   // 外部タイマーアプリ連携
   timerAppUrl?: string          // 外部タイマーアプリのURL（レガシー）
@@ -144,11 +146,12 @@ export interface Item {
   isAvailable: boolean
   imageUrl?: string        // 商品画像URL（任意）
   avatarColor?: string     // アバターカラー用アイテムの場合の色コード
-  itemSubtype?: 'title' | 'avatar_color' | 'avatar_decoration' | 'point_icon' | 'custom_hand_title'
+  itemSubtype?: 'title' | 'avatar_color' | 'avatar_decoration' | 'avatar_variant' | 'point_icon' | 'custom_hand_title'
   decorationType?: 'frame' | 'overlay'  // avatar_decoration の下位分類
   frameStyle?: string    // FRAME_DEFS のキー
   overlayId?:  string    // OVERLAY_DEFS のキー
   pointIconId?: string   // POINT_ICON_DEFS のキー
+  avatarVariant?: string  // アバターバリエーションID
   titleTier?: 'common' | 'rare' | 'elite' | 'prime'  // 称号レアリティ
   allowMultiplePurchase?: boolean  // 複数購入可能か（custom_hand_title用）
   createdBy: string
@@ -262,7 +265,8 @@ export interface UserBingoCard {
   pointsPerBingo: number
   pointsForCompletion: number // 全マス完了ボーナス
   assignedAt: Timestamp       // 配布日時
-  completedAt?: Timestamp     // 全マス完了時
-  firstBingoClaimed?: boolean // 初回ビンゴポイント受取済みフラグ
+  completedAt?: Timestamp     // 全マス完了時（廃止予定、finishedAtに移行）
+  finishedAt?: Timestamp      // ビンゴ終了日時（ユーザーが「終了する」を押した日時）
+  firstBingoClaimed?: boolean // 初回ビンゴポイント受取済みフラグ（廃止予定）
 }
 

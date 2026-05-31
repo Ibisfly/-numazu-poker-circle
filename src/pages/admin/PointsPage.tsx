@@ -13,6 +13,7 @@ export const PointsPage = () => {
   // 手動調整
   const [selectedUid, setSelectedUid] = useState('')
   const [type, setType] = useState<'add' | 'subtract'>('add')
+  const [target, setTarget] = useState<'both' | 'owned' | 'total'>('both')
   const [amount, setAmount] = useState('')
   const [reason, setReason] = useState('')
   const [saving, setSaving] = useState(false)
@@ -44,8 +45,9 @@ export const PointsPage = () => {
     }
     setSaving(true)
     try {
-      await addPointLog(selectedUid, delta, 'manual', reason.trim(), adminUser.uid)
-      setMsg(`${delta > 0 ? '+' : ''}${delta}pt を付与しました`)
+      await addPointLog(selectedUid, delta, 'manual', reason.trim(), adminUser.uid, undefined, target)
+      const targetLabel = target === 'both' ? '保有+累積' : target === 'owned' ? '保有のみ' : '累積のみ'
+      setMsg(`${delta > 0 ? '+' : ''}${delta}pt（${targetLabel}）を反映しました`)
       setAmount('')
       setReason('')
     } catch {
@@ -125,6 +127,35 @@ export const PointsPage = () => {
                 </button>
               ))}
             </div>
+          </div>
+
+          <div>
+            <label className="text-xs text-swan-sub block mb-1">対象</label>
+            <div className="flex gap-2">
+              {([
+                { key: 'both', label: '保有+累積' },
+                { key: 'owned', label: '保有のみ' },
+                { key: 'total', label: '累積のみ' },
+              ] as const).map(({ key, label }) => (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() => setTarget(key)}
+                  className={`flex-1 py-2 rounded-lg text-xs font-medium border transition-colors ${
+                    target === key
+                      ? 'bg-swan-accent/20 text-swan-accent border-swan-accent/50'
+                      : 'bg-swan-card text-swan-sub border-swan-border'
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+            <p className="text-xs text-swan-muted mt-1">
+              {target === 'both' && '保有ポイントと累計ポイントの両方を変更'}
+              {target === 'owned' && '保有ポイントのみ変更（ランキングに影響しない）'}
+              {target === 'total' && '累計ポイントのみ変更（残高に影響しない）'}
+            </p>
           </div>
 
           <div>

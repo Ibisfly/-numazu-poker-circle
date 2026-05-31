@@ -154,8 +154,9 @@ export const MatchesAdminPage = () => {
   const [formDate, setFormDate] = useState('')
   const [formDist, setFormDist] = useState<DistributionRule[]>(DEFAULT_DIST)
   const [formReentry, setFormReentry] = useState(false)
-  const [formBounty, setFormBounty] = useState(false)
+  const [formReentryFee, setFormReentryFee] = useState('')
   const [formRebuy, setFormRebuy] = useState(false)
+  const [formRebuyFee, setFormRebuyFee] = useState('')
   const [saving, setSaving] = useState(false)
 
   // トーナメント精算
@@ -192,11 +193,17 @@ export const MatchesAdminPage = () => {
         participants: [],
         scheduledAt: Timestamp.fromDate(new Date(formDate)),
         createdBy: adminUser.uid,
-        ...(formCat === 'tournament' && { hasReentry: formReentry, hasBounty: formBounty }),
-        ...(formCat === 'ring' && { hasRebuy: formRebuy }),
+        ...(formCat === 'tournament' && {
+          hasReentry: formReentry,
+          reentryFee: formReentry ? (parseInt(formReentryFee) || parseInt(formFee)) : undefined,
+        }),
+        ...(formCat === 'ring' && {
+          hasRebuy: formRebuy,
+          rebuyFee: formRebuy ? (parseInt(formRebuyFee) || parseInt(formFee)) : undefined,
+        }),
       })
       setShowForm(false)
-      setFormTitle(''); setFormCat('tournament'); setFormReentry(false); setFormBounty(false); setFormRebuy(false)
+      setFormTitle(''); setFormCat('tournament'); setFormReentry(false); setFormReentryFee(''); setFormRebuy(false); setFormRebuyFee('')
       setFormDist(DEFAULT_DIST)
     } finally {
       setSaving(false)
@@ -367,32 +374,61 @@ export const MatchesAdminPage = () => {
                   <button type="button" onClick={() => setFormDist([...formDist, { rank: formDist.length + 1, points: 0 }])}
                     className="text-xs text-swan-accent mt-1">+ 順位追加</button>
                 </div>
-                <div className="flex gap-4">
+                <div className="space-y-2">
                   <label className="flex items-center gap-2 cursor-pointer text-sm">
                     <input type="checkbox" checked={formReentry} onChange={(e) => setFormReentry(e.target.checked)}
                       className="accent-swan-accent" />
                     リエントリー可
                   </label>
-                  <label className="flex items-center gap-2 cursor-pointer text-sm">
-                    <input type="checkbox" checked={formBounty} onChange={(e) => setFormBounty(e.target.checked)}
-                      className="accent-swan-accent" />
-                    バウンティあり
-                  </label>
+                  {formReentry && (
+                    <div className="ml-6">
+                      <label className="text-xs text-swan-sub flex items-center gap-1 mb-1">
+                        リエントリー費 <FeatherPtIcon size={10} className="text-swan-accent" />
+                        <span className="text-swan-muted">（空欄でエントリー費と同額）</span>
+                      </label>
+                      <input
+                        type="number"
+                        value={formReentryFee}
+                        onChange={(e) => setFormReentryFee(e.target.value)}
+                        min="0"
+                        placeholder={formFee || '0'}
+                        className="w-32 bg-swan-black border border-swan-border rounded-lg px-3 py-1.5 text-sm text-swan-text focus:outline-none"
+                      />
+                    </div>
+                  )}
                 </div>
               </>
             )}
 
             {/* プレミアリング専用 */}
             {formCat === 'ring' && (
-              <div>
-                <p className="text-xs text-cyan-400 bg-cyan-400/10 border border-cyan-400/20 rounded-lg px-3 py-2 mb-3">
+              <div className="space-y-3">
+                <p className="text-xs text-cyan-400 bg-cyan-400/10 border border-cyan-400/20 rounded-lg px-3 py-2">
                   精算時に参加者ごとのキャッシュバック額を入力します
                 </p>
-                <label className="flex items-center gap-2 cursor-pointer text-sm">
-                  <input type="checkbox" checked={formRebuy} onChange={(e) => setFormRebuy(e.target.checked)}
-                    className="accent-swan-accent" />
-                  リバイ可
-                </label>
+                <div className="space-y-2">
+                  <label className="flex items-center gap-2 cursor-pointer text-sm">
+                    <input type="checkbox" checked={formRebuy} onChange={(e) => setFormRebuy(e.target.checked)}
+                      className="accent-swan-accent" />
+                    リバイ可
+                  </label>
+                  {formRebuy && (
+                    <div className="ml-6">
+                      <label className="text-xs text-swan-sub flex items-center gap-1 mb-1">
+                        リバイ費 <FeatherPtIcon size={10} className="text-swan-accent" />
+                        <span className="text-swan-muted">（空欄でエントリー費と同額）</span>
+                      </label>
+                      <input
+                        type="number"
+                        value={formRebuyFee}
+                        onChange={(e) => setFormRebuyFee(e.target.value)}
+                        min="0"
+                        placeholder={formFee || '100'}
+                        className="w-32 bg-swan-black border border-swan-border rounded-lg px-3 py-1.5 text-sm text-swan-text focus:outline-none"
+                      />
+                    </div>
+                  )}
+                </div>
               </div>
             )}
 
@@ -534,9 +570,16 @@ export const MatchesAdminPage = () => {
                       <FeatherPtIcon size={10} className="text-swan-accent ml-1" />
                       {match.entryFee}
                       {/* フラグ表示 */}
-                      {match.hasReentry && <span className="ml-1 text-purple-400">リエントリー可</span>}
-                      {match.hasBounty  && <span className="ml-1 text-orange-400">バウンティ</span>}
-                      {match.hasRebuy   && <span className="ml-1 text-cyan-400">リバイ可</span>}
+                      {match.hasReentry && (
+                        <span className="ml-1 text-purple-400">
+                          リエントリー可{match.reentryFee && match.reentryFee !== match.entryFee ? ` (${match.reentryFee}pt)` : ''}
+                        </span>
+                      )}
+                      {match.hasRebuy && (
+                        <span className="ml-1 text-cyan-400">
+                          リバイ可{match.rebuyFee && match.rebuyFee !== match.entryFee ? ` (${match.rebuyFee}pt)` : ''}
+                        </span>
+                      )}
                     </p>
                   </div>
                 </div>
