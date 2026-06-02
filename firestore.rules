@@ -205,5 +205,14 @@ service cloud.firestore {
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['isRead']);
       allow create, delete: if isAdmin();
     }
+
+    // ── playerNotes（個人用プレイヤーメモ）─────────────────────────────────────
+    match /playerNotes/{noteId} {
+      // 自分が書いたメモのみ読み書き可能（他人には見えない）
+      allow read: if isActiveUser() && resource.data.ownerUid == request.auth.uid;
+      allow create: if isActiveUser() && request.resource.data.ownerUid == request.auth.uid;
+      allow update: if isActiveUser() && resource.data.ownerUid == request.auth.uid;
+      allow delete: if isActiveUser() && resource.data.ownerUid == request.auth.uid;
+    }
   }
 }

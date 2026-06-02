@@ -315,3 +315,12 @@ export interface EventParticipantSummary {
   createdAt: Timestamp
 }
 
+// ── プレイヤーメモ（個人用）─────────────────────────────────────────────────────
+export interface PlayerNote {
+  id: string
+  ownerUid: string     // メモを書いた人
+  targetUid: string    // メモ対象のプレイヤー
+  content: string      // メモ内容
+  updatedAt: Timestamp
+}
+

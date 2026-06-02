@@ -1879,4 +1879,43 @@ export const grantTitleToUser = async (
   await batch.commit()
 }
 
+// ── Player Notes（個人用プレイヤーメモ）────────────────────────────────────
+
+export const getPlayerNote = async (
+  ownerUid: string,
+  targetUid: string
+): Promise<import('@/types').PlayerNote | null> => {
+  const snap = await getDocs(
+    query(
+      collection(db, 'playerNotes'),
+      where('ownerUid', '==', ownerUid),
+      where('targetUid', '==', targetUid)
+    )
+  )
+  if (snap.empty) return null
+  const doc = snap.docs[0]
+  return { id: doc.id, ...doc.data() } as import('@/types').PlayerNote
+}
+
+export const savePlayerNote = async (
+  ownerUid: string,
+  targetUid: string,
+  content: string
+) => {
+  const existing = await getPlayerNote(ownerUid, targetUid)
+  if (existing) {
+    await updateDoc(doc(db, 'playerNotes', existing.id), {
+      content,
+      updatedAt: serverTimestamp(),
+    })
+  } else {
+    await addDoc(collection(db, 'playerNotes'), {
+      ownerUid,
+      targetUid,
+      content,
+      updatedAt: serverTimestamp(),
+    })
+  }
+}
+
 export { Timestamp, serverTimestamp }

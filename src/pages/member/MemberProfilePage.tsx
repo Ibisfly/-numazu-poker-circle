@@ -3,14 +3,17 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { AppShell } from '@/components/layout/AppShell'
 import { FeatherIcon } from '@/components/ui/FeatherIcon'
 import { SwanAvatar, DEFAULT_AVATAR_COLOR } from '@/components/ui/SwanAvatar'
-import { BeginnerIcon, Trophy, Award } from '@/components/ui/Icons'
+import { BeginnerIcon, Trophy, Award, Pencil, Check, X } from '@/components/ui/Icons'
 import { GoldMedalIcon, BronzeMedalIcon } from '@/components/ui/Icons'
 import { AchievementIcon } from '@/components/ui/AchievementIcons'
 import {
   getUser,
   subscribePointLogs,
   subscribeUserAchievements,
+  getPlayerNote,
+  savePlayerNote,
 } from '@/lib/firebase/firestore'
+import { useAuth } from '@/lib/hooks/useAuth'
 import { collection, getDocs } from 'firebase/firestore'
 import { db } from '@/lib/firebase/config'
 import type { User, PointLog, UserAchievement } from '@/types'
@@ -22,12 +25,31 @@ interface RingStats      { entries: number; netProfit: number }
 
 export const MemberProfilePage = () => {
   const { uid } = useParams<{ uid: string }>()
+  const { user: currentUser } = useAuth()
   const navigate  = useNavigate()
   const [member, setMember]       = useState<User | null>(null)
   const [pointLogs, setPointLogs] = useState<PointLog[]>([])
   const [achievements, setAchievements] = useState<UserAchievement[]>([])
   const [tournamentStats, setTournamentStats] = useState<TournamentStats>({ entries: 0, wins: 0, placements: 0 })
   const [ringStats, setRingStats]             = useState<RingStats>({ entries: 0, netProfit: 0 })
+
+  // メモ機能
+  const [note, setNote] = useState('')
+  const [editingNote, setEditingNote] = useState(false)
+  const [noteInput, setNoteInput] = useState('')
+  const [savingNote, setSavingNote] = useState(false)
+
+  // メモを読み込み
+  useEffect(() => {
+    if (!uid || !currentUser) return
+    if (uid === currentUser.uid) return // 自分自身にはメモしない
+    getPlayerNote(currentUser.uid, uid).then((n) => {
+      if (n) {
+        setNote(n.content)
+        setNoteInput(n.content)
+      }
+    })
+  }, [uid, currentUser])
 
   useEffect(() => {
     if (!uid) return
@@ -95,6 +117,25 @@ export const MemberProfilePage = () => {
   }))
 
   const attendanceLogs = pointLogs.filter((l) => l.type === 'attendance').length
+
+  const handleSaveNote = async () => {
+    if (!currentUser || !uid) return
+    setSavingNote(true)
+    try {
+      await savePlayerNote(currentUser.uid, uid, noteInput)
+      setNote(noteInput)
+      setEditingNote(false)
+    } finally {
+      setSavingNote(false)
+    }
+  }
+
+  const handleCancelNote = () => {
+    setNoteInput(note)
+    setEditingNote(false)
+  }
+
+  const isSelf = currentUser?.uid === uid
 
   return (
     <AppShell title={member.playerName} showBack onBack={() => navigate('/members')}>
@@ -236,6 +277,61 @@ export const MemberProfilePage = () => {
                 </div>
               ))}
             </div>
+          </div>
+        )}
+
+        {/* 個人メモ（自分以外のプレイヤーに対してのみ表示） */}
+        {!isSelf && currentUser && (
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <h3 className="text-xs font-semibold text-swan-sub uppercase tracking-wide flex items-center gap-1">
+                <Pencil size={12} />
+                自分用メモ
+              </h3>
+              {!editingNote && (
+                <button
+                  onClick={() => setEditingNote(true)}
+                  className="text-xs text-swan-accent hover:underline"
+                >
+                  {note ? '編集' : '追加'}
+                </button>
+              )}
+            </div>
+            {editingNote ? (
+              <div className="space-y-2">
+                <textarea
+                  value={noteInput}
+                  onChange={(e) => setNoteInput(e.target.value)}
+                  placeholder="このプレイヤーについてのメモ（戦略、傾向など）"
+                  className="w-full bg-swan-black border border-swan-border rounded-xl px-3 py-2 text-sm text-swan-text focus:outline-none focus:border-swan-accent resize-none"
+                  rows={4}
+                />
+                <div className="flex gap-2">
+                  <button
+                    onClick={handleSaveNote}
+                    disabled={savingNote}
+                    className="flex-1 bg-swan-accent text-black font-bold py-2 rounded-xl text-sm flex items-center justify-center gap-1 disabled:opacity-50 active:scale-[0.98] transition-transform"
+                  >
+                    <Check size={14} /> {savingNote ? '保存中...' : '保存'}
+                  </button>
+                  <button
+                    onClick={handleCancelNote}
+                    className="flex-1 bg-swan-muted text-swan-sub py-2 rounded-xl text-sm flex items-center justify-center gap-1 active:scale-[0.98] transition-transform"
+                  >
+                    <X size={14} /> キャンセル
+                  </button>
+                </div>
+              </div>
+            ) : note ? (
+              <div className="bg-swan-card border border-swan-border rounded-xl p-3">
+                <p className="text-sm text-swan-text whitespace-pre-wrap">{note}</p>
+              </div>
+            ) : (
+              <p className="text-xs text-swan-sub italic">メモはありません</p>
+            )}
+            <p className="text-[10px] text-swan-muted mt-1">
+              ※ このメモは自分だけが見られます
+            </p>
           </div>
         )}
 
