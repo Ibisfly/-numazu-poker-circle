@@ -518,7 +518,7 @@ export const ProfilePage = () => {
               <button
                 onClick={handleSave}
                 disabled={saving}
-                className="flex-1 bg-swan-accent text-black font-bold py-2.5 rounded-xl text-sm disabled:opacity-50 flex items-center justify-center gap-1"
+                className="flex-1 bg-swan-accent text-black font-bold py-2.5 rounded-xl text-sm disabled:opacity-50 flex items-center justify-center gap-1 active:scale-[0.98] transition-transform"
               >
                 <Check size={14} /> {saving ? '保存中...' : '保存する'}
               </button>

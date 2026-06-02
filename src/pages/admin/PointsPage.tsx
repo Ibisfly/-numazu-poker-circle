@@ -227,7 +227,7 @@ export const PointsPage = () => {
           <button
             type="submit"
             disabled={saving}
-            className="w-full bg-swan-accent text-black font-bold py-3 rounded-xl disabled:opacity-50 flex items-center justify-center gap-2"
+            className="w-full bg-swan-accent text-black font-bold py-3 rounded-xl disabled:opacity-50 flex items-center justify-center gap-2 active:scale-[0.98] transition-transform"
           >
             <FeatherPtIcon size={16} />
             {saving ? '処理中...' : `${type === 'add' ? '加算' : '減算'}する`}

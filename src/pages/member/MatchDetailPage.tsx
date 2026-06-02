@@ -108,7 +108,8 @@ export const MatchDetailPage = () => {
   const handleExtraEntry = async () => {
     if (!match) return
     setActionMsg('')
-    if ((user.ownedPoints ?? 0) < match.entryFee) {
+    const fee = confirmAction === 'rebuy' ? (match.rebuyFee ?? match.entryFee) : (match.reentryFee ?? match.entryFee)
+    if ((user.ownedPoints ?? 0) < fee) {
       setActionMsg('ポイント残高が不足しています')
       setConfirmAction(null)
       return
@@ -137,6 +138,7 @@ export const MatchDetailPage = () => {
       : (match.reentries ?? {})[uid] ?? 0
 
   const extraLabel = cat === 'ring' ? 'リバイ' : 'リエントリー'
+  const extraFee = cat === 'ring' ? (match.rebuyFee ?? match.entryFee) : (match.reentryFee ?? match.entryFee)
   const canExtraEntry = isEntered && isOngoing && (cat === 'ring' ? match.hasRebuy : match.hasReentry)
 
   return (
@@ -150,8 +152,16 @@ export const MatchDetailPage = () => {
           ) : (
             <span className="text-xs font-bold text-cyan-400 bg-cyan-400/10 border border-cyan-400/30 px-2 py-1 rounded-full">プレミアリング</span>
           )}
-          {match.hasReentry && <span className="text-xs text-purple-400 border border-purple-400/30 px-2 py-1 rounded-full">リエントリー可</span>}
-          {match.hasRebuy   && <span className="text-xs text-cyan-400 border border-cyan-400/30 px-2 py-1 rounded-full">リバイ可</span>}
+          {match.hasReentry && (
+            <span className="text-xs text-purple-400 border border-purple-400/30 px-2 py-1 rounded-full">
+              リエントリー可{match.reentryFee && match.reentryFee !== match.entryFee ? ` (🪶${match.reentryFee.toLocaleString()})` : ''}
+            </span>
+          )}
+          {match.hasRebuy && (
+            <span className="text-xs text-cyan-400 border border-cyan-400/30 px-2 py-1 rounded-full">
+              リバイ可{match.rebuyFee && match.rebuyFee !== match.entryFee ? ` (🪶${match.rebuyFee.toLocaleString()})` : ''}
+            </span>
+          )}
           <span className={`text-xs font-medium px-2 py-1 rounded-full border ${
             match.status === 'recruiting' ? 'text-green-400 border-green-400/30 bg-green-400/10' :
             match.status === 'ongoing' ? 'text-yellow-400 border-yellow-400/30 bg-yellow-400/10' :
@@ -258,7 +268,7 @@ export const MatchDetailPage = () => {
               <button
                 onClick={handleEntry}
                 disabled={loading}
-                className="w-full bg-swan-accent text-black font-bold py-3 rounded-xl hover:opacity-90 disabled:opacity-50 transition-opacity"
+                className="w-full bg-swan-accent text-black font-bold py-3 rounded-xl hover:opacity-90 disabled:opacity-50 transition-all active:scale-[0.98]"
               >
                 {loading ? '処理中...' : `エントリーする（🪶${match.entryFee.toLocaleString()}）`}
               </button>
@@ -283,13 +293,13 @@ export const MatchDetailPage = () => {
             )}
             <button
               onClick={() => setConfirmAction(cat === 'ring' ? 'rebuy' : 'reentry')}
-              className={`w-full font-bold py-3 rounded-xl transition-opacity ${
+              className={`w-full font-bold py-3 rounded-xl transition-all active:scale-[0.98] ${
                 cat === 'ring'
-                  ? 'bg-cyan-500/20 text-cyan-400 border border-cyan-500/40 hover:bg-cyan-500/30'
-                  : 'bg-purple-500/20 text-purple-400 border border-purple-500/40 hover:bg-purple-500/30'
+                  ? 'bg-cyan-500/20 text-cyan-400 border border-cyan-500/40 hover:bg-cyan-500/30 active:bg-cyan-500/40'
+                  : 'bg-purple-500/20 text-purple-400 border border-purple-500/40 hover:bg-purple-500/30 active:bg-purple-500/40'
               }`}
             >
-              {extraLabel}する（🪶{match.entryFee.toLocaleString()}）
+              {extraLabel}する（🪶{extraFee.toLocaleString()}）
             </button>
           </div>
         )}
@@ -320,7 +330,7 @@ export const MatchDetailPage = () => {
               {confirmAction === 'rebuy' ? 'リバイしますか？' : 'リエントリーしますか？'}
             </p>
             <p className="text-sm text-swan-sub">
-              🪶{match.entryFee.toLocaleString()} を消費します
+              🪶{(confirmAction === 'rebuy' ? (match.rebuyFee ?? match.entryFee) : (match.reentryFee ?? match.entryFee)).toLocaleString()} を消費します
             </p>
             <p className="text-xs text-swan-sub">
               現在の保有ポイント: 🪶{(user.ownedPoints ?? 0).toLocaleString()}

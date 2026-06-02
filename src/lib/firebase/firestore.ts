@@ -217,7 +217,9 @@ export const finishEvent = async (eventId: string, adminUid: string) => {
   )
   const userBingoCards = bingoCardsSnap.docs.map((d) => ({ id: d.id, ...d.data() } as UserBingoCard))
 
-  const batch = writeBatch(db)
+  // バッチを分割して処理（Firestoreは500操作が上限）
+  type BatchOp = { type: 'set' | 'update'; ref: ReturnType<typeof doc>; data: Record<string, unknown> }
+  const operations: BatchOp[] = []
 
   // 未終了のビンゴカードを強制終了してポイント付与
   for (const card of userBingoCards) {
@@ -244,25 +246,34 @@ export const finishEvent = async (eventId: string, adminUid: string) => {
       pointBreakdown.push(`全埋め: ${card.pointsForCompletion}pt`)
     }
 
-    batch.update(doc(db, 'userBingoCards', card.id), {
-      finishedAt: serverTimestamp(),
+    operations.push({
+      type: 'update',
+      ref: doc(db, 'userBingoCards', card.id),
+      data: { finishedAt: serverTimestamp() },
     })
 
     if (totalPoints > 0) {
-      const logRef = doc(collection(db, 'pointLogs'))
-      batch.set(logRef, {
-        uid: card.uid,
-        type: 'manual',
-        amount: totalPoints,
-        description: `ビンゴ「${card.bingoCardName}」イベント終了時自動精算 (${pointBreakdown.join(' / ')})`,
-        relatedId: card.id,
-        createdAt: serverTimestamp(),
-        createdBy: adminUid,
+      operations.push({
+        type: 'set',
+        ref: doc(collection(db, 'pointLogs')),
+        data: {
+          uid: card.uid,
+          type: 'manual',
+          amount: totalPoints,
+          description: `ビンゴ「${card.bingoCardName}」イベント終了時自動精算 (${pointBreakdown.join(' / ')})`,
+          relatedId: card.id,
+          createdAt: serverTimestamp(),
+          createdBy: adminUid,
+        },
       })
-      batch.update(doc(db, 'users', card.uid), {
-        totalPoints: increment(totalPoints),
-        yearPoints: increment(totalPoints),
-        ownedPoints: increment(totalPoints),
+      operations.push({
+        type: 'update',
+        ref: doc(db, 'users', card.uid),
+        data: {
+          totalPoints: increment(totalPoints),
+          yearPoints: increment(totalPoints),
+          ownedPoints: increment(totalPoints),
+        },
       })
     }
   }
@@ -333,7 +344,6 @@ export const finishEvent = async (eventId: string, adminUid: string) => {
       ringResults.reduce((s, r) => s + r.netPoints, 0) +
       bingoResults.reduce((s, r) => s + r.earnedPoints, 0)
 
-    const summaryRef = doc(collection(db, 'eventParticipantSummaries'))
     const summary: Omit<EventParticipantSummary, 'id'> = {
       eventId,
       eventTitle: event.title,
@@ -346,26 +356,47 @@ export const finishEvent = async (eventId: string, adminUid: string) => {
       isRead: false,
       createdAt: serverTimestamp() as Timestamp,
     }
-    batch.set(summaryRef, summary)
+    operations.push({
+      type: 'set',
+      ref: doc(collection(db, 'eventParticipantSummaries')),
+      data: summary,
+    })
 
     // 通知
-    const notifRef = doc(collection(db, 'notifications'))
-    batch.set(notifRef, {
-      uid,
-      type: 'point_awarded',
-      message: `「${event.title}」が終了しました。本日の成績をホームで確認できます。`,
-      isRead: false,
-      createdAt: serverTimestamp(),
+    operations.push({
+      type: 'set',
+      ref: doc(collection(db, 'notifications')),
+      data: {
+        uid,
+        type: 'point_awarded',
+        message: `「${event.title}」が終了しました。本日の成績をホームで確認できます。`,
+        isRead: false,
+        createdAt: serverTimestamp(),
+      },
     })
   }
 
   // イベントを終了
-  batch.update(doc(db, 'events', eventId), {
-    status: 'finished',
-    finishedAt: serverTimestamp(),
+  operations.push({
+    type: 'update',
+    ref: doc(db, 'events', eventId),
+    data: { status: 'finished', finishedAt: serverTimestamp() },
   })
 
-  await batch.commit()
+  // バッチを450操作ごとに分割して実行
+  const BATCH_LIMIT = 450
+  for (let i = 0; i < operations.length; i += BATCH_LIMIT) {
+    const batch = writeBatch(db)
+    const chunk = operations.slice(i, i + BATCH_LIMIT)
+    for (const op of chunk) {
+      if (op.type === 'set') {
+        batch.set(op.ref, op.data)
+      } else {
+        batch.update(op.ref, op.data)
+      }
+    }
+    await batch.commit()
+  }
 }
 
 export const subscribeUnreadEventSummaries = (uid: string, cb: (summaries: EventParticipantSummary[]) => void) =>

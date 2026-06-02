@@ -146,7 +146,7 @@ export const TournamentPage = () => {
             <p className={`text-sm ${msg.includes('失敗') ? 'text-red-400' : 'text-green-400'}`}>{msg}</p>
           )}
 
-          <button type="submit" disabled={saving} className="w-full bg-swan-accent text-black font-bold py-3 rounded-xl disabled:opacity-50 flex items-center justify-center gap-2">
+          <button type="submit" disabled={saving} className="w-full bg-swan-accent text-black font-bold py-3 rounded-xl disabled:opacity-50 flex items-center justify-center gap-2 active:scale-[0.98] transition-transform">
             <FeatherPtIcon size={16} />
             {saving ? '登録中...' : 'ポイント一括付与'}
           </button>

@@ -154,7 +154,7 @@ export const ShopAdminPage = () => {
 
         {tab === 'items' && (
           <>
-            <button onClick={() => openForm()} className="w-full bg-swan-accent text-black font-bold py-2.5 rounded-xl text-sm flex items-center justify-center gap-2">
+            <button onClick={() => openForm()} className="w-full bg-swan-accent text-black font-bold py-2.5 rounded-xl text-sm flex items-center justify-center gap-2 active:scale-[0.98] transition-transform">
               <Plus size={16} />
               アイテム追加
             </button>
@@ -429,7 +429,7 @@ export const ShopAdminPage = () => {
                 )}
 
                 <div className="flex gap-2">
-                  <button type="submit" disabled={saving} className="flex-1 bg-swan-accent text-black font-bold py-2 rounded-lg text-sm disabled:opacity-50">
+                  <button type="submit" disabled={saving} className="flex-1 bg-swan-accent text-black font-bold py-2 rounded-lg text-sm disabled:opacity-50 active:scale-[0.98] transition-transform">
                     {saving ? '保存中...' : '保存'}
                   </button>
                   <button type="button" onClick={() => setShowForm(false)} className="flex-1 bg-swan-muted text-swan-sub py-2 rounded-lg text-sm">

@@ -94,7 +94,7 @@ export const RegisterPage = () => {
         <button
           type="submit"
           disabled={loading}
-          className="w-full bg-swan-accent text-black font-bold py-3 rounded-lg hover:opacity-90 transition-opacity disabled:opacity-50"
+          className="w-full bg-swan-accent text-black font-bold py-3 rounded-lg hover:opacity-90 transition-all active:scale-[0.98] disabled:opacity-50"
         >
           {loading ? '登録中...' : '登録する'}
         </button>

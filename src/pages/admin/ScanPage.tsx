@@ -243,7 +243,7 @@ export const ScanPage = () => {
           <button
             onClick={startScan}
             disabled={!selectedEventId}
-            className="w-full bg-swan-accent text-black font-bold py-3 rounded-xl disabled:opacity-50 flex items-center justify-center gap-2"
+            className="w-full bg-swan-accent text-black font-bold py-3 rounded-xl disabled:opacity-50 flex items-center justify-center gap-2 active:scale-[0.98] transition-transform"
           >
             <Camera size={18} />
             カメラでQRスキャン開始

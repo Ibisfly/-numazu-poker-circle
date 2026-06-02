@@ -67,20 +67,20 @@ export const ACHIEVEMENTS: Achievement[] = [
   {
     id: 'ring_earnings_2k',
     name: '大喰らい',
-    description: 'プレミアリングでの累計獲得ポイント2,000到達',
-    condition: 'ring_earned_total >= 2000',
+    description: 'プレミアリングでの累計獲得ポイント1,000到達',
+    condition: 'ring_earned_total >= 1000',
   },
   {
     id: 'ring_earnings_10k',
     name: '羽も積もれば山となる',
-    description: 'プレミアリングでの累計獲得ポイント10,000到達',
-    condition: 'ring_earned_total >= 10000',
+    description: 'プレミアリングでの累計獲得ポイント5,000到達',
+    condition: 'ring_earned_total >= 5000',
   },
   {
     id: 'ring_big_win',
     name: '総てを手に入れた',
-    description: 'プレミアリング1試合での収支が+1,000超え',
-    condition: 'ring_single_net > 1000',
+    description: 'プレミアリング1試合での収支が+500超え',
+    condition: 'ring_single_net > 500',
   },
   // ── ショップ ──────────────────────────────────────────────────────────────
   {
@@ -98,7 +98,7 @@ export const ACHIEVEMENTS: Achievement[] = [
   },
   {
     id: 'vault',
-    name: '金庫が足りない！',
+    name: '金庫番',
     description: '累計獲得ポイント20,000超過',
     condition: 'total_points >= 20000',
   },
@@ -113,8 +113,8 @@ export const ACHIEVEMENTS: Achievement[] = [
   {
     id: 'fish',
     name: 'フィッシュ！',
-    description: 'プレミアリングで1回1,000ポイント以上のマイナス',
-    condition: 'ring_big_loss >= 1000',
+    description: 'プレミアリングで1度に200ポイント以上のマイナス',
+    condition: 'ring_big_loss >= 200',
     isSecret: true,
   },
   {

@@ -311,7 +311,7 @@ export const MatchesAdminPage = () => {
 
         <button
           onClick={() => setShowForm(!showForm)}
-          className="w-full bg-swan-accent text-black font-bold py-2.5 rounded-xl text-sm flex items-center justify-center gap-2"
+          className="w-full bg-swan-accent text-black font-bold py-2.5 rounded-xl text-sm flex items-center justify-center gap-2 active:scale-[0.98] transition-transform"
         >
           <Plus size={16} />
           {showForm ? 'キャンセル' : '新規マッチ作成'}
@@ -477,7 +477,7 @@ export const MatchesAdminPage = () => {
             )}
 
             <button type="submit" disabled={saving}
-              className="w-full bg-swan-accent text-black font-bold py-2.5 rounded-xl text-sm disabled:opacity-50">
+              className="w-full bg-swan-accent text-black font-bold py-2.5 rounded-xl text-sm disabled:opacity-50 active:scale-[0.98] transition-transform">
               {saving ? '作成中...' : 'マッチを作成'}
             </button>
           </form>
@@ -531,7 +531,7 @@ export const MatchesAdminPage = () => {
                 <button
                   onClick={handleSaveEdit}
                   disabled={saving}
-                  className="flex-1 bg-swan-accent text-black font-bold py-2 rounded-xl text-sm disabled:opacity-50"
+                  className="flex-1 bg-swan-accent text-black font-bold py-2 rounded-xl text-sm disabled:opacity-50 active:scale-[0.98] transition-transform"
                 >
                   {saving ? '保存中...' : '保存'}
                 </button>
@@ -568,7 +568,7 @@ export const MatchesAdminPage = () => {
               ))}
               <div className="flex gap-2">
                 <button onClick={handleTournamentSettle} disabled={saving}
-                  className="flex-1 bg-swan-accent text-black font-bold py-2 rounded-lg text-sm disabled:opacity-50">
+                  className="flex-1 bg-swan-accent text-black font-bold py-2 rounded-lg text-sm disabled:opacity-50 active:scale-[0.98] transition-transform">
                   {saving ? '精算中...' : '精算実行'}
                 </button>
                 <button onClick={() => setSettlingMatch(null)}

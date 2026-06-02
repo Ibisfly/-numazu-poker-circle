@@ -36,6 +36,7 @@ export const EventsPage = () => {
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const [finishingEvent, setFinishingEvent] = useState<Event | null>(null)
   const [actionLoading, setActionLoading] = useState<string | null>(null)
+  const [actionError, setActionError] = useState<string | null>(null)
 
   useEffect(() => { return subscribeEvents(setEvents) }, [])
   useEffect(() => { return subscribeBingoCards(setBingoCards) }, [])
@@ -100,9 +101,13 @@ export const EventsPage = () => {
   const handleFinish = async () => {
     if (!finishingEvent || !user) return
     setActionLoading(finishingEvent.id)
+    setActionError(null)
     try {
       await finishEvent(finishingEvent.id, user.uid)
       setFinishingEvent(null)
+    } catch (e) {
+      console.error('finishEvent error:', e)
+      setActionError(e instanceof Error ? e.message : 'イベント終了処理に失敗しました')
     } finally {
       setActionLoading(null)
     }
@@ -120,7 +125,7 @@ export const EventsPage = () => {
         {!showForm && (
           <button
             onClick={openCreate}
-            className="w-full bg-swan-accent text-black font-bold py-2.5 rounded-xl text-sm flex items-center justify-center gap-2"
+            className="w-full bg-swan-accent text-black font-bold py-2.5 rounded-xl text-sm flex items-center justify-center gap-2 active:scale-[0.98] transition-transform"
           >
             <Plus size={16} /> 新規イベント作成
           </button>
@@ -185,11 +190,11 @@ export const EventsPage = () => {
             </div>
             <div className="flex gap-2">
               <button type="submit" disabled={saving}
-                className="flex-1 bg-swan-accent text-black font-bold py-2 rounded-lg text-sm disabled:opacity-50">
+                className="flex-1 bg-swan-accent text-black font-bold py-2 rounded-lg text-sm disabled:opacity-50 active:scale-[0.98] transition-transform">
                 {saving ? '保存中...' : editingId ? '保存する' : '作成する'}
               </button>
               <button type="button" onClick={closeForm}
-                className="flex-1 bg-swan-muted text-swan-sub py-2 rounded-lg text-sm">
+                className="flex-1 bg-swan-muted text-swan-sub py-2 rounded-lg text-sm active:scale-[0.98] transition-transform">
                 キャンセル
               </button>
             </div>
@@ -226,17 +231,22 @@ export const EventsPage = () => {
                 ・未終了のビンゴカードを強制終了<br />
                 ・参加者に通知を送信
               </p>
+              {actionError && (
+                <p className="text-xs text-red-400 bg-red-400/10 border border-red-400/30 rounded-lg p-2">
+                  {actionError}
+                </p>
+              )}
               <div className="flex gap-2">
                 <button
                   onClick={handleFinish}
                   disabled={actionLoading === finishingEvent.id}
-                  className="flex-1 bg-green-500/20 text-green-400 border border-green-500/30 font-bold py-2 rounded-xl text-sm disabled:opacity-50"
+                  className="flex-1 bg-green-500/20 text-green-400 border border-green-500/30 font-bold py-2 rounded-xl text-sm disabled:opacity-50 active:scale-[0.98] transition-transform"
                 >
                   {actionLoading === finishingEvent.id ? '処理中...' : '終了する'}
                 </button>
                 <button
-                  onClick={() => setFinishingEvent(null)}
-                  className="flex-1 bg-swan-muted text-swan-sub py-2 rounded-xl text-sm"
+                  onClick={() => { setFinishingEvent(null); setActionError(null) }}
+                  className="flex-1 bg-swan-muted text-swan-sub py-2 rounded-xl text-sm active:scale-[0.98] transition-transform"
                 >
                   キャンセル
                 </button>
