@@ -2,11 +2,11 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { AppShell } from '@/components/layout/AppShell'
 import { FeatherIcon } from '@/components/ui/FeatherIcon'
-import { CreditCard, ShoppingBag, BeginnerIcon, BookOpen, Layers, Star, Trophy, X } from '@/components/ui/Icons'
+import { CreditCard, ShoppingBag, BeginnerIcon, BookOpen, Layers, Star, Trophy, X, ChevronDown, ChevronUp } from '@/components/ui/Icons'
 import { FlyingSwanProgress } from '@/components/ui/FlyingSwanProgress'
 import { DEFAULT_AVATAR_COLOR } from '@/components/ui/SwanAvatar'
 import { useAuth } from '@/lib/hooks/useAuth'
-import { subscribeMatches, subscribeUnreadEventSummaries, markEventSummaryAsRead } from '@/lib/firebase/firestore'
+import { subscribeMatches, subscribeRecentEventSummaries, markEventSummaryAsRead } from '@/lib/firebase/firestore'
 import type { Match, EventParticipantSummary } from '@/types'
 
 const SUIT_COLORS: Record<string, string> = {
@@ -34,6 +34,23 @@ const parseLuckyHand = (hand: string): { rank1: string; rank2: string; suited: b
   return { rank1, rank2, suited }
 }
 
+const getScoreGradient = (points: number): string => {
+  if (points >= 1000) return 'from-yellow-500/30 via-amber-400/20 to-yellow-600/30 border-yellow-400/60'
+  if (points >= 500) return 'from-purple-500/25 via-pink-400/15 to-purple-600/25 border-purple-400/50'
+  if (points >= 200) return 'from-cyan-500/20 via-blue-400/10 to-cyan-600/20 border-cyan-400/40'
+  if (points > 0) return 'from-green-500/15 via-emerald-400/10 to-green-600/15 border-green-400/30'
+  if (points === 0) return 'from-swan-card to-swan-dark border-swan-border'
+  if (points > -200) return 'from-orange-500/15 via-red-400/10 to-orange-600/15 border-orange-400/30'
+  return 'from-red-500/20 via-rose-400/15 to-red-600/20 border-red-400/40'
+}
+
+const getScoreLabel = (points: number): { text: string; color: string } | null => {
+  if (points >= 1000) return { text: 'LEGENDARY', color: 'text-yellow-400' }
+  if (points >= 500) return { text: 'EXCELLENT', color: 'text-purple-400' }
+  if (points >= 200) return { text: 'GREAT', color: 'text-cyan-400' }
+  return null
+}
+
 export const HomePage = () => {
   const { user } = useAuth()
   const [upcomingMatch, setUpcomingMatch] = useState<Match | null>(null)
@@ -49,11 +66,10 @@ export const HomePage = () => {
 
   useEffect(() => {
     if (!user) return
-    return subscribeUnreadEventSummaries(user.uid, (summaries) => {
+    return subscribeRecentEventSummaries(user.uid, (summaries) => {
       setEventSummaries(summaries)
-      if (summaries.length > 0) {
-        summaries.forEach((s) => markEventSummaryAsRead(s.id))
-      }
+      // 未読のものを既読にする
+      summaries.filter((s) => !s.isRead).forEach((s) => markEventSummaryAsRead(s.id))
     })
   }, [user])
 
@@ -82,29 +98,43 @@ export const HomePage = () => {
         </div>
 
         {/* イベントサマリー */}
-        {eventSummaries.map((summary) => (
-          <div key={summary.id} className="bg-gradient-to-br from-swan-card to-swan-dark border border-swan-accent/50 rounded-xl overflow-hidden">
+        {eventSummaries.map((summary) => {
+          const gradient = getScoreGradient(summary.totalEarnedPoints)
+          const label = getScoreLabel(summary.totalEarnedPoints)
+          const isExpanded = expandedSummary === summary.id
+          return (
+          <div key={summary.id} className={`bg-gradient-to-br ${gradient} border rounded-xl overflow-hidden transition-all`}>
             <div
-              className="p-4 cursor-pointer"
-              onClick={() => setExpandedSummary(expandedSummary === summary.id ? null : summary.id)}
+              className="p-4 cursor-pointer active:scale-[0.99] transition-transform"
+              onClick={() => setExpandedSummary(isExpanded ? null : summary.id)}
             >
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <Trophy size={20} className="text-swan-accent" />
+                  <Trophy size={20} className={summary.totalEarnedPoints >= 500 ? 'text-yellow-400' : 'text-swan-accent'} />
                   <div>
-                    <p className="text-xs text-swan-accent font-semibold">本日の成績</p>
+                    <div className="flex items-center gap-2">
+                      <p className="text-xs text-swan-accent font-semibold">成績</p>
+                      {label && (
+                        <span className={`text-[10px] font-bold ${label.color} tracking-wider animate-pulse`}>
+                          {label.text}
+                        </span>
+                      )}
+                    </div>
                     <p className="font-bold text-swan-text">{summary.eventTitle}</p>
                   </div>
                 </div>
-                <div className="text-right">
-                  <p className="text-xs text-swan-sub">獲得ポイント</p>
-                  <p className={`text-lg font-bold flex items-center gap-1 justify-end ${
-                    summary.totalEarnedPoints >= 0 ? 'text-green-400' : 'text-red-400'
-                  }`}>
-                    {summary.totalEarnedPoints >= 0 ? '+' : ''}
-                    {summary.totalEarnedPoints.toLocaleString()}
-                    <FeatherIcon size={14} />
-                  </p>
+                <div className="flex items-center gap-2">
+                  <div className="text-right">
+                    <p className="text-xs text-swan-sub">獲得</p>
+                    <p className={`text-xl font-bold flex items-center gap-1 justify-end ${
+                      summary.totalEarnedPoints >= 0 ? 'text-green-400' : 'text-red-400'
+                    }`}>
+                      {summary.totalEarnedPoints >= 0 ? '+' : ''}
+                      {summary.totalEarnedPoints.toLocaleString()}
+                      <FeatherIcon size={14} />
+                    </p>
+                  </div>
+                  {isExpanded ? <ChevronUp size={16} className="text-swan-sub" /> : <ChevronDown size={16} className="text-swan-sub" />}
                 </div>
               </div>
             </div>
@@ -165,15 +195,16 @@ export const HomePage = () => {
                     e.stopPropagation()
                     setEventSummaries((prev) => prev.filter((s) => s.id !== summary.id))
                   }}
-                  className="w-full mt-2 py-2 text-xs text-swan-sub border border-swan-border rounded-lg hover:bg-swan-dark flex items-center justify-center gap-1"
+                  className="w-full mt-2 py-2 text-xs text-swan-sub border border-swan-border/50 rounded-lg hover:bg-swan-dark/50 flex items-center justify-center gap-1 active:scale-[0.98] transition-transform"
                 >
                   <X size={12} />
-                  閉じる
+                  非表示
                 </button>
               </div>
             )}
           </div>
-        ))}
+        )})}
+
 
         {/* ② 初心者向けガイドブック誘導 */}
         {user.isBeginner && (

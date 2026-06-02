@@ -412,6 +412,20 @@ export const subscribeUnreadEventSummaries = (uid: string, cb: (summaries: Event
 export const markEventSummaryAsRead = (summaryId: string) =>
   updateDoc(doc(db, 'eventParticipantSummaries', summaryId), { isRead: true })
 
+export const subscribeRecentEventSummaries = (uid: string, cb: (summaries: EventParticipantSummary[]) => void) => {
+  const sevenDaysAgo = new Date()
+  sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7)
+  return onSnapshot(
+    query(
+      collection(db, 'eventParticipantSummaries'),
+      where('uid', '==', uid),
+      where('createdAt', '>=', Timestamp.fromDate(sevenDaysAgo)),
+      orderBy('createdAt', 'desc')
+    ),
+    (snap) => cb(snap.docs.map((d) => ({ id: d.id, ...d.data() } as EventParticipantSummary)))
+  )
+}
+
 export const subscribeUserEventSummaries = (uid: string, cb: (summaries: EventParticipantSummary[]) => void) =>
   onSnapshot(
     query(
