@@ -82,7 +82,11 @@ export const MemberProfilePage = () => {
           const entry = cashbacks.find((c) => c.uid === uid)
           if (entry) {
             ring.entries++
-            ring.netProfit += entry.amount - (match.entryFee ?? 0)
+            // リバイ回数分の費用も差し引く
+            const rebuyCount = (match.rebuys as Record<string, number> ?? {})[uid] ?? 0
+            const rebuyFee = match.rebuyFee ?? match.entryFee ?? 0
+            const totalEntryFee = (match.entryFee ?? 0) + rebuyCount * rebuyFee
+            ring.netProfit += entry.amount - totalEntryFee
           }
         } else {
           // トーナメント（デフォルト）
