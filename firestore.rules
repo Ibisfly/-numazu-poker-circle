@@ -214,5 +214,11 @@ service cloud.firestore {
       allow update: if isActiveUser() && resource.data.ownerUid == request.auth.uid;
       allow delete: if isActiveUser() && resource.data.ownerUid == request.auth.uid;
     }
+
+    // ── handHistories（ハンド履歴）──────────────────────────────────────────────
+    match /handHistories/{handId} {
+      allow read: if isActiveUser();
+      allow create, update, delete: if isAdmin();
+    }
   }
 }

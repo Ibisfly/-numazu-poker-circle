@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { AppShell } from '@/components/layout/AppShell'
 import { FeatherIcon } from '@/components/ui/FeatherIcon'
-import { Shield, LogOut, Pencil, X, Check, BeginnerIcon, CreditCard, ChevronDown, ChevronUp } from '@/components/ui/Icons'
+import { Shield, LogOut, Pencil, X, Check, BeginnerIcon, CreditCard, ChevronDown, ChevronUp, History } from '@/components/ui/Icons'
 import { SwanAvatar, AVATAR_COLORS, DEFAULT_AVATAR_COLOR, AVATAR_VARIANT_DEFS } from '@/components/ui/SwanAvatar'
 import { TitleBadge, type TitleTier } from '@/components/ui/TitleBadge'
 import { AchievementIcon } from '@/components/ui/AchievementIcons'
@@ -731,14 +731,23 @@ export const ProfilePage = () => {
           </div>
         )}
 
-        {/* 会員証へのリンク */}
-        <Link
-          to="/card"
-          className="flex items-center justify-center gap-2 w-full border border-swan-border text-swan-sub py-3 rounded-xl text-sm hover:border-swan-accent hover:text-swan-accent transition-colors"
-        >
-          <CreditCard size={16} />
-          会員証を表示
-        </Link>
+        {/* クイックリンク */}
+        <div className="grid grid-cols-2 gap-2">
+          <Link
+            to="/card"
+            className="flex items-center justify-center gap-2 border border-swan-border text-swan-sub py-3 rounded-xl text-sm hover:border-swan-accent hover:text-swan-accent transition-colors"
+          >
+            <CreditCard size={16} />
+            会員証
+          </Link>
+          <Link
+            to="/hands"
+            className="flex items-center justify-center gap-2 border border-swan-border text-swan-sub py-3 rounded-xl text-sm hover:border-swan-accent hover:text-swan-accent transition-colors"
+          >
+            <History size={16} />
+            ハンド履歴
+          </Link>
+        </div>
 
         {/* 管理パネル（管理者のみ） */}
         {user.role === 'admin' && (

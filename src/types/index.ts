@@ -324,3 +324,67 @@ export interface PlayerNote {
   updatedAt: Timestamp
 }
 
+// ── ハンド履歴 ─────────────────────────────────────────────────────────────────
+
+export type PokerAction = 'fold' | 'check' | 'call' | 'bet' | 'raise' | 'all-in'
+export type PokerPosition = 'BTN' | 'SB' | 'BB' | 'UTG' | 'UTG+1' | 'MP' | 'MP+1' | 'CO' | string
+
+export interface HandAction {
+  uid: string | null
+  displayName: string
+  action: PokerAction
+  amount?: number
+  isAllIn?: boolean
+}
+
+export interface HandPlayer {
+  uid: string | null          // circlesユーザー（ゲストはnull）
+  displayName: string
+  seatNumber: number
+  position: PokerPosition
+  startingStack: number
+  holeCards: [string, string] // 'As', 'Kh' 等
+}
+
+export interface HandWinner {
+  uid: string | null
+  displayName: string
+  amount: number
+  hand?: string               // "Two Pair, Aces and Kings"
+}
+
+export interface HandHistory {
+  id: string
+  handNumber: number
+  playedAt: Timestamp
+
+  // ブラインド構造
+  blinds: { sb: number; bb: number; ante?: number }
+
+  // プレイヤー（シート順）
+  players: HandPlayer[]
+
+  // ストリート別アクション
+  actions: {
+    preflop: HandAction[]
+    flop?: HandAction[]
+    turn?: HandAction[]
+    river?: HandAction[]
+  }
+
+  // ボード
+  board: {
+    flop?: [string, string, string]
+    turn?: string
+    river?: string
+  }
+
+  // 結果
+  pot: number
+  winners: HandWinner[]
+
+  // メタ
+  importedAt: Timestamp
+  importedBy: string
+}
+

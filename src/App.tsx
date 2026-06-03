@@ -22,6 +22,7 @@ import { MembersDirectoryPage } from '@/pages/member/MembersDirectoryPage'
 import { MemberProfilePage } from '@/pages/member/MemberProfilePage'
 import { GuidePage } from '@/pages/member/GuidePage'
 import { BingoPage } from '@/pages/member/BingoPage'
+import { HandHistoryPage } from '@/pages/member/HandHistoryPage'
 
 // Admin
 import { AdminDashboardPage } from '@/pages/admin/AdminDashboardPage'
@@ -36,6 +37,7 @@ import { AchievementsAdminPage } from '@/pages/admin/AchievementsAdminPage'
 import { BingoAdminPage } from '@/pages/admin/BingoAdminPage'
 import { BingoStampPage } from '@/pages/admin/BingoStampPage'
 import { TitlesAdminPage } from '@/pages/admin/TitlesAdminPage'
+import { HandHistoryImportPage } from '@/pages/admin/HandHistoryImportPage'
 
 export const App = () => (
   <BrowserRouter>
@@ -61,6 +63,7 @@ export const App = () => (
         <Route path="/members/:uid" element={<RequireAuth><MemberProfilePage /></RequireAuth>} />
         <Route path="/guide" element={<RequireAuth><GuidePage /></RequireAuth>} />
         <Route path="/bingo" element={<RequireAuth><BingoPage /></RequireAuth>} />
+        <Route path="/hands" element={<RequireAuth><HandHistoryPage /></RequireAuth>} />
 
         {/* ── Admin (requires admin role) ── */}
         <Route path="/admin" element={<RequireAuth requireAdmin><AdminDashboardPage /></RequireAuth>} />
@@ -75,6 +78,7 @@ export const App = () => (
         <Route path="/admin/bingo" element={<RequireAuth requireAdmin><BingoAdminPage /></RequireAuth>} />
         <Route path="/admin/bingo/stamp" element={<RequireAuth requireAdmin><BingoStampPage /></RequireAuth>} />
         <Route path="/admin/titles" element={<RequireAuth requireAdmin><TitlesAdminPage /></RequireAuth>} />
+        <Route path="/admin/hands" element={<RequireAuth requireAdmin><HandHistoryImportPage /></RequireAuth>} />
 
         {/* ── Fallback ── */}
         <Route path="*" element={<Navigate to="/" replace />} />

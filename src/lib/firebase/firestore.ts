@@ -1932,4 +1932,47 @@ export const savePlayerNote = async (
   }
 }
 
+// ── ハンド履歴 ──────────────────────────────────────────────────────────────
+
+export const importHandHistories = async (
+  hands: Omit<import('@/types').HandHistory, 'id' | 'importedAt'>[],
+  adminUid: string
+) => {
+  const batch = writeBatch(db)
+  for (const hand of hands) {
+    const ref = doc(collection(db, 'handHistories'))
+    batch.set(ref, {
+      ...hand,
+      importedAt: serverTimestamp(),
+      importedBy: adminUid,
+    })
+  }
+  await batch.commit()
+  return hands.length
+}
+
+export const subscribeHandHistories = (
+  cb: (hands: import('@/types').HandHistory[]) => void
+) =>
+  onSnapshot(
+    query(collection(db, 'handHistories'), orderBy('playedAt', 'desc'), limit(100)),
+    (snap) => cb(snap.docs.map((d) => ({ id: d.id, ...d.data() } as import('@/types').HandHistory)))
+  )
+
+export const subscribeUserHandHistories = (
+  uid: string,
+  cb: (hands: import('@/types').HandHistory[]) => void
+) =>
+  onSnapshot(
+    query(collection(db, 'handHistories'), orderBy('playedAt', 'desc'), limit(200)),
+    (snap) => {
+      const all = snap.docs.map((d) => ({ id: d.id, ...d.data() } as import('@/types').HandHistory))
+      const filtered = all.filter((h) => h.players.some((p) => p.uid === uid))
+      cb(filtered)
+    }
+  )
+
+export const deleteHandHistory = (handId: string) =>
+  deleteDoc(doc(db, 'handHistories', handId))
+
 export { Timestamp, serverTimestamp }

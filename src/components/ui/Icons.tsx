@@ -46,6 +46,9 @@ export {
   Trash2,
   Play,
   CheckCircle,
+  Clock,
+  History,
+  Upload,
 } from 'lucide-react'
 
 import type { SVGProps } from 'react'
