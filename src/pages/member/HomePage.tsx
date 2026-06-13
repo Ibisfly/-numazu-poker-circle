@@ -6,8 +6,11 @@ import { CreditCard, ShoppingBag, BeginnerIcon, BookOpen, Layers, Star, Trophy, 
 import { FlyingSwanProgress } from '@/components/ui/FlyingSwanProgress'
 import { DEFAULT_AVATAR_COLOR } from '@/components/ui/SwanAvatar'
 import { useAuth } from '@/lib/hooks/useAuth'
-import { subscribeMatches, subscribeRecentEventSummaries, markEventSummaryAsRead } from '@/lib/firebase/firestore'
-import type { Match, EventParticipantSummary } from '@/types'
+import {
+  subscribeMatches, subscribeRecentEventSummaries, markEventSummaryAsRead,
+  subscribeUnreadMatchAnnouncements, markMatchAnnouncementRead,
+} from '@/lib/firebase/firestore'
+import type { Match, EventParticipantSummary, MatchResultAnnouncement } from '@/types'
 
 const SUIT_COLORS: Record<string, string> = {
   s: 'text-gray-800',
@@ -51,11 +54,99 @@ const getScoreLabel = (points: number): { text: string; color: string } | null =
   return null
 }
 
+// ── トーナメントリザルト発表オーバーレイ ──────────────────────────────────
+const RANK_MEDALS: Record<number, string> = { 1: '🥇', 2: '🥈', 3: '🥉' }
+
+const TournamentResultOverlay = ({
+  announcement,
+  onClose,
+}: {
+  announcement: MatchResultAnnouncement
+  onClose: () => void
+}) => {
+  const winner = announcement.podium.find((p) => p.rank === 1)
+  const others = announcement.podium.filter((p) => p.rank !== 1)
+  const isWinner = announcement.myRank === 1
+  const isPodium = announcement.myRank <= 3
+
+  return (
+    <div className="fixed inset-0 bg-black/90 z-50 flex items-center justify-center px-5 overflow-y-auto">
+      <div className={`w-full max-w-sm rounded-3xl border-2 p-6 my-8 space-y-5 text-center bg-gradient-to-b ${
+        isWinner
+          ? 'from-yellow-500/30 via-swan-dark to-swan-black border-yellow-400/70'
+          : 'from-purple-500/20 via-swan-dark to-swan-black border-swan-accent/50'
+      }`}>
+        {/* ヘッダー */}
+        <div>
+          <p className="text-3xl animate-bounce">🏆</p>
+          <p className="text-xs tracking-[0.3em] text-swan-accent font-bold mt-1">TOURNAMENT RESULT</p>
+          <h2 className="text-lg font-bold text-swan-text mt-1">{announcement.matchTitle}</h2>
+        </div>
+
+        {/* 優勝者発表 */}
+        {winner && (
+          <div className="bg-gradient-to-r from-yellow-500/20 via-amber-400/30 to-yellow-500/20 border border-yellow-400/60 rounded-2xl py-4 px-3">
+            <p className="text-[10px] tracking-widest text-yellow-400 font-bold animate-pulse">CHAMPION</p>
+            <p className="text-2xl font-bold text-yellow-300 mt-1">👑 {winner.playerName}</p>
+            <p className="text-sm text-yellow-400/90 mt-1 flex items-center justify-center gap-1">
+              <FeatherIcon size={13} />{winner.points.toLocaleString()}
+              {winner.itemName && <span className="ml-1">＋🎁{winner.itemName}</span>}
+            </p>
+          </div>
+        )}
+
+        {/* 2位・3位 */}
+        {others.length > 0 && (
+          <div className="space-y-1.5">
+            {others.map((p) => (
+              <div key={p.rank} className="flex items-center justify-between bg-swan-card/80 border border-swan-border rounded-xl px-4 py-2">
+                <span className="text-sm font-bold text-swan-text">
+                  {RANK_MEDALS[p.rank] ?? `${p.rank}位`} {p.playerName}
+                </span>
+                <span className="text-sm text-swan-accent flex items-center gap-1">
+                  <FeatherIcon size={12} />{p.points.toLocaleString()}
+                  {p.itemName && <span className="text-xs">＋🎁</span>}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* 自分の成績 */}
+        <div className={`rounded-xl px-4 py-3 border ${
+          isPodium ? 'bg-swan-accent/10 border-swan-accent/50' : 'bg-swan-card border-swan-border'
+        }`}>
+          <p className="text-xs text-swan-sub">あなたの成績</p>
+          <p className="text-lg font-bold text-swan-text mt-0.5">
+            {RANK_MEDALS[announcement.myRank] ?? ''} {announcement.myRank}位
+            {announcement.myPoints > 0 && (
+              <span className="text-swan-accent ml-2 text-base">
+                +{announcement.myPoints.toLocaleString()} 🪶
+              </span>
+            )}
+          </p>
+          {announcement.myItemName && (
+            <p className="text-xs text-pink-400 mt-1">特典「{announcement.myItemName}」を獲得しました！</p>
+          )}
+        </div>
+
+        <button
+          onClick={onClose}
+          className="w-full bg-swan-accent text-black font-bold py-3 rounded-xl text-sm active:scale-[0.98] transition-transform"
+        >
+          閉じる
+        </button>
+      </div>
+    </div>
+  )
+}
+
 export const HomePage = () => {
   const { user } = useAuth()
   const [upcomingMatch, setUpcomingMatch] = useState<Match | null>(null)
   const [eventSummaries, setEventSummaries] = useState<EventParticipantSummary[]>([])
   const [expandedSummary, setExpandedSummary] = useState<string | null>(null)
+  const [announcements, setAnnouncements] = useState<MatchResultAnnouncement[]>([])
 
   useEffect(() => {
     return subscribeMatches((matches) => {
@@ -73,10 +164,25 @@ export const HomePage = () => {
     })
   }, [user])
 
+  // トーナメントのリザルト発表（未読のみ。閉じるまで既読にしない）
+  useEffect(() => {
+    if (!user) return
+    return subscribeUnreadMatchAnnouncements(user.uid, setAnnouncements)
+  }, [user])
+
   if (!user) return null
+
+  const currentAnnouncement = announcements[0] ?? null
 
   return (
     <AppShell>
+      {/* トーナメントリザルト発表（未読がある場合、1件ずつ表示） */}
+      {currentAnnouncement && (
+        <TournamentResultOverlay
+          announcement={currentAnnouncement}
+          onClose={() => markMatchAnnouncementRead(currentAnnouncement.id)}
+        />
+      )}
       <div className="py-6 space-y-5">
 
         {/* ① こんにちは + 保有ポイント */}

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { AdminShell } from './AdminDashboardPage'
-import { subscribeItems, createItem, updateItem, deleteItem, markItemUsed, subscribeAllUsers } from '@/lib/firebase/firestore'
+import { subscribeItems, createItem, updateItem, deleteItem, markItemUsed, subscribeAllUsers, grantBenefitItem } from '@/lib/firebase/firestore'
 import { uploadShopImage } from '@/lib/firebase/storage'
 import { collection, onSnapshot, query } from 'firebase/firestore'
 import { db } from '@/lib/firebase/config'
@@ -40,6 +40,39 @@ export const ShopAdminPage = () => {
   const [saving, setSaving] = useState(false)
   const [uploadProgress, setUploadProgress] = useState<number | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
+
+  // 特典の管理者付与
+  const [grantUid, setGrantUid] = useState('')
+  const [grantItemId, setGrantItemId] = useState('')
+  const [grantQty, setGrantQty] = useState('1')
+  const [granting, setGranting] = useState(false)
+  const [grantMsg, setGrantMsg] = useState<{ text: string; ok: boolean } | null>(null)
+
+  const handleGrant = async () => {
+    if (!adminUser) return
+    setGrantMsg(null)
+    const item = items.find((i) => i.id === grantItemId)
+    const member = allUsers.find((u) => u.uid === grantUid)
+    const qty = parseInt(grantQty)
+    if (!item || !member) {
+      setGrantMsg({ text: 'メンバーと特典を選択してください', ok: false })
+      return
+    }
+    if (!Number.isInteger(qty) || qty < 1) {
+      setGrantMsg({ text: '数量は1以上を指定してください', ok: false })
+      return
+    }
+    setGranting(true)
+    try {
+      await grantBenefitItem(grantUid, item, qty, adminUser.uid)
+      setGrantMsg({ text: `${member.playerName} さんに「${item.name}」×${qty} を付与しました`, ok: true })
+      setGrantUid(''); setGrantItemId(''); setGrantQty('1')
+    } catch (e: unknown) {
+      setGrantMsg({ text: e instanceof Error ? e.message : '付与に失敗しました。もう一度お試しください。', ok: false })
+    } finally {
+      setGranting(false)
+    }
+  }
 
   useEffect(() => {
     const u1 = subscribeItems(setItems)
@@ -513,6 +546,57 @@ export const ShopAdminPage = () => {
 
         {tab === 'benefits' && (
           <div className="space-y-3">
+            {/* 特典の手動付与 */}
+            <div className="bg-swan-card border border-swan-accent/30 rounded-xl p-4 space-y-2">
+              <p className="text-sm font-semibold text-swan-accent">特典を付与する</p>
+              <select
+                value={grantUid}
+                onChange={(e) => setGrantUid(e.target.value)}
+                className="w-full bg-swan-black border border-swan-border rounded-lg px-3 py-2 text-sm text-swan-text"
+              >
+                <option value="">メンバーを選択</option>
+                {allUsers
+                  .filter((u) => u.status === 'active')
+                  .sort((a, b) => a.playerName.localeCompare(b.playerName, 'ja'))
+                  .map((u) => (
+                    <option key={u.uid} value={u.uid}>{u.playerName}</option>
+                  ))}
+              </select>
+              <div className="flex gap-2">
+                <select
+                  value={grantItemId}
+                  onChange={(e) => setGrantItemId(e.target.value)}
+                  className="flex-1 bg-swan-black border border-swan-border rounded-lg px-3 py-2 text-sm text-swan-text"
+                >
+                  <option value="">特典を選択</option>
+                  {items.filter((i) => i.category === 'benefit').map((i) => (
+                    <option key={i.id} value={i.id}>{i.name}</option>
+                  ))}
+                </select>
+                <input
+                  type="number"
+                  value={grantQty}
+                  onChange={(e) => setGrantQty(e.target.value)}
+                  min="1"
+                  className="w-16 bg-swan-black border border-swan-border rounded-lg px-2 py-2 text-sm text-swan-text text-center"
+                />
+                <span className="text-xs text-swan-sub self-center">枚</span>
+              </div>
+              {grantMsg && (
+                <p className={`text-xs text-center ${grantMsg.ok ? 'text-green-400' : 'text-red-400'}`}>
+                  {grantMsg.text}
+                </p>
+              )}
+              <button
+                onClick={handleGrant}
+                disabled={granting}
+                className="w-full bg-swan-accent text-black font-bold py-2 rounded-lg text-sm disabled:opacity-50 active:scale-[0.98] transition-transform"
+              >
+                {granting ? '付与中...' : '付与する'}
+              </button>
+              <p className="text-xs text-swan-muted">※ ポイントは消費されません（運営からのプレゼント扱い）</p>
+            </div>
+
             {/* 検索・フィルタ */}
             <input
               type="text"

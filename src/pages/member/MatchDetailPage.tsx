@@ -5,7 +5,7 @@ import { FeatherIcon } from '@/components/ui/FeatherIcon'
 import { useAuth } from '@/lib/hooks/useAuth'
 import { subscribeMatch, subscribeAllUsers, performRebuy, performReentry, cancelMatchEntry, notifyAdminsMatchReady } from '@/lib/firebase/firestore'
 import type { Match, User } from '@/types'
-import { writeBatch, doc, collection, increment, serverTimestamp } from 'firebase/firestore'
+import { writeBatch, doc, collection, increment, serverTimestamp, arrayUnion } from 'firebase/firestore'
 import { db } from '@/lib/firebase/config'
 
 export const MatchDetailPage = () => {
@@ -59,10 +59,10 @@ export const MatchDetailPage = () => {
     }
     setLoading(true)
     try {
-      const newParticipants = [...match.participants, user.uid]
       const batch = writeBatch(db)
+      // 同時エントリーで配列が上書きされ消失するのを防ぐため arrayUnion を使う
       batch.update(doc(db, 'matches', matchId), {
-        participants: newParticipants,
+        participants: arrayUnion(user.uid),
       })
       const logRef = doc(collection(db, 'pointLogs'))
       batch.set(logRef, {
@@ -81,9 +81,10 @@ export const MatchDetailPage = () => {
       })
       await batch.commit()
 
-      // 3人目のエントリーで管理者に通知
-      if (newParticipants.length === 3) {
-        await notifyAdminsMatchReady({ ...match, participants: newParticipants })
+      // 3人目のエントリーで管理者に通知（未エントリー状態から+1人になる想定）
+      const expectedCount = match.participants.length + 1
+      if (expectedCount === 3) {
+        await notifyAdminsMatchReady({ ...match, participants: [...match.participants, user.uid] })
       }
     } catch {
       setError('エントリーに失敗しました')
@@ -202,6 +203,9 @@ export const MatchDetailPage = () => {
                 <span className="text-sm">{rule.rank}位</span>
                 <span className="text-sm text-swan-accent flex items-center gap-1">
                   <FeatherIcon />{rule.points.toLocaleString()}
+                  {rule.itemName && (
+                    <span className="text-xs text-pink-400 ml-1">＋🎁{rule.itemName}</span>
+                  )}
                 </span>
               </div>
             ))}
@@ -243,7 +247,7 @@ export const MatchDetailPage = () => {
           </div>
         )}
 
-        {/* エントリーボタン（受付中のみ） */}
+        {/* エントリーボタン（受付中＝キャンセル可 / 開催中＝途中参加・キャンセル不可） */}
         {match.status === 'recruiting' && (
           <div className="space-y-2">
             {error && <p className="text-red-400 text-sm text-center">{error}</p>}
@@ -272,6 +276,31 @@ export const MatchDetailPage = () => {
               >
                 {loading ? '処理中...' : `エントリーする（🪶${match.entryFee.toLocaleString()}）`}
               </button>
+            )}
+          </div>
+        )}
+
+        {/* 開催中：未エントリーなら途中参加可（キャンセル不可） */}
+        {match.status === 'ongoing' && !isEntered && (
+          <div className="space-y-2">
+            {error && <p className="text-red-400 text-sm text-center">{error}</p>}
+            {isFull ? (
+              <div className="w-full bg-swan-muted text-swan-sub font-medium py-3 rounded-xl text-center">
+                定員に達しています
+              </div>
+            ) : (
+              <>
+                <button
+                  onClick={handleEntry}
+                  disabled={loading}
+                  className="w-full bg-yellow-500/20 text-yellow-400 border border-yellow-500/40 font-bold py-3 rounded-xl hover:bg-yellow-500/30 disabled:opacity-50 transition-all active:scale-[0.98]"
+                >
+                  {loading ? '処理中...' : `途中エントリーする（🪶${match.entryFee.toLocaleString()}）`}
+                </button>
+                <p className="text-xs text-swan-sub text-center">
+                  ※ 開催中のエントリーはキャンセル・返金できません
+                </p>
+              </>
             )}
           </div>
         )}

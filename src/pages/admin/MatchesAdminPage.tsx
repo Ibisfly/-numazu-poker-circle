@@ -2,12 +2,12 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { AdminShell } from './AdminDashboardPage'
 import {
-  subscribeMatches, createMatch, updateMatch, deleteMatch,
+  subscribeMatches, createMatch, updateMatch, deleteMatch, setMatchEvent,
   settleMatch, settleRingGame, subscribeAllUsers, checkAndUnlockAchievements,
-  getTimerProvisionalRankings, getTimerSessionState, subscribeActiveEvents,
+  getTimerProvisionalRankings, getTimerSessionState, subscribeActiveEvents, subscribeItems,
 } from '@/lib/firebase/firestore'
 import { useAuth } from '@/lib/hooks/useAuth'
-import type { Match, MatchStatus, User, DistributionRule, MatchCategory, Event } from '@/types'
+import type { Match, MatchStatus, User, DistributionRule, MatchCategory, Event, Item } from '@/types'
 import { Timestamp } from 'firebase/firestore'
 import { ChevronLeft, Plus, FeatherPtIcon, Pencil } from '@/components/ui/Icons'
 
@@ -140,7 +140,10 @@ export const MatchesAdminPage = () => {
   const [matches, setMatches] = useState<Match[]>([])
   const [allUsers, setAllUsers] = useState<User[]>([])
   const [activeEvents, setActiveEvents] = useState<Event[]>([])
+  const [items, setItems] = useState<Item[]>([])
   const [showForm, setShowForm] = useState(false)
+  const [formError, setFormError] = useState('')
+  const [settleError, setSettleError] = useState('')
 
   // 作成フォーム
   const [formCat, setFormCat] = useState<MatchCategory>('tournament')
@@ -177,8 +180,11 @@ export const MatchesAdminPage = () => {
     const u1 = subscribeMatches(setMatches)
     const u2 = subscribeAllUsers(setAllUsers)
     const u3 = subscribeActiveEvents(setActiveEvents)
-    return () => { u1(); u2(); u3() }
+    const u4 = subscribeItems(setItems)
+    return () => { u1(); u2(); u3(); u4() }
   }, [])
+
+  const benefitItems = items.filter((i) => i.category === 'benefit')
 
   const getUserName = (uid: string) =>
     allUsers.find((u) => u.uid === uid)?.playerName ?? uid.slice(0, 8)
@@ -188,30 +194,41 @@ export const MatchesAdminPage = () => {
     e.preventDefault()
     if (!adminUser) return
     setSaving(true)
+    setFormError('')
     try {
+      // undefined のフィールドは含めない（Firestore は undefined を書き込めない）
       await createMatch({
         title: formTitle.trim(),
         matchCategory: formCat,
-        entryFee: parseInt(formFee),
-        capacity: parseInt(formCapacity),
+        entryFee: parseInt(formFee) || 0,
+        capacity: parseInt(formCapacity) || 0,
         status: 'recruiting',
-        distributionRules: formCat === 'tournament' ? formDist : [],
+        distributionRules: formCat === 'tournament'
+          ? formDist.map(({ rank, points, itemId, itemName }) => ({
+              rank,
+              points,
+              ...(itemId && { itemId, itemName }),
+            }))
+          : [],
         participants: [],
         scheduledAt: Timestamp.fromDate(new Date(formDate)),
         createdBy: adminUser.uid,
-        eventId: formEventId || undefined,
+        ...(formEventId && { eventId: formEventId }),
         ...(formCat === 'tournament' && {
           hasReentry: formReentry,
-          reentryFee: formReentry ? (parseInt(formReentryFee) || parseInt(formFee)) : undefined,
+          ...(formReentry && { reentryFee: parseInt(formReentryFee) || parseInt(formFee) || 0 }),
         }),
         ...(formCat === 'ring' && {
           hasRebuy: formRebuy,
-          rebuyFee: formRebuy ? (parseInt(formRebuyFee) || parseInt(formFee)) : undefined,
+          ...(formRebuy && { rebuyFee: parseInt(formRebuyFee) || parseInt(formFee) || 0 }),
         }),
       })
       setShowForm(false)
       setFormTitle(''); setFormCat('tournament'); setFormReentry(false); setFormReentryFee(''); setFormRebuy(false); setFormRebuyFee(''); setFormEventId('')
       setFormDist(DEFAULT_DIST)
+    } catch (err) {
+      console.error('マッチ作成に失敗:', err)
+      setFormError('マッチの作成に失敗しました。もう一度お試しください。')
     } finally {
       setSaving(false)
     }
@@ -222,7 +239,7 @@ export const MatchesAdminPage = () => {
     if (!editingMatch) return
     setSaving(true)
     try {
-      await updateMatch(editingMatch.id, { eventId: formEventId || undefined })
+      await setMatchEvent(editingMatch.id, formEventId || null)
       setEditingMatch(null)
     } finally {
       setSaving(false)
@@ -236,6 +253,7 @@ export const MatchesAdminPage = () => {
 
   // ── トーナメント精算開始 ──────────────────────────────────────────────────
   const startTournamentSettle = async (match: Match) => {
+    setSettleError('')
     setSettlingMatch(match)
 
     // タイマーセッションがあれば暫定順位を取得
@@ -268,15 +286,23 @@ export const MatchesAdminPage = () => {
 
   const handleTournamentSettle = async () => {
     if (!adminUser || !settlingMatch) return
+    setSettleError('')
+    // 順位未入力（NaN）のまま精算すると不正なデータが保存されるため事前に検証
+    const parsed = rankings.map((r) => ({ uid: r.uid, rank: parseInt(r.rank) }))
+    const invalid = parsed.filter((r) => !Number.isInteger(r.rank) || r.rank < 1)
+    if (invalid.length > 0) {
+      setSettleError(`順位が未入力の参加者がいます（${invalid.map((r) => getUserName(r.uid)).join('、')}）`)
+      return
+    }
     setSaving(true)
     try {
-      await settleMatch(
-        settlingMatch,
-        rankings.map((r) => ({ uid: r.uid, rank: parseInt(r.rank) })),
-        adminUser.uid
-      )
+      const playerNames = Object.fromEntries(allUsers.map((u) => [u.uid, u.playerName]))
+      await settleMatch(settlingMatch, parsed, adminUser.uid, playerNames)
       settlingMatch.participants.forEach((uid) => checkAndUnlockAchievements(uid).catch(() => {}))
       setSettlingMatch(null)
+    } catch (err) {
+      console.error('精算に失敗:', err)
+      setSettleError('精算に失敗しました。もう一度お試しください。')
     } finally { setSaving(false) }
   }
 
@@ -398,20 +424,45 @@ export const MatchesAdminPage = () => {
                     順位別褒章 <FeatherPtIcon size={10} className="text-swan-accent" />
                   </label>
                   {formDist.map((rule, i) => (
-                    <div key={i} className="flex items-center gap-2 mb-1">
-                      <span className="text-xs text-swan-sub w-8">{rule.rank}位</span>
-                      <input
-                        type="number" value={rule.points} min="0"
-                        onChange={(e) => setFormDist(formDist.map((r, idx) =>
-                          idx === i ? { ...r, points: parseInt(e.target.value) || 0 } : r
-                        ))}
-                        placeholder="0"
-                        className="flex-1 bg-swan-black border border-swan-border rounded px-2 py-1 text-xs text-swan-text"
-                      />
-                      <span className="text-xs text-swan-sub">pt</span>
-                      {formDist.length > 1 && (
-                        <button type="button" onClick={() => setFormDist(formDist.filter((_, idx) => idx !== i))}
-                          className="text-xs text-red-400">×</button>
+                    <div key={i} className="mb-2 space-y-1">
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs text-swan-sub w-8">{rule.rank}位</span>
+                        <input
+                          type="number" value={rule.points} min="0"
+                          onChange={(e) => setFormDist(formDist.map((r, idx) =>
+                            idx === i ? { ...r, points: parseInt(e.target.value) || 0 } : r
+                          ))}
+                          placeholder="0"
+                          className="flex-1 bg-swan-black border border-swan-border rounded px-2 py-1 text-xs text-swan-text"
+                        />
+                        <span className="text-xs text-swan-sub">pt</span>
+                        {formDist.length > 1 && (
+                          <button type="button" onClick={() => setFormDist(formDist.filter((_, idx) => idx !== i))}
+                            className="text-xs text-red-400">×</button>
+                        )}
+                      </div>
+                      {benefitItems.length > 0 && (
+                        <div className="flex items-center gap-2 pl-10">
+                          <select
+                            value={rule.itemId ?? ''}
+                            onChange={(e) => {
+                              const item = benefitItems.find((it) => it.id === e.target.value)
+                              setFormDist(formDist.map((r, idx) =>
+                                idx === i
+                                  ? item
+                                    ? { ...r, itemId: item.id, itemName: item.name }
+                                    : { rank: r.rank, points: r.points }
+                                  : r
+                              ))
+                            }}
+                            className="flex-1 bg-swan-black border border-swan-border rounded px-2 py-1 text-xs text-swan-text"
+                          >
+                            <option value="">特典報酬なし</option>
+                            {benefitItems.map((it) => (
+                              <option key={it.id} value={it.id}>🎁 {it.name}</option>
+                            ))}
+                          </select>
+                        </div>
                       )}
                     </div>
                   ))}
@@ -476,6 +527,7 @@ export const MatchesAdminPage = () => {
               </div>
             )}
 
+            {formError && <p className="text-red-400 text-sm text-center">{formError}</p>}
             <button type="submit" disabled={saving}
               className="w-full bg-swan-accent text-black font-bold py-2.5 rounded-xl text-sm disabled:opacity-50 active:scale-[0.98] transition-transform">
               {saving ? '作成中...' : 'マッチを作成'}
@@ -566,12 +618,13 @@ export const MatchesAdminPage = () => {
                   <span className="text-xs text-swan-sub">位</span>
                 </div>
               ))}
+              {settleError && <p className="text-red-400 text-xs text-center">{settleError}</p>}
               <div className="flex gap-2">
                 <button onClick={handleTournamentSettle} disabled={saving}
                   className="flex-1 bg-swan-accent text-black font-bold py-2 rounded-lg text-sm disabled:opacity-50 active:scale-[0.98] transition-transform">
                   {saving ? '精算中...' : '精算実行'}
                 </button>
-                <button onClick={() => setSettlingMatch(null)}
+                <button onClick={() => { setSettlingMatch(null); setSettleError('') }}
                   className="flex-1 bg-swan-muted text-swan-sub py-2 rounded-lg text-sm">
                   キャンセル
                 </button>

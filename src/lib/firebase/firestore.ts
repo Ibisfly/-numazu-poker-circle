@@ -16,6 +16,8 @@ import {
   writeBatch,
   getDocs,
   addDoc,
+  deleteField,
+  arrayRemove,
 } from 'firebase/firestore'
 import { db } from './config'
 import type {
@@ -449,8 +451,19 @@ export const subscribeMatch = (matchId: string, cb: (m: Match | null) => void) =
     cb(snap.exists() ? ({ id: snap.id, ...snap.data() } as Match) : null)
   )
 
-export const createMatch = (data: Omit<Match, 'id' | 'createdAt'>) =>
-  addDoc(collection(db, 'matches'), { ...data, createdAt: serverTimestamp() })
+export const createMatch = (data: Omit<Match, 'id' | 'createdAt'>) => {
+  // Firestore は undefined を書き込めないため、未指定フィールドは除外する
+  const sanitized = Object.fromEntries(
+    Object.entries(data).filter(([, v]) => v !== undefined)
+  )
+  return addDoc(collection(db, 'matches'), { ...sanitized, createdAt: serverTimestamp() })
+}
+
+// イベント紐付けの変更（eventId に null を渡すと紐付け解除）
+export const setMatchEvent = (matchId: string, eventId: string | null) =>
+  updateDoc(doc(db, 'matches', matchId), {
+    eventId: eventId ?? deleteField(),
+  })
 
 export const updateMatch = (matchId: string, data: Partial<Match>) =>
   updateDoc(doc(db, 'matches', matchId), data as Record<string, unknown>)
@@ -546,6 +559,49 @@ export const purchaseBenefitItem = async (
   batch.update(doc(db, 'users', uid), {
     ownedPoints: increment(-totalCost),
   })
+  await batch.commit()
+}
+
+// 管理者が任意のユーザーへ特典を付与（ポイント消費なし）
+export const grantBenefitItem = async (
+  uid: string,
+  item: Item,
+  quantity: number,
+  adminUid: string
+) => {
+  if (quantity < 1) throw new Error('数量は1以上を指定してください')
+  const batch = writeBatch(db)
+
+  for (let i = 0; i < quantity; i++) {
+    batch.set(doc(collection(db, 'userItems')), {
+      uid,
+      itemId: item.id,
+      category: item.category,
+      purchasedAt: serverTimestamp(),
+      usedAt: null,
+      equipped: false,
+    })
+  }
+
+  // 監査用にポイントログへ記録（増減0）
+  batch.set(doc(collection(db, 'pointLogs')), {
+    uid,
+    type: 'manual',
+    amount: 0,
+    description: `特典「${item.name}」×${quantity} を管理者付与`,
+    relatedId: item.id,
+    createdAt: serverTimestamp(),
+    createdBy: adminUid,
+  })
+
+  batch.set(doc(collection(db, 'notifications')), {
+    uid,
+    type: 'point_awarded',
+    message: `運営から特典「${item.name}」×${quantity} が付与されました！`,
+    isRead: false,
+    createdAt: serverTimestamp(),
+  })
+
   await batch.commit()
 }
 
@@ -878,25 +934,43 @@ export const purchaseCustomHandTitle = async (
 export const settleMatch = async (
   match: Match,
   rankings: { uid: string; rank: number }[],
-  adminUid: string
+  adminUid: string,
+  playerNames: Record<string, string> = {}
 ) => {
   const batch = writeBatch(db)
 
   const resultRef = doc(collection(db, 'matchResults'))
   const rankingWithPoints = rankings.map(({ uid, rank }) => {
     const rule = match.distributionRules.find((r) => r.rank === rank)
-    const earnedPoints = rule ? rule.points : 0
-    return { uid, rank, earnedPoints }
+    return {
+      uid,
+      rank,
+      earnedPoints: rule ? rule.points : 0,
+      itemId: rule?.itemId ?? null,
+      itemName: rule?.itemName ?? null,
+    }
   })
 
   batch.set(resultRef, {
     matchId: match.id,
-    rankings: rankingWithPoints,
+    rankings: rankingWithPoints.map(({ uid, rank, earnedPoints }) => ({ uid, rank, earnedPoints })),
     settledAt: serverTimestamp(),
   })
   batch.update(doc(db, 'matches', match.id), { status: 'finished' })
 
-  for (const { uid, rank, earnedPoints } of rankingWithPoints) {
+  // リザルト発表用の上位3名（入賞者）
+  const podium = rankingWithPoints
+    .filter((r) => Number.isFinite(r.rank) && r.rank >= 1 && r.rank <= 3)
+    .sort((a, b) => a.rank - b.rank)
+    .map((r) => ({
+      rank: r.rank,
+      uid: r.uid,
+      playerName: playerNames[r.uid] ?? r.uid.slice(0, 8),
+      points: r.earnedPoints,
+      ...(r.itemName && { itemName: r.itemName }),
+    }))
+
+  for (const { uid, rank, earnedPoints, itemId, itemName } of rankingWithPoints) {
     if (earnedPoints > 0) {
       const logRef = doc(collection(db, 'pointLogs'))
       batch.set(logRef, {
@@ -914,17 +988,103 @@ export const settleMatch = async (
         ownedPoints: increment(earnedPoints),
       })
     }
+
+    // 順位報酬の特典アイテムを付与
+    if (itemId) {
+      batch.set(doc(collection(db, 'userItems')), {
+        uid,
+        itemId,
+        category: 'benefit',
+        purchasedAt: serverTimestamp(),
+        usedAt: null,
+        equipped: false,
+      })
+    }
+
+    const itemSuffix = itemName ? `／特典「${itemName}」を獲得！` : ''
     const notifRef = doc(collection(db, 'notifications'))
     batch.set(notifRef, {
       uid,
       type: 'match_result',
-      message: `${match.title} が終了しました。${rank}位 / 獲得 ${earnedPoints}pt`,
+      message: `${match.title} が終了しました。${rank}位 / 獲得 ${earnedPoints}pt${itemSuffix}`,
+      isRead: false,
+      createdAt: serverTimestamp(),
+    })
+
+    // 参加者全員のホームに表示するリザルト発表
+    batch.set(doc(collection(db, 'matchResultAnnouncements')), {
+      uid,
+      matchId: match.id,
+      matchTitle: match.title,
+      myRank: rank,
+      myPoints: earnedPoints,
+      ...(itemName && { myItemName: itemName }),
+      podium,
       isRead: false,
       createdAt: serverTimestamp(),
     })
   }
 
   await batch.commit()
+}
+
+// ── リザルト発表（ホーム画面表示用）───────────────────────────────────────
+export const subscribeUnreadMatchAnnouncements = (
+  uid: string,
+  cb: (announcements: import('@/types').MatchResultAnnouncement[]) => void
+) =>
+  onSnapshot(
+    query(
+      collection(db, 'matchResultAnnouncements'),
+      where('uid', '==', uid),
+      where('isRead', '==', false)
+    ),
+    (snap) =>
+      cb(snap.docs.map((d) => ({ id: d.id, ...d.data() } as import('@/types').MatchResultAnnouncement)))
+  )
+
+export const markMatchAnnouncementRead = (announcementId: string) =>
+  updateDoc(doc(db, 'matchResultAnnouncements', announcementId), { isRead: true })
+
+// ── マッチ成績集計（ランキング用）──────────────────────────────────────────
+
+export interface MatchPointsTotals {
+  tournamentEarnings: Map<string, number>  // uid → トーナメント獲得賞金合計
+  ringNet: Map<string, number>             // uid → リング収支（キャッシュバック − エントリー費 − リバイ費）
+}
+
+export const getMatchPointsTotals = async (): Promise<MatchPointsTotals> => {
+  const [resultsSnap, matchesSnap] = await Promise.all([
+    getDocs(collection(db, 'matchResults')),
+    getDocs(collection(db, 'matches')),
+  ])
+  const matchMap = new Map(matchesSnap.docs.map((d) => [d.id, d.data() as Match]))
+
+  const tournamentEarnings = new Map<string, number>()
+  const ringNet = new Map<string, number>()
+
+  for (const resultDoc of resultsSnap.docs) {
+    const result = resultDoc.data()
+    const match = matchMap.get(result.matchId)
+    if (!match) continue
+
+    if (match.matchCategory === 'ring') {
+      const cashbacks: { uid: string; amount: number }[] = result.cashbacks ?? []
+      for (const cb of cashbacks) {
+        const rebuyCount = match.rebuys?.[cb.uid] ?? 0
+        const rebuyFee = match.rebuyFee ?? match.entryFee ?? 0
+        const totalFee = (match.entryFee ?? 0) + rebuyCount * rebuyFee
+        ringNet.set(cb.uid, (ringNet.get(cb.uid) ?? 0) + cb.amount - totalFee)
+      }
+    } else {
+      const rankings: { uid: string; earnedPoints: number }[] = result.rankings ?? []
+      for (const r of rankings) {
+        tournamentEarnings.set(r.uid, (tournamentEarnings.get(r.uid) ?? 0) + (r.earnedPoints || 0))
+      }
+    }
+  }
+
+  return { tournamentEarnings, ringNet }
 }
 
 // ── Yearly Rankings ────────────────────────────────────────────────────────
@@ -1078,6 +1238,7 @@ export const subscribeUserTitles = (
 // ── Rebuy / Reentry ────────────────────────────────────────────────────────
 
 export const performRebuy = async (match: Match, uid: string) => {
+  const fee = match.rebuyFee ?? match.entryFee
   const batch = writeBatch(db)
   batch.update(doc(db, 'matches', match.id), {
     [`rebuys.${uid}`]: increment(1),
@@ -1086,21 +1247,22 @@ export const performRebuy = async (match: Match, uid: string) => {
   batch.set(logRef, {
     uid,
     type: 'match',
-    amount: -match.entryFee,
+    amount: -fee,
     description: `${match.title} リバイ費`,
     relatedId: match.id,
     createdAt: serverTimestamp(),
     createdBy: uid,
   })
   batch.update(doc(db, 'users', uid), {
-    totalPoints: increment(-match.entryFee),
-    yearPoints:  increment(-match.entryFee),
-    ownedPoints: increment(-match.entryFee),
+    totalPoints: increment(-fee),
+    yearPoints:  increment(-fee),
+    ownedPoints: increment(-fee),
   })
   await batch.commit()
 }
 
 export const performReentry = async (match: Match, uid: string) => {
+  const fee = match.reentryFee ?? match.entryFee
   const batch = writeBatch(db)
   batch.update(doc(db, 'matches', match.id), {
     [`reentries.${uid}`]: increment(1),
@@ -1109,16 +1271,16 @@ export const performReentry = async (match: Match, uid: string) => {
   batch.set(logRef, {
     uid,
     type: 'match',
-    amount: -match.entryFee,
+    amount: -fee,
     description: `${match.title} リエントリー費`,
     relatedId: match.id,
     createdAt: serverTimestamp(),
     createdBy: uid,
   })
   batch.update(doc(db, 'users', uid), {
-    totalPoints: increment(-match.entryFee),
-    yearPoints:  increment(-match.entryFee),
-    ownedPoints: increment(-match.entryFee),
+    totalPoints: increment(-fee),
+    yearPoints:  increment(-fee),
+    ownedPoints: increment(-fee),
   })
   await batch.commit()
 }
@@ -1731,10 +1893,9 @@ export const cancelMatchEntry = async (match: Match, uid: string) => {
 
   const batch = writeBatch(db)
 
-  // 参加者リストから削除
-  const newParticipants = match.participants.filter((p) => p !== uid)
+  // 参加者リストから削除（他者のエントリーを巻き込まないよう arrayRemove を使う）
   batch.update(doc(db, 'matches', match.id), {
-    participants: newParticipants,
+    participants: arrayRemove(uid),
   })
 
   // 返金

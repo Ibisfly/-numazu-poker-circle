@@ -5,10 +5,17 @@ import { SwanAvatar, DEFAULT_AVATAR_COLOR } from '@/components/ui/SwanAvatar'
 import { GoldMedalIcon, SilverMedalIcon, BronzeMedalIcon, BeginnerIcon } from '@/components/ui/Icons'
 import { TitleBadge } from '@/components/ui/TitleBadge'
 import { useAuth } from '@/lib/hooks/useAuth'
-import { subscribeRanking } from '@/lib/firebase/firestore'
+import { subscribeRanking, getMatchPointsTotals } from '@/lib/firebase/firestore'
 import type { User } from '@/types'
 
-type Tab = 'total' | 'year'
+type Tab = 'total' | 'year' | 'tournament' | 'ring'
+
+const TAB_LABELS: Record<Tab, string> = {
+  total: '累計',
+  year: '年間',
+  tournament: 'トナメ',
+  ring: 'リング',
+}
 
 const RankBadge = ({ rank }: { rank: number }) => {
   if (rank === 1) return <GoldMedalIcon size={36} />
@@ -40,31 +47,63 @@ export const RankingPage = () => {
   const { user } = useAuth()
   const [tab, setTab] = useState<Tab>('total')
   const [allUsers, setAllUsers] = useState<User[]>([])
+  const [matchTotals, setMatchTotals] = useState<{
+    tournamentEarnings: Map<string, number>
+    ringNet: Map<string, number>
+  } | null>(null)
 
   useEffect(() => {
-    const field = tab === 'total' ? 'totalPoints' : 'yearPoints'
+    // 全タブでアクティブユーザー一覧が必要（マッチ系タブは集計値と突き合わせる）
+    const field = tab === 'year' ? 'yearPoints' : 'totalPoints'
     return subscribeRanking(field, setAllUsers)
   }, [tab])
 
-  const rankedUsers = allUsers.filter((u) => u.role !== 'admin').slice(0, 5)
+  useEffect(() => {
+    if (tab !== 'tournament' && tab !== 'ring') return
+    getMatchPointsTotals().then(setMatchTotals).catch(() => setMatchTotals(null))
+  }, [tab])
+
+  // 管理者もランキングに表示する
+  const rankedEntries: { user: User; value: number }[] = (() => {
+    if (tab === 'total' || tab === 'year') {
+      return allUsers
+        .map((u) => ({ user: u, value: tab === 'total' ? u.totalPoints : u.yearPoints }))
+        .slice(0, 5)
+    }
+    if (!matchTotals) return []
+    const totals = tab === 'tournament' ? matchTotals.tournamentEarnings : matchTotals.ringNet
+    return allUsers
+      .filter((u) => totals.has(u.uid))
+      .map((u) => ({ user: u, value: totals.get(u.uid) ?? 0 }))
+      .sort((a, b) => b.value - a.value)
+      .slice(0, 5)
+  })()
+
+  const rankedUsers = rankedEntries.map((e) => e.user)
 
   return (
     <AppShell title="ランキング">
       <div className="py-4">
         {/* タブ */}
-        <div className="flex bg-swan-card rounded-xl p-1 mb-6">
-          {(['total', 'year'] as Tab[]).map((t) => (
+        <div className="flex bg-swan-card rounded-xl p-1 mb-2">
+          {(['total', 'year', 'tournament', 'ring'] as Tab[]).map((t) => (
             <button
               key={t}
               onClick={() => setTab(t)}
-              className={`flex-1 py-2 text-sm rounded-lg font-medium transition-colors ${
+              className={`flex-1 py-2 text-xs sm:text-sm rounded-lg font-medium transition-colors ${
                 tab === t ? 'bg-swan-accent text-black' : 'text-swan-sub'
               }`}
             >
-              {t === 'total' ? '累計' : '年間'}
+              {TAB_LABELS[t]}
             </button>
           ))}
         </div>
+        <p className="text-xs text-swan-muted text-center mb-6">
+          {tab === 'total' && '獲得ポイントの累計ランキング'}
+          {tab === 'year' && '今年の獲得ポイントランキング'}
+          {tab === 'tournament' && 'トーナメント賞金の合計ランキング'}
+          {tab === 'ring' && 'プレミアリングの収支ランキング'}
+        </p>
 
         {/* トップ3 ポディウム */}
         {rankedUsers.length >= 3 && (
@@ -121,10 +160,9 @@ export const RankingPage = () => {
 
         {/* ランキングリスト */}
         <div className="space-y-3">
-          {rankedUsers.map((u, i) => {
+          {rankedEntries.map(({ user: u, value: points }, i) => {
             const rank = i + 1
             const isMe = u.uid === user?.uid
-            const points = tab === 'total' ? u.totalPoints : u.yearPoints
             const gradient = getRankGradient(rank)
             const borderColor = getRankBorder(rank, isMe)
 
@@ -152,6 +190,9 @@ export const RankingPage = () => {
                         {u.playerName}
                       </p>
                       {u.isBeginner && <BeginnerIcon size={14} />}
+                      {u.role === 'admin' && (
+                        <span className="text-[10px] text-swan-sub border border-swan-border px-1 py-0.5 rounded shrink-0">運営</span>
+                      )}
                       {isMe && <span className="text-xs text-swan-accent shrink-0">(自分)</span>}
                     </div>
                     {u.equippedTitle && (
@@ -163,10 +204,10 @@ export const RankingPage = () => {
                 </div>
                 <div className="relative z-10 text-right shrink-0">
                   <p className={`font-bold text-lg flex items-center gap-1 justify-end ${
-                    rank === 1 ? 'text-yellow-400' : 'text-swan-accent'
+                    points < 0 ? 'text-red-400' : rank === 1 ? 'text-yellow-400' : 'text-swan-accent'
                   }`}>
                     <FeatherIcon size={16} />
-                    {points.toLocaleString()}
+                    {tab === 'ring' && points > 0 ? '+' : ''}{points.toLocaleString()}
                   </p>
                 </div>
               </div>

@@ -81,6 +81,14 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
+    // ── matchResultAnnouncements（トーナメントリザルト発表）──────────────────
+    match /matchResultAnnouncements/{announcementId} {
+      allow read: if (isActiveUser() && resource.data.uid == request.auth.uid) || isAdmin();
+      allow update: if isActiveUser() && resource.data.uid == request.auth.uid
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['isRead']);
+      allow create, delete: if isAdmin();
+    }
+
     // ── items ────────────────────────────────────────────────────────────────
     match /items/{itemId} {
       allow read: if isActiveUser();

@@ -64,6 +64,8 @@ export interface PointLog {
 export interface DistributionRule {
   rank: number
   points: number  // 付与ポイント実数値
+  itemId?: string    // 順位報酬として付与する特典アイテムID
+  itemName?: string  // 表示用に作成時のアイテム名を保持
 }
 
 export type MatchCategory = 'tournament' | 'ring'
@@ -126,6 +128,28 @@ export interface MatchResult {
   matchId: string
   rankings: MatchRanking[]
   settledAt: Timestamp
+}
+
+// トーナメント終了時に参加者全員のホームに表示するリザルト発表
+export interface AnnouncementPodiumEntry {
+  rank: number
+  uid: string
+  playerName: string
+  points: number
+  itemName?: string
+}
+
+export interface MatchResultAnnouncement {
+  id: string
+  matchId: string
+  matchTitle: string
+  uid: string             // 表示対象の参加者
+  myRank: number
+  myPoints: number
+  myItemName?: string
+  podium: AnnouncementPodiumEntry[]  // 上位3名
+  isRead: boolean
+  createdAt: Timestamp
 }
 
 export interface TournamentParticipant {
