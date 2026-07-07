@@ -262,23 +262,63 @@ function loadAll(){
   try{HANDS=JSON.parse(localStorage.getItem(K_HANDS))||[];}catch(e){HANDS=[];}
   try{PLAYERS=JSON.parse(localStorage.getItem(K_PLAYERS))||{};}catch(e){PLAYERS={};}
   try{SET=Object.assign({},DEF_SET,JSON.parse(localStorage.getItem(K_SET))||{});}catch(e){SET=Object.assign({},DEF_SET);}
-  try{MEMBERS=JSON.parse(localStorage.getItem(K_MEMBERS))||[];}catch(e){MEMBERS=[];}
+  try{
+    const raw=JSON.parse(localStorage.getItem(K_MEMBERS))||[];
+    /* 旧形式（名前文字列の配列）はuidなし候補として読む */
+    MEMBERS=raw.map(m=>typeof m==="string"?{uid:"",name:m}:m).filter(m=>m&&typeof m.name==="string"&&m.name.trim());
+  }catch(e){MEMBERS=[];}
+}
+/* ---- サークル会員（uid紐付け）ヘルパー ----
+   PLAYERSと保存ハンドのプレイヤーキーは、会員なら "u:<uid>"、ビジターは名前文字列 */
+function memberByName(n){n=(n||"").trim();return MEMBERS.find(m=>m.uid&&m.name===n)||null;}
+function memberName(uid){const m=MEMBERS.find(m=>m.uid===uid);return m?m.name:null;}
+function playerLabel(key){
+  if(key.startsWith("u:")){
+    return memberName(key.slice(2))||(PLAYERS[key]&&PLAYERS[key].name)||key;
+  }
+  return key;
+}
+/* 名前で保存された既存データを、登録名と一致すればuidキーへ移行する */
+function syncMembers(){
+  let pchg=false,hchg=false;
+  Object.keys(PLAYERS).forEach(k=>{
+    if(k.startsWith("u:"))return;
+    const m=memberByName(k);
+    if(!m)return;
+    const nk="u:"+m.uid,old=PLAYERS[k];
+    if(!PLAYERS[nk])PLAYERS[nk]=Object.assign({},old,{name:m.name});
+    else{
+      if(!PLAYERS[nk].note&&old.note)PLAYERS[nk].note=old.note;
+      if((PLAYERS[nk].tag||"UNK")==="UNK")PLAYERS[nk].tag=old.tag;
+    }
+    delete PLAYERS[k];pchg=true;
+  });
+  HANDS.forEach(h=>{
+    Object.entries(h.names||{}).forEach(([pos,n])=>{
+      if(h.uids&&h.uids[pos])return;
+      const m=memberByName(n);
+      if(m){h.uids=h.uids||{};h.uids[pos]=m.uid;hchg=true;}
+    });
+  });
+  if(pchg)savePlayers();
+  if(hchg)saveHands();
 }
 function saveHands(){localStorage.setItem(K_HANDS,JSON.stringify(HANDS));}
 function savePlayers(){localStorage.setItem(K_PLAYERS,JSON.stringify(PLAYERS));updateDL();}
 function saveSet(){localStorage.setItem(K_SET,JSON.stringify(SET));}
 function updateDL(){
-  const names=new Set(MEMBERS);
-  Object.keys(PLAYERS).forEach(n=>names.add(n));
+  const names=new Set(MEMBERS.map(m=>m.name));
+  Object.keys(PLAYERS).forEach(k=>names.add(playerLabel(k)));
   HANDS.forEach(h=>Object.values(h.names||{}).forEach(n=>n&&names.add(n)));
   $("#playersDL").innerHTML=[...names].map(n=>'<option value="'+esc(n)+'">').join("");
 }
-/* サークルアプリ本体（親ウィンドウ）から登録メンバー名簿を受け取る */
+/* サークルアプリ本体（親ウィンドウ）から登録メンバー名簿 {uid,name}[] を受け取る */
 window.addEventListener("message",e=>{
   const d=e.data;
-  if(e.origin!==location.origin||!d||d.type!=="hl-members"||!Array.isArray(d.names))return;
-  MEMBERS=d.names.filter(n=>typeof n==="string"&&n.trim());
+  if(e.origin!==location.origin||!d||d.type!=="hl-members"||!Array.isArray(d.members))return;
+  MEMBERS=d.members.filter(m=>m&&typeof m.uid==="string"&&m.uid&&typeof m.name==="string"&&m.name.trim());
   try{localStorage.setItem(K_MEMBERS,JSON.stringify(MEMBERS));}catch(err){}
+  syncMembers();
   updateDL();
   if($("#view-notes").classList.contains("on"))renderNotes();
 });
@@ -485,10 +525,21 @@ function voluntaryVillains(){
 function saveHand(){
   if(R.wts&&R.winners.length===0){toast("勝者を選択してください");return;}
   captureFinish();
-  const names={};
+  /* 登録名と完全一致すればuidに紐付け、表示名は登録名に正規化。それ以外はビジター（名前キー） */
+  const names={},uids={};
   Object.entries(R.namesDraft||{}).forEach(([pos,v])=>{
     v=(v||"").trim();
-    if(v){names[pos]=v;if(!PLAYERS[v])PLAYERS[v]={tag:"UNK",note:""};}
+    if(!v)return;
+    const m=memberByName(v);
+    if(m){
+      uids[pos]=m.uid;names[pos]=m.name;
+      const k="u:"+m.uid;
+      if(!PLAYERS[k])PLAYERS[k]={tag:"UNK",note:"",name:m.name};
+      else PLAYERS[k].name=m.name;
+    }else{
+      names[pos]=v;
+      if(!PLAYERS[v])PLAYERS[v]={tag:"UNK",note:""};
+    }
   });
   /* ルール上SDまで行った分＝showdown（スタッツ対象）、それ以外の公開＝shown（メモ扱い） */
   const sdRule={},sdShown={};
@@ -503,7 +554,7 @@ function saveHand(){
     heroPos:R.heroPos,heroCards:R.heroCards,board:R.board,
     actions:R.actions,pot:potTotal(),winners:R.winners,
     wentToShowdown:R.wts,heroNet:heroNetNow(),
-    showdown:sdRule,shown:sdShown,names:names,memo:R.memo||""
+    showdown:sdRule,shown:sdShown,names:names,uids:uids,memo:R.memo||""
   };
   HANDS.push(rec);
   saveHands();savePlayers();
@@ -750,7 +801,9 @@ function handDetailHTML(h){
   }
   d+='<div class="ln">勝者 <b>'+(h.winners||[]).join(", ")+'</b> ・ POT <b>'+fbb(h.pot)+'bb</b> ・ '+esc(h.stakes)+' '+h.tableSize+'max</div>';
   const nm=h.names||{};
-  if(Object.keys(nm).length)d+='<div class="ln">相手: <b>'+Object.entries(nm).map(([p,n])=>esc(p)+"="+esc(n)).join(", ")+'</b></div>';
+  /* 会員は現在の登録名で表示（保存時から改名されていても追従） */
+  if(Object.keys(nm).length)d+='<div class="ln">相手: <b>'+
+    Object.entries(nm).map(([p,n])=>esc(p)+"="+esc(((h.uids||{})[p]&&memberName(h.uids[p]))||n)).join(", ")+'</b></div>';
   if(h.memo)d+='<div class="ln">メモ: <b>'+esc(h.memo)+'</b></div>';
   d+='<div class="btnrow cols2" style="margin-top:8px">'+
     '<button class="btn ghost" onclick="editMemo(\''+h.id+'\')">メモ編集</button>'+
@@ -761,7 +814,10 @@ function renderHistory(){
   const v=$("#view-history");
   const q=(v.dataset.q||"").toLowerCase();
   let list=HANDS.slice().reverse();
-  if(q)list=list.filter(h=>(h.memo||"").toLowerCase().includes(q)||Object.values(h.names||{}).some(n=>n.toLowerCase().includes(q))||h.heroPos.toLowerCase()===q);
+  if(q)list=list.filter(h=>(h.memo||"").toLowerCase().includes(q)
+    ||Object.values(h.names||{}).some(n=>n.toLowerCase().includes(q))
+    ||Object.values(h.uids||{}).some(u=>{const nm=memberName(u);return nm&&nm.toLowerCase().includes(q);})
+    ||h.heroPos.toLowerCase()===q);
   let h='<h2>履歴（'+HANDS.length+' ハンド）</h2>'+
     '<input type="text" placeholder="検索（メモ / 名前 / ポジション）Enterで確定" value="'+esc(v.dataset.q||"")+'" onchange="this.closest(\'section\').dataset.q=this.value;renderHistory()">'+
     '<div class="btnrow cols2" style="margin:8px 0 2px">'+
@@ -908,7 +964,7 @@ function addStats(dst,src){
 }
 function computeStats(hands){
   const S={HERO:emptyStats(),_POP:emptyStats()};
-  const posStats={};
+  const posStats={},labels={};
   for(const h of hands){
     if(!h||!h.actions)continue;
     let per;
@@ -924,12 +980,18 @@ function computeStats(hands){
         ps.net=r2(ps.net+(h.heroNet||0));
       }else{
         addStats(S._POP,f);
-        const nm=(h.names||{})[p];
-        if(nm){if(!S[nm])S[nm]=emptyStats();addStats(S[nm],f);}
+        /* 会員はuidキーで集計（改名しても同一人物として追跡）、ビジターは名前キー */
+        const uid=(h.uids||{})[p];
+        const key=uid?("u:"+uid):(h.names||{})[p];
+        if(key){
+          if(!S[key])S[key]=emptyStats();
+          addStats(S[key],f);
+          labels[key]=uid?(memberName(uid)||(h.names||{})[p]||key):key;
+        }
       }
     }
   }
-  return {S,posStats};
+  return {S,posStats,labels};
 }
 function pct(n,o){return o?(100*n/o).toFixed(1)+"%":"—";}
 function frac(n,o){return o?" ("+n+"/"+o+")":"";}
@@ -955,11 +1017,12 @@ function statRow(label,n,o){
 function renderStats(){
   const v=$("#view-stats");
   const hands=statsSource?statsSource.hands:HANDS;
-  const {S,posStats}=computeStats(hands);
+  const {S,posStats,labels}=computeStats(hands);
   const sel=v.dataset.sel||"HERO";
-  const keys=["HERO","_POP"].concat(Object.keys(S).filter(k=>k!=="HERO"&&k!=="_POP").sort());
+  const labelOf=k=>k==="HERO"?"自分 (Hero)":k==="_POP"?"相手全体":(labels[k]||playerLabel(k));
+  const keys=["HERO","_POP"].concat(
+    Object.keys(S).filter(k=>k!=="HERO"&&k!=="_POP").sort((a,b)=>labelOf(a).localeCompare(labelOf(b),"ja")));
   const st=S[sel]||emptyStats();
-  const labelOf=k=>k==="HERO"?"自分 (Hero)":k==="_POP"?"相手全体":k;
   let h='<h2>分析'+(statsSource?'（ファイル: '+esc(statsSource.name)+'）':'（保存データ '+hands.length+' ハンド）')+'</h2>';
   h+='<div class="inline"><select onchange="this.closest(\'section\').dataset.sel=this.value;renderStats()">'+
     keys.map(k=>'<option value="'+esc(k)+'"'+(k===sel?" selected":"")+'>'+esc(labelOf(k))+'</option>').join("")+'</select></div>';
@@ -1026,7 +1089,7 @@ function renderStats(){
 /* ================= notes ================= */
 function renderNotes(){
   const v=$("#view-notes");
-  const names=Object.keys(PLAYERS).sort();
+  const names=Object.keys(PLAYERS).sort((a,b)=>playerLabel(a).localeCompare(playerLabel(b),"ja"));
   let h='<h2>プレイヤーメモ</h2>'+
     '<div class="inline"><input type="text" id="np-name" list="playersDL" placeholder="プレイヤー名を追加（会員名は候補表示）">'+
     '<button class="btn ghost" style="flex:0 0 70px" onclick="addPlayer()">追加</button></div>';
@@ -1034,10 +1097,13 @@ function renderNotes(){
   if(!names.length)h+='<div class="muted">プレイヤーを追加するか、ハンド保存時に名前タグを付けると表示されます</div>';
   names.forEach(n=>{
     const p=PLAYERS[n];
-    const cnt=HANDS.filter(hd=>Object.values(hd.names||{}).includes(n)).length;
+    const isM=n.startsWith("u:");
+    const cnt=HANDS.filter(hd=>isM
+      ?Object.values(hd.uids||{}).includes(n.slice(2))
+      :Object.values(hd.names||{}).includes(n)).length;
     h+='<div class="pl-item"><div class="row1">'+
-      '<span class="nm">'+esc(n)+'</span>'+
-      (MEMBERS.includes(n)?'<span class="tag MBR">会員</span>':'')+
+      '<span class="nm">'+esc(playerLabel(n))+'</span>'+
+      (isM?'<span class="tag MBR">会員</span>':'')+
       '<span class="tag '+esc(p.tag||"UNK")+'">'+esc(p.tag||"UNK")+'</span>'+
       '<span style="font-size:11px;color:var(--faint)">'+cnt+' hands</span>'+
       '<button class="btn ghost" style="min-height:28px;color:var(--red)" onclick="delPlayer(\''+jsq(n)+'\')">削除</button></div>'+
@@ -1051,11 +1117,13 @@ function renderNotes(){
 function addPlayer(){
   const n=$("#np-name").value.trim();
   if(!n)return;
-  if(!PLAYERS[n])PLAYERS[n]={tag:"UNK",note:""};
+  const m=memberByName(n);
+  const k=m?("u:"+m.uid):n;
+  if(!PLAYERS[k])PLAYERS[k]=m?{tag:"UNK",note:"",name:m.name}:{tag:"UNK",note:""};
   savePlayers();renderNotes();
 }
 function delPlayer(n){
-  if(!confirm(n+" を削除しますか？（ハンド内の名前タグは残ります）"))return;
+  if(!confirm(playerLabel(n)+" を削除しますか？（ハンド内の名前タグは残ります）"))return;
   delete PLAYERS[n];savePlayers();renderNotes();
 }
 function setTag(n,t){PLAYERS[n].tag=t;savePlayers();renderNotes();}
@@ -1102,6 +1170,7 @@ function wipeAll(){
 
 /* ================= init ================= */
 loadAll();
+syncMembers();
 updateDL();
 newHand();
 /* ?tab=history 等で初期タブ指定（デバッグ・ショートカット用） */
