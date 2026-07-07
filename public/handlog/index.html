@@ -1,0 +1,1099 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<meta name="theme-color" content="#0f1114">
+<title>ハンド履歴 — BLACK SWAN</title>
+<style>
+:root{
+  --bg:#0f1114; --panel:#181b20; --panel2:#1e2228; --line:#23272e; --line2:#2d3139;
+  --text:#e8e8e8; --dim:#8b9099; --faint:#5c6069;
+  --acc:#c8a96e; --acc2:#d8bc82; --acc-soft:rgba(200,169,110,.12);
+  --red:#e05c5c; --blue:#5b9be6; --green:#46b073;
+  --felt1:#1d3a2e; --felt2:#10221a; --rail:#262b32;
+  --cs:#22262b; --ch:#c93a3a; --cd:#2364c8; --cc:#1f8a4d;
+  --cs-l:#cfd6dd; --ch-l:#ef6b6b; --cd-l:#5ea0f0; --cc-l:#46c07c;
+}
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html{height:100%}
+body{min-height:100%}
+body{
+  background:var(--bg); color:var(--text);
+  font-family:"Noto Sans JP","Segoe UI","Hiragino Kaku Gothic ProN",system-ui,sans-serif;
+  font-size:14px; line-height:1.55;
+  max-width:448px; margin:0 auto;
+  padding-top:46px; padding-bottom:32px;
+}
+main{padding:12px}
+section{display:none}
+section.on{display:block}
+h2{font-size:13px; color:var(--text); font-weight:800; margin:22px 0 8px; padding-bottom:6px; border-bottom:2px solid rgba(200,169,110,.5)}
+h2:first-child{margin-top:4px}
+
+/* ---- top tab nav（サークルアプリのシェル内に埋め込むため上部固定） ---- */
+nav{
+  position:fixed; top:0; left:50%; transform:translateX(-50%);
+  width:100%; max-width:448px; display:flex;
+  background:rgba(24,27,32,.96); backdrop-filter:blur(8px);
+  border-bottom:1px solid var(--line2); z-index:50;
+}
+nav button{
+  flex:1; background:none; border:none; color:var(--dim);
+  font:inherit; font-size:12px; font-weight:700;
+  padding:13px 0 11px; cursor:pointer; border-bottom:2px solid transparent;
+}
+nav button.on{color:var(--acc); border-bottom-color:var(--acc)}
+
+/* ---- buttons ---- */
+.btn{
+  display:inline-flex; align-items:center; justify-content:center;
+  background:var(--panel2); border:1px solid var(--line2); color:var(--text);
+  border-radius:2px; min-height:46px; padding:8px 10px;
+  font:inherit; font-weight:700; font-size:14px; cursor:pointer;
+  font-variant-numeric:tabular-nums;
+}
+.btn:active{filter:brightness(1.25)}
+.btn.fold{color:var(--red)}
+.btn.call{color:var(--blue)}
+.btn.check{color:var(--dim)}
+.btn.agg{color:var(--acc2); border-color:rgba(200,169,110,.45); background:var(--acc-soft)}
+.btn.ai{color:var(--red); border-color:rgba(224,92,92,.45); background:rgba(224,92,92,.10)}
+.btn.primary{background:var(--acc); border-color:var(--acc); color:#14100a}
+.btn.ghost{min-height:34px; font-size:12px; color:var(--dim); border-radius:2px; background:none}
+.btn:disabled{opacity:.4; pointer-events:none}
+.btnrow{display:grid; gap:8px; margin-top:8px}
+.cols2{grid-template-columns:1fr 1fr}
+.cols3{grid-template-columns:1fr 1fr 1fr}
+.chiprow{display:flex; flex-wrap:wrap; gap:6px}
+.chip{
+  background:var(--panel2); border:1px solid var(--line2); color:var(--dim);
+  border-radius:2px; padding:7px 13px; font:inherit; font-size:13px; font-weight:700; cursor:pointer;
+}
+.chip.on{color:#14100a; background:var(--acc); border-color:var(--acc)}
+
+/* ---- poker table ---- */
+.tablewrap{position:relative; width:100%; height:330px; margin:6px 0 4px}
+.felt{
+  position:absolute; inset:17% 10%;
+  border-radius:999px;
+  background:radial-gradient(ellipse at 50% 35%, var(--felt1), var(--felt2) 85%);
+  border:5px solid var(--rail);
+  box-shadow:0 0 0 1px #000, 0 8px 22px rgba(0,0,0,.5), inset 0 0 30px rgba(0,0,0,.45);
+}
+.felt::after{
+  content:""; position:absolute; inset:9px;
+  border-radius:999px; border:1.5px solid rgba(200,169,110,.28);
+}
+.tcenter{
+  position:absolute; left:50%; top:47%; transform:translate(-50%,-50%);
+  text-align:center; width:80%;
+}
+.tstreet{font-size:10px; letter-spacing:.22em; color:rgba(232,232,232,.4); margin-bottom:6px; font-weight:700}
+.board{display:flex; gap:4px; justify-content:center}
+.pot{margin-top:7px; font-size:12.5px; color:var(--acc2); font-weight:700; font-variant-numeric:tabular-nums}
+.pot small{color:var(--dim); margin-right:5px; font-weight:600}
+.seat{
+  position:absolute; transform:translate(-50%,-50%);
+  min-width:56px; text-align:center;
+  background:var(--panel); border:1px solid var(--line2); border-radius:3px;
+  padding:5px 7px 4px; cursor:default; z-index:2;
+  box-shadow:0 2px 6px rgba(0,0,0,.45);
+}
+.seat.tap{cursor:pointer}
+.seat .pos{font-size:11px; font-weight:800; color:var(--dim)}
+.seat .st{font-size:11px; color:var(--text); min-height:15px; font-variant-numeric:tabular-nums; white-space:nowrap}
+.seat.hero{border-color:var(--acc)}
+.seat.hero .pos{color:var(--acc)}
+.seat.folded{opacity:.38}
+.seat.actor{border-color:var(--acc); box-shadow:0 0 0 2px rgba(200,169,110,.4)}
+.seat .mini{display:flex; gap:2px; justify-content:center; margin-top:2px}
+
+/* ---- cards ---- */
+.pcard{
+  display:inline-flex; flex-direction:column; align-items:center; justify-content:center;
+  width:30px; height:41px; border-radius:4px; background:#f4f1ea;
+  border:1px solid #cfc9bc;
+  font-weight:700; font-size:14px; line-height:1;
+  box-shadow:0 1px 3px rgba(0,0,0,.5);
+}
+.pcard small{font-size:11px; line-height:1; margin-top:1px}
+.pcard.sm{width:22px; height:30px; font-size:11px; border-radius:3px}
+.pcard.sm small{font-size:8px}
+.pcard.s{color:var(--cs)} .pcard.h{color:var(--ch)} .pcard.d{color:var(--cd)} .pcard.c{color:var(--cc)}
+.pcard.unk{background:var(--panel2); color:var(--dim); box-shadow:none; border:1px dashed var(--faint); font-size:11px}
+.pcard.slot{background:rgba(255,255,255,.04); border:1px dashed rgba(255,255,255,.22); box-shadow:none}
+
+/* ---- card grid 13x4 ---- */
+.cgrid{display:grid; grid-template-columns:20px repeat(13,1fr); gap:3px; margin-top:8px}
+.cg-suit{display:flex; align-items:center; justify-content:center; font-size:15px}
+.cg-suit.s{color:var(--cs-l)} .cg-suit.h{color:var(--ch-l)} .cg-suit.d{color:var(--cd-l)} .cg-suit.c{color:var(--cc-l)}
+.cg-cell{
+  aspect-ratio:.82; border-radius:2px; border:1px solid var(--line2);
+  background:var(--panel2); font:inherit; font-size:13.5px; font-weight:700; cursor:pointer; padding:0;
+}
+.cg-cell.s{color:var(--cs-l)} .cg-cell.h{color:var(--ch-l)} .cg-cell.d{color:var(--cd-l)} .cg-cell.c{color:var(--cc-l)}
+.cg-cell.used{opacity:.16; pointer-events:none}
+.cg-cell.sel{border-color:var(--acc); box-shadow:0 0 0 1.5px var(--acc)}
+
+/* ---- panels ---- */
+.panel{background:var(--bg); border-top:2px solid var(--line2); padding:12px 0 0; margin-top:14px}
+.prompt{display:flex; align-items:baseline; gap:10px}
+.prompt .who{font-size:20px; font-weight:800; color:var(--text)}
+.prompt .info{font-size:12px; color:var(--dim); font-variant-numeric:tabular-nums}
+.topbar{display:flex; align-items:center; gap:8px; margin-bottom:2px}
+.topbar .crumb{flex:1; font-size:12px; color:var(--dim); font-weight:700}
+input[type=text],input[type=number],textarea,select{
+  width:100%; background:var(--panel2); border:0; border-bottom:2px solid var(--muted,#3d424a); color:var(--text);
+  border-radius:2px 2px 0 0; padding:10px 12px; font:inherit; font-size:14px;
+}
+input::placeholder,textarea::placeholder{color:var(--faint)}
+input:focus,textarea:focus,select:focus{outline:none; border-bottom-color:var(--acc)}
+textarea{min-height:64px; resize:vertical}
+label.f{display:block; font-size:11px; color:var(--dim); margin:10px 0 4px; font-weight:700}
+.inline{display:flex; gap:8px; align-items:center}
+.inline>*{flex:1; min-width:0}
+.hint{font-size:11.5px; color:var(--faint); margin-top:6px}
+
+/* ---- history ---- */
+.hitem{border-bottom:1px solid var(--line); padding:10px 0; margin:0}
+.hitem .head{display:flex; align-items:center; gap:6px; cursor:pointer}
+.hitem .head .dt{font-size:11px; color:var(--faint); width:64px; flex-shrink:0}
+.hitem .head .hp{font-size:12px; font-weight:700; color:var(--dim); width:40px; flex-shrink:0}
+.hitem .head .cards{display:flex; gap:2px; min-width:0; overflow:hidden; flex-shrink:1}
+.hitem .head .net{margin-left:auto; padding-left:6px; flex-shrink:0; white-space:nowrap; font-weight:700; font-variant-numeric:tabular-nums; font-size:13px}
+.net.win{color:var(--green)} .net.lose{color:var(--red)} .net.zero{color:var(--dim)}
+.hdetail{border-top:1px solid var(--line); margin-top:9px; padding-top:9px; font-size:13px}
+.hdetail .ln{margin:3px 0; color:var(--dim)}
+.hdetail .ln b{color:var(--text); font-weight:600}
+.hdetail .ln .street{display:inline-block; width:40px; color:var(--acc); font-size:11px; font-weight:800}
+
+/* ---- stats ---- */
+.statgrid{display:grid; grid-template-columns:1fr 1fr; gap:12px 18px; margin-top:10px}
+.stattile{border-top:2px solid var(--line2); padding:7px 0 2px; min-width:0}
+.stattile .k{font-size:10.5px; color:var(--dim); font-weight:700}
+.stattile .v{font-size:21px; font-weight:800; font-variant-numeric:tabular-nums; margin-top:2px; line-height:1.2; overflow-wrap:anywhere}
+.stattile .n{font-size:10.5px; color:var(--faint); font-variant-numeric:tabular-nums}
+table.stt{width:100%; border-collapse:collapse; margin-top:8px; font-variant-numeric:tabular-nums}
+table.stt th{font-size:10.5px; color:var(--dim); text-align:right; padding:6px 8px; border-bottom:1px solid var(--line2); font-weight:700}
+table.stt td{font-size:13px; text-align:right; padding:6px 8px; border-bottom:1px solid var(--line)}
+table.stt th:first-child,table.stt td:first-child{text-align:left}
+.tscroll{overflow-x:auto}
+
+/* ---- notes ---- */
+.pl-item{border-bottom:1px solid var(--line); padding:12px 0; margin:0}
+.pl-item .row1{display:flex; align-items:center; gap:8px}
+.pl-item .nm{font-weight:700; font-size:15px; flex:1}
+.tag{font-size:10px; font-weight:800; border-radius:2px; padding:3px 8px}
+.tag.FISH{color:#6fcf97; background:rgba(70,176,115,.15)}
+.tag.REG{color:#7fb3ef; background:rgba(91,155,230,.15)}
+.tag.AGG{color:#ef8080; background:rgba(224,92,92,.15)}
+.tag.NIT{color:#d8bc82; background:rgba(200,169,110,.16)}
+.tag.UNK{color:#9aa0a8; background:rgba(139,144,153,.14)}
+
+.toast{
+  position:fixed; bottom:24px; left:50%; transform:translateX(-50%);
+  background:var(--text); color:#14161a; font-weight:700; font-size:13px;
+  padding:9px 18px; border-radius:2px; z-index:99; opacity:0; transition:opacity .25s;
+  pointer-events:none; white-space:nowrap;
+}
+.toast.on{opacity:1}
+.muted{color:var(--faint); font-size:12.5px; text-align:center; padding:24px 0}
+</style>
+</head>
+<body>
+
+<main>
+  <section id="view-record" class="on"></section>
+  <section id="view-history"></section>
+  <section id="view-stats"></section>
+  <section id="view-notes"></section>
+  <section id="view-settings"></section>
+</main>
+
+<nav>
+  <button id="nav-record" class="on" onclick="showTab('record')">記録</button>
+  <button id="nav-history" onclick="showTab('history')">履歴</button>
+  <button id="nav-stats" onclick="showTab('stats')">分析</button>
+  <button id="nav-notes" onclick="showTab('notes')">メモ</button>
+  <button id="nav-settings" onclick="showTab('settings')">設定</button>
+</nav>
+
+<div class="toast" id="toast"></div>
+<datalist id="playersDL"></datalist>
+
+<script>
+"use strict";
+/* ================= constants / utils ================= */
+const RANKS=["A","K","Q","J","T","9","8","7","6","5","4","3","2"];
+const SUITS=["s","h","d","c"];
+const SYM={s:"♠",h:"♥",d:"♦",c:"♣"};
+const POSITIONS={
+  2:["SB","BB"],
+  3:["BTN","SB","BB"],
+  4:["CO","BTN","SB","BB"],
+  5:["HJ","CO","BTN","SB","BB"],
+  6:["UTG","HJ","CO","BTN","SB","BB"],
+  7:["UTG","LJ","HJ","CO","BTN","SB","BB"],
+  8:["UTG","UTG+1","LJ","HJ","CO","BTN","SB","BB"],
+  9:["UTG","UTG+1","UTG+2","LJ","HJ","CO","BTN","SB","BB"]
+};
+const STREET_JA={preflop:"PREFLOP",flop:"FLOP",turn:"TURN",river:"RIVER"};
+const $=s=>document.querySelector(s);
+const r2=x=>Math.round(x*100)/100;
+function fbb(x){x=r2(x);return Number.isInteger(x)?String(x):(r2(x*10)===Math.round(x*10)?x.toFixed(1):x.toFixed(2));}
+function esc(s){return String(s==null?"":s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));}
+/* 文字列をinline onclickのJS文字列リテラルへ安全に埋め込む（JSエスケープ→HTMLエスケープの順） */
+function jsq(s){return esc(String(s).replace(/\\/g,"\\\\").replace(/'/g,"\\'"));}
+function toast(msg){const t=$("#toast");t.textContent=msg;t.classList.add("on");clearTimeout(t._tm);t._tm=setTimeout(()=>t.classList.remove("on"),1600);}
+function cardHTML(c,sm){
+  if(!c||c==="??")return '<span class="pcard unk'+(sm?" sm":"")+'">??</span>';
+  const r=c[0],s=c[1];
+  return '<span class="pcard '+s+(sm?" sm":"")+'">'+(r)+'<small>'+SYM[s]+'</small></span>';
+}
+function slotHTML(sm){return '<span class="pcard slot'+(sm?" sm":"")+'"></span>';}
+
+/* ================= storage ================= */
+const K_HANDS="hl2_hands",K_PLAYERS="hl2_players",K_SET="hl2_settings";
+const DEF_SET={tableSize:6,stakes:"100/200",effStack:100,open:[2,2.3,2.5,3],tbx:[3,3.5,4],pct:[33,50,66,75,100,150],rx:[2.2,2.6,3]};
+let HANDS=[],PLAYERS={},SET={};
+function loadAll(){
+  try{HANDS=JSON.parse(localStorage.getItem(K_HANDS))||[];}catch(e){HANDS=[];}
+  try{PLAYERS=JSON.parse(localStorage.getItem(K_PLAYERS))||{};}catch(e){PLAYERS={};}
+  try{SET=Object.assign({},DEF_SET,JSON.parse(localStorage.getItem(K_SET))||{});}catch(e){SET=Object.assign({},DEF_SET);}
+}
+function saveHands(){localStorage.setItem(K_HANDS,JSON.stringify(HANDS));}
+function savePlayers(){localStorage.setItem(K_PLAYERS,JSON.stringify(PLAYERS));updateDL();}
+function saveSet(){localStorage.setItem(K_SET,JSON.stringify(SET));}
+function updateDL(){
+  const names=new Set(Object.keys(PLAYERS));
+  HANDS.forEach(h=>Object.values(h.names||{}).forEach(n=>n&&names.add(n)));
+  $("#playersDL").innerHTML=[...names].map(n=>'<option value="'+esc(n)+'">').join("");
+}
+
+/* ================= tabs ================= */
+function showTab(name){
+  ["record","history","stats","notes","settings"].forEach(t=>{
+    $("#view-"+t).classList.toggle("on",t===name);
+    $("#nav-"+t).classList.toggle("on",t===name);
+  });
+  if(name==="history")renderHistory();
+  if(name==="stats")renderStats();
+  if(name==="notes")renderNotes();
+  if(name==="settings")renderSettings();
+}
+
+/* ================= recorder state ================= */
+let R=null;
+function newHand(){
+  R={phase:"setup",tableSize:SET.tableSize,stakes:SET.stakes,effStack:SET.effStack,
+     heroPos:null,seats:POSITIONS[SET.tableSize],players:null,heroCards:[],board:[],
+     actions:{preflop:[],flop:[],turn:[],river:[]},street:"preflop",
+     curBet:0,raiseCount:0,betCount:0,order:[],toAct:[],pick:null,custom:null,
+     winners:[],wts:false,sd:{},memo:"",undo:[]};
+  renderRecord();
+}
+function pushUndo(){
+  const u=R.undo;R.undo=null;
+  const s=JSON.stringify(R);
+  R.undo=u;u.push(s);
+  if(u.length>80)u.shift();
+}
+function undoStep(){
+  if(!R.undo.length)return;
+  const u=R.undo;const s=u.pop();
+  R=JSON.parse(s);R.undo=u;
+  renderRecord();
+}
+function discardHand(){
+  if(R.phase!=="setup"&&!confirm("このハンドを破棄しますか？"))return;
+  newHand();
+}
+
+/* ---- setup ---- */
+function setSize(n){R.tableSize=n;R.seats=POSITIONS[n];if(R.heroPos&&!R.seats.includes(R.heroPos))R.heroPos=null;renderRecord();}
+function setHero(pos){R.heroPos=pos;renderRecord();}
+function beginHand(){
+  if(!R.heroPos){toast("自分の席をタップしてください");return;}
+  R.stakes=$("#in-stakes")?$("#in-stakes").value:R.stakes;
+  R.effStack=parseFloat($("#in-eff")?$("#in-eff").value:R.effStack)||100;
+  /* 次のハンドのデフォルトとして今回の卓設定を引き継ぐ */
+  SET.stakes=R.stakes;SET.effStack=R.effStack;SET.tableSize=R.tableSize;saveSet();
+  R.players={};
+  R.seats.forEach(p=>R.players[p]={folded:false,allin:false,inv:0,st:0,last:""});
+  R.pick={target:"hero",need:2,got:[]};
+  R.phase="hero";
+  R.undo=[];
+  renderRecord();
+}
+
+/* ---- betting engine ---- */
+function canAct(p){const pl=R.players[p];return !pl.folded&&!pl.allin;}
+function activeSeats(){return R.seats.filter(p=>!R.players[p].folded);}
+function potTotal(){return r2(R.seats.reduce((a,p)=>a+R.players[p].inv,0));}
+function actingOrder(st){
+  if(st==="preflop")return R.seats.slice();
+  if(R.tableSize===2)return ["BB","SB"];
+  const i=R.seats.indexOf("SB");
+  return R.seats.slice(i).concat(R.seats.slice(0,i));
+}
+function startStreet(st){
+  R.street=st;
+  R.raiseCount=0;R.custom=null;
+  R.seats.forEach(p=>{R.players[p].st=0;if(canAct(p))R.players[p].last="";});
+  if(st==="preflop"){
+    const sb=R.players["SB"],bb=R.players["BB"];
+    sb.st=0.5;sb.inv+=0.5;sb.last="SB 0.5";
+    bb.st=1;bb.inv+=1;bb.last="BB 1";
+    R.curBet=1;R.betCount=1;
+  }else{R.curBet=0;R.betCount=0;}
+  R.order=actingOrder(st);
+  R.toAct=R.order.filter(canAct);
+  R.phase="bet";
+  renderRecord();
+}
+function requeueAfter(pos){
+  const o=R.order,i=o.indexOf(pos);
+  R.toAct=o.slice(i+1).concat(o.slice(0,i)).filter(canAct);
+}
+function act(type,amt){
+  pushUndo();
+  const pos=R.toAct[0],pl=R.players[pos];
+  const rec={p:pos,a:type};
+  if(type==="fold"){pl.folded=true;pl.last="フォールド";R.toAct.shift();}
+  else if(type==="check"){pl.last="チェック";R.toAct.shift();rec.a="check";}
+  else if(type==="call"){
+    const pay=r2(R.curBet-pl.st);
+    pl.st=R.curBet;pl.inv=r2(pl.inv+pay);pl.last="コール "+fbb(R.curBet);
+    R.toAct.shift();
+  }
+  else{ /* agg or allin */
+    amt=r2(amt);
+    const aggressive=amt>R.curBet;
+    if(type==="allin"){rec.ai=1;pl.allin=true;}
+    if(aggressive){
+      rec.a=(R.betCount===0)?"bet":"raise";rec.to=amt;
+      pl.inv=r2(pl.inv+(amt-pl.st));pl.st=amt;
+      R.curBet=amt;R.betCount++;R.raiseCount++;
+      pl.last=(type==="allin"?"AI ":(rec.a==="bet"?"ベット ":"レイズ "))+fbb(amt);
+      requeueAfter(pos);
+    }else{
+      rec.a="call";
+      const to=Math.min(amt,R.curBet);
+      pl.inv=r2(pl.inv+Math.max(0,to-pl.st));pl.st=to;
+      pl.last=(type==="allin"?"AI ":"コール ")+fbb(to);
+      R.toAct.shift();
+    }
+    if(type==="allin")R.toAct=R.toAct.filter(p=>p!==pos);
+  }
+  R.actions[R.street].push(rec);
+  R.custom=null;
+  afterAct();
+}
+function afterAct(){
+  const active=activeSeats();
+  if(active.length===1){
+    R.winners=[active[0]];R.wts=false;R.pick=null;R.phase="finish";
+    renderRecord();return;
+  }
+  if(R.toAct.length===0)endStreet();
+  else renderRecord();
+}
+function endStreet(){
+  if(R.street==="river"){
+    R.wts=true;R.winners=[];R.pick=null;R.phase="finish";
+    renderRecord();return;
+  }
+  const next={preflop:"flop",flop:"turn",turn:"river"}[R.street];
+  R.street=next;
+  R.phase="board";
+  R.pick={target:"board",need:next==="flop"?3:1,got:[]};
+  renderRecord();
+}
+
+/* ---- card picking ---- */
+function usedCards(){
+  const u=new Set(R.heroCards.concat(R.board));
+  Object.values(R.sd).forEach(cs=>cs.forEach(c=>u.add(c)));
+  if(R.pick)R.pick.got.forEach(c=>u.add(c));
+  return u;
+}
+function pickCard(c){
+  if(!R.pick)return;
+  pushUndo();
+  R.pick.got.push(c);
+  if(R.pick.got.length>=R.pick.need){
+    const t=R.pick.target,got=R.pick.got;
+    if(t==="hero"){R.heroCards=got;R.pick=null;startStreet("preflop");return;}
+    if(t==="board"){
+      R.board=R.board.concat(got);R.pick=null;
+      const ca=R.seats.filter(canAct);
+      if(ca.length>=2)startStreet(R.street);else endStreet();
+      return;
+    }
+    if(t.startsWith("sd:")){R.sd[t.slice(3)]=got;R.pick=null;renderRecord();return;}
+  }
+  renderRecord();
+}
+function startSdPick(pos){captureFinish();pushUndo();R.pick={target:"sd:"+pos,need:2,got:[]};renderRecord();}
+function clearSd(pos){captureFinish();pushUndo();delete R.sd[pos];renderRecord();}
+function cancelPick(){R.pick=null;renderRecord();}
+
+/* ---- finish / save ---- */
+function captureFinish(){
+  const m=$("#in-memo");
+  if(m)R.memo=m.value;
+  document.querySelectorAll(".name-in").forEach(i=>{
+    R.namesDraft=R.namesDraft||{};
+    R.namesDraft[i.dataset.pos]=i.value;
+  });
+}
+function toggleWinner(pos){
+  captureFinish();
+  pushUndo();
+  const i=R.winners.indexOf(pos);
+  if(i>=0)R.winners.splice(i,1);else R.winners.push(pos);
+  renderRecord();
+}
+function heroNetNow(){
+  const pot=potTotal();
+  const share=R.winners.includes(R.heroPos)?pot/R.winners.length:0;
+  return r2(share-R.players[R.heroPos].inv);
+}
+function voluntaryVillains(){
+  const s=new Set();
+  ["preflop","flop","turn","river"].forEach(st=>R.actions[st].forEach(a=>{
+    if(a.a==="call"||a.a==="bet"||a.a==="raise")s.add(a.p);
+  }));
+  activeSeats().forEach(p=>s.add(p));
+  Object.keys(R.sd).forEach(p=>s.add(p)); /* ハンドを見せた相手も名前タグ対象に */
+  s.delete(R.heroPos);
+  return R.seats.filter(p=>s.has(p));
+}
+function saveHand(){
+  if(R.wts&&R.winners.length===0){toast("勝者を選択してください");return;}
+  captureFinish();
+  const names={};
+  Object.entries(R.namesDraft||{}).forEach(([pos,v])=>{
+    v=(v||"").trim();
+    if(v){names[pos]=v;if(!PLAYERS[v])PLAYERS[v]={tag:"UNK",note:""};}
+  });
+  /* ルール上SDまで行った分＝showdown（スタッツ対象）、それ以外の公開＝shown（メモ扱い） */
+  const sdRule={},sdShown={};
+  Object.entries(R.sd).forEach(([p,cs])=>{
+    if(R.wts&&R.players[p]&&!R.players[p].folded)sdRule[p]=cs;
+    else sdShown[p]=cs;
+  });
+  const rec={
+    id:Date.now().toString(36)+Math.random().toString(36).slice(2,6),
+    date:new Date().toISOString(),
+    stakes:R.stakes,tableSize:R.tableSize,effStack:R.effStack,
+    heroPos:R.heroPos,heroCards:R.heroCards,board:R.board,
+    actions:R.actions,pot:potTotal(),winners:R.winners,
+    wentToShowdown:R.wts,heroNet:heroNetNow(),
+    showdown:sdRule,shown:sdShown,names:names,memo:R.memo||""
+  };
+  HANDS.push(rec);
+  saveHands();savePlayers();
+  toast("保存しました（通算 "+HANDS.length+" ハンド）");
+  newHand();
+}
+
+/* ================= record rendering ================= */
+/* トラック（スタジアム）形状の周回上の点を返す。u=0が下辺中央、増加で左回り */
+function trackPt(u){
+  const a=40,b=34,c=15,L=a-c;           /* a:半幅% b:半高% c:カーブ部半幅% */
+  const C=Math.PI/2*(c+b);              /* 半円カーブ部の近似弧長 */
+  const P=4*L+2*C;
+  let s=(((u%1)+1)%1)*P,x,y;
+  if(s<L){x=-s;y=b;}
+  else if(s<L+C){const t=Math.PI/2+Math.PI*(s-L)/C;x=-L+c*Math.cos(t);y=b*Math.sin(t);}
+  else if(s<3*L+C){x=-L+(s-L-C);y=-b;}
+  else if(s<3*L+2*C){const t=3*Math.PI/2+Math.PI*(s-3*L-C)/C;x=L+c*Math.cos(t);y=b*Math.sin(t);}
+  else{x=L-(s-3*L-2*C);y=b;}
+  return [50+x,50+y];
+}
+function seatHTML(){
+  const n=R.seats.length;
+  const heroIdx=R.heroPos?R.seats.indexOf(R.heroPos):R.seats.indexOf("BTN");
+  const actor=(R.phase==="bet"&&R.toAct.length)?R.toAct[0]:null;
+  return R.seats.map((p,i)=>{
+    const [x,y]=trackPt((i-heroIdx)/n);
+    const pl=R.players?R.players[p]:null;
+    let cls="seat";
+    if(p===R.heroPos)cls+=" hero";
+    if(pl&&pl.folded)cls+=" folded";
+    if(p===actor)cls+=" actor";
+    if(R.phase==="setup")cls+=" tap";
+    let inner='<div class="pos">'+p+'</div>';
+    if(R.phase==="setup"){inner+='<div class="st" style="color:var(--faint)">'+(p===R.heroPos?"YOU":"&nbsp;")+'</div>';}
+    else{
+      inner+='<div class="st">'+esc(pl?pl.last:"")+'&nbsp;</div>';
+      if(p===R.heroPos&&R.heroCards.length===2)
+        inner+='<div class="mini">'+cardHTML(R.heroCards[0],1)+cardHTML(R.heroCards[1],1)+'</div>';
+    }
+    const oc=R.phase==="setup"?' onclick="setHero(\''+p+'\')"':'';
+    return '<div class="'+cls+'" style="left:'+x+'%;top:'+y+'%"'+oc+'>'+inner+'</div>';
+  }).join("");
+}
+function tableHTML(){
+  let boardCards="";
+  for(let i=0;i<5;i++){
+    if(i<R.board.length)boardCards+=cardHTML(R.board[i]);
+    else if(R.pick&&R.pick.target==="board"&&i<R.board.length+R.pick.got.length)boardCards+=cardHTML(R.pick.got[i-R.board.length]);
+    else boardCards+=slotHTML();
+  }
+  const pot=R.players?fbb(potTotal()):"0";
+  const stLabel=R.phase==="setup"?"SEAT SELECT":STREET_JA[R.street]||"";
+  return '<div class="tablewrap"><div class="felt"></div>'+
+    '<div class="tcenter"><div class="tstreet">'+stLabel+'</div>'+
+    '<div class="board">'+boardCards+'</div>'+
+    (R.players?'<div class="pot"><small>POT</small>'+pot+' bb</div>':"")+
+    '</div>'+seatHTML()+'</div>';
+}
+function gridHTML(){
+  const used=usedCards();
+  let h='<div class="cgrid">';
+  SUITS.forEach(s=>{
+    h+='<div class="cg-suit '+s+'">'+SYM[s]+'</div>';
+    RANKS.forEach(r=>{
+      const c=r+s;
+      const u=used.has(c);
+      const sel=R.pick&&R.pick.got.includes(c);
+      h+='<button class="cg-cell '+s+(u&&!sel?" used":"")+(sel?" sel":"")+'" onclick="pickCard(\''+c+'\')">'+r+'</button>';
+    });
+  });
+  return h+'</div>';
+}
+function topbarHTML(){
+  return '<div class="topbar"><span class="crumb">'+esc(R.stakes)+' ・ '+R.tableSize+'MAX ・ HERO '+esc(R.heroPos||"")+'</span>'+
+    '<button class="btn ghost" onclick="undoStep()"'+(R.undo.length?"":" disabled")+'>元に戻す</button>'+
+    '<button class="btn ghost" onclick="discardHand()">破棄</button></div>';
+}
+function setupHTML(){
+  const sizes=[2,3,4,5,6,7,8,9];
+  return '<h2>新規ハンド</h2>'+
+  '<div class="chiprow">'+sizes.map(n=>'<button class="chip'+(n===R.tableSize?" on":"")+'" onclick="setSize('+n+')">'+n+'</button>').join("")+'</div>'+
+  tableHTML()+
+  '<div class="hint" style="text-align:center">テーブルの自分の席をタップ</div>'+
+  '<div class="panel"><div class="inline">'+
+  '<div><label class="f">ステークス</label><input type="text" id="in-stakes" value="'+esc(R.stakes)+'"></div>'+
+  '<div><label class="f">有効スタック (bb)</label><input type="number" id="in-eff" value="'+R.effStack+'" inputmode="decimal"></div>'+
+  '</div>'+
+  '<div class="btnrow"><button class="btn primary" onclick="beginHand()"'+(R.heroPos?"":" disabled")+'>ハンド開始</button></div></div>';
+}
+function pickPanelHTML(){
+  const t=R.pick.target;
+  let title,cancel="";
+  if(t==="hero")title="自分のハンドを選択 ("+R.pick.got.length+"/2)";
+  else if(t==="board")title=STREET_JA[R.street]+" のボードを選択 ("+R.pick.got.length+"/"+R.pick.need+")";
+  else{title=t.slice(3)+" のショウダウンハンド ("+R.pick.got.length+"/2)";
+       cancel='<div class="btnrow"><button class="btn ghost" onclick="cancelPick()">キャンセル</button></div>';}
+  return '<div class="panel"><div class="prompt"><span class="who" style="font-size:14px">'+esc(title)+'</span></div>'+gridHTML()+cancel+'</div>';
+}
+function sizeButtons(){
+  const pos=R.toAct[0],pl=R.players[pos];
+  const pot=potTotal();
+  let list;
+  if(R.street==="preflop"){
+    if(R.raiseCount===0)list=SET.open.map(v=>({t:v,l:fbb(v)+"bb"}));
+    else list=SET.tbx.map(x=>({t:r2(x*R.curBet),l:fbb(x)+"x "+fbb(r2(x*R.curBet))}));
+  }else{
+    if(R.betCount===0)list=SET.pct.map(p=>({t:Math.max(1,r2(p/100*pot)),l:p+"% "+fbb(Math.max(1,r2(p/100*pot)))}));
+    else list=SET.rx.map(x=>({t:r2(x*R.curBet),l:fbb(x)+"x "+fbb(r2(x*R.curBet))}));
+  }
+  return list.filter(o=>o.t>R.curBet&&o.t>pl.st);
+}
+function betPanelHTML(){
+  const pos=R.toAct[0],pl=R.players[pos];
+  const toCall=r2(R.curBet-pl.st);
+  const facing=toCall>0?"コール "+fbb(toCall)+" bb":"チェック可";
+  let h='<div class="panel"><div class="prompt"><span class="who">'+pos+'</span><span class="info">'+STREET_JA[R.street]+' ・ '+facing+'</span></div>';
+  let row1='';
+  if(toCall>0){
+    row1='<button class="btn fold" onclick="act(\'fold\')">フォールド</button>'+
+         '<button class="btn call" onclick="act(\'call\')">コール '+fbb(R.curBet)+'</button>';
+  }else{
+    row1='<button class="btn check" onclick="act(\'check\')">チェック</button>';
+  }
+  h+='<div class="btnrow cols2">'+row1+'</div>';
+  const sb=sizeButtons();
+  if(sb.length)h+='<div class="btnrow cols3">'+sb.map(o=>'<button class="btn agg" onclick="act(\'agg\','+o.t+')">'+esc(o.l)+'</button>').join("")+'</div>';
+  h+='<div class="btnrow cols2">'+
+     '<button class="btn agg" onclick="openCustom(\'custom\')">カスタム</button>'+
+     '<button class="btn ai" onclick="openCustom(\'allin\')">オールイン</button></div>';
+  if(R.custom){
+    const def=R.custom==="allin"?R.effStack:"";
+    h+='<div class="btnrow" style="grid-template-columns:2fr 1fr 1fr">'+
+      '<input type="number" id="customAmt" inputmode="decimal" placeholder="合計額 (bb)" value="'+def+'">'+
+      '<button class="btn primary" onclick="confirmCustom()">確定</button>'+
+      '<button class="btn ghost" onclick="R.custom=null;renderRecord()">戻る</button></div>'+
+      '<div class="hint">ストリート合計のサイズをbbで入力（レイズは合計額）</div>';
+  }
+  return h+'</div>';
+}
+function openCustom(mode){R.custom=mode;renderRecord();const i=$("#customAmt");if(i)i.focus();}
+function confirmCustom(){
+  const v=parseFloat($("#customAmt").value);
+  if(!(v>0)){toast("金額を入力してください");return;}
+  act(R.custom==="allin"?"allin":"agg",v);
+}
+function sdRowHTML(p){
+  const cs=R.sd[p];
+  return '<div class="inline" style="margin-top:6px"><span style="flex:0 0 52px;font-weight:700;font-size:13px">'+p+'</span>'+
+    '<span style="flex:0 0 auto;display:flex;gap:3px">'+(cs?cardHTML(cs[0],1)+cardHTML(cs[1],1):cardHTML("??",1)+cardHTML("??",1))+'</span>'+
+    '<button class="btn ghost" onclick="startSdPick(\''+p+'\')">入力</button>'+
+    (cs?'<button class="btn ghost" onclick="clearSd(\''+p+'\')">クリア</button>':"")+
+    '</div>';
+}
+function finishHTML(){
+  const active=activeSeats();
+  const pot=fbb(potTotal());
+  let h='<div class="panel"><h2 style="margin-top:0">ハンド終了 ・ POT '+pot+' bb</h2>';
+  if(R.wts){
+    h+='<label class="f">勝者（タップで選択 / 複数可＝チョップ）</label><div class="chiprow">'+
+      active.map(p=>'<button class="chip'+(R.winners.includes(p)?" on":"")+'" onclick="toggleWinner(\''+p+'\')">'+p+'</button>').join("")+'</div>';
+    const vil=active.filter(p=>p!==R.heroPos);
+    if(vil.length){
+      h+='<label class="f">ショウダウンハンド（スタッツに反映 ・ 未入力は ?? ）</label>';
+      vil.forEach(p=>{h+=sdRowHTML(p);});
+    }
+  }else{
+    h+='<div style="font-size:14px">勝者: <b style="color:var(--acc2)">'+R.winners[0]+'</b>'+(R.winners[0]===R.heroPos?"（自分）":"")+'</div>';
+  }
+  /* SDに含まれない席（フォールドした席や、SDなしで終わったハンドの全席）は「見せてもらったハンド」として記録可 */
+  const others=R.seats.filter(p=>p!==R.heroPos&&!(R.wts&&!R.players[p].folded));
+  if(others.length){
+    h+='<label class="f">見せてもらったハンド（勉強会ショー / ブラフ見せ等 ・ スタッツ対象外）</label>';
+    others.filter(p=>R.sd[p]).forEach(p=>{h+=sdRowHTML(p);});
+    const rest=others.filter(p=>!R.sd[p]);
+    if(rest.length)h+='<div class="chiprow" style="margin-top:6px">'+
+      rest.map(p=>'<button class="chip" onclick="startSdPick(\''+p+'\')">'+p+'</button>').join("")+'</div>';
+  }
+  const net=heroNetNow();
+  const ncls=net>0?"win":net<0?"lose":"zero";
+  h+='<div style="margin-top:10px;font-size:14px">Hero 収支: <span class="net '+ncls+'" style="font-size:16px">'+(net>0?"+":"")+fbb(net)+' bb</span></div>';
+  const vv=voluntaryVillains();
+  if(vv.length){
+    h+='<label class="f">プレイヤー名タグ（任意 ・ メモ/スタッツに紐付け）</label>';
+    vv.forEach(p=>{
+      const dv=(R.namesDraft||{})[p]||"";
+      h+='<div class="inline" style="margin-top:6px"><span style="flex:0 0 52px;font-weight:700;font-size:13px">'+p+'</span>'+
+        '<input type="text" class="name-in" data-pos="'+p+'" list="playersDL" placeholder="名前" value="'+esc(dv)+'"></div>';
+    });
+  }
+  h+='<label class="f">ハンドメモ</label><textarea id="in-memo" placeholder="ラインの意図、相手の傾向など">'+esc(R.memo||"")+'</textarea>';
+  h+='<div class="btnrow"><button class="btn primary" onclick="saveHand()">保存する</button></div></div>';
+  return h;
+}
+function renderRecord(){
+  const v=$("#view-record");
+  if(!R){v.innerHTML="";return;}
+  if(R.phase==="setup"){v.innerHTML=setupHTML();return;}
+  let h=topbarHTML()+tableHTML();
+  if(R.pick)h+=pickPanelHTML();
+  else if(R.phase==="bet")h+=betPanelHTML();
+  else if(R.phase==="finish")h+=finishHTML();
+  v.innerHTML=h;
+}
+
+/* ================= history ================= */
+let histLimit=50,histOpen={};
+function fmtDate(iso){
+  const d=new Date(iso);
+  const z=n=>String(n).padStart(2,"0");
+  return (d.getMonth()+1)+"/"+d.getDate()+" "+z(d.getHours())+":"+z(d.getMinutes());
+}
+function actLabel(a){
+  if(a.a==="fold")return "F";
+  if(a.a==="check")return "X";
+  if(a.a==="call")return (a.ai?"AIコール":"C");
+  const s=(a.a==="bet"?"B":"R")+fbb(a.to);
+  return a.ai?"AI "+fbb(a.to):s;
+}
+function handDetailHTML(h){
+  let d="";
+  const streets=[["preflop","PF",0],["flop","FLOP",3],["turn","TURN",4],["river","RIV",5]];
+  streets.forEach(([st,lb,bn])=>{
+    const acts=h.actions[st]||[];
+    const hasBoard=bn>0&&h.board.length>=bn;
+    if(!acts.length&&!hasBoard)return;
+    let ln='<div class="ln"><span class="street">'+lb+'</span>';
+    if(hasBoard){
+      const cards=st==="flop"?h.board.slice(0,3):[h.board[bn-1]];
+      ln+=cards.map(c=>cardHTML(c,1)).join("")+" ";
+    }
+    ln+='<b>'+acts.map(a=>esc(a.p)+" "+actLabel(a)).join(" / ")+'</b></div>';
+    d+=ln;
+  });
+  const sd=h.showdown||{};
+  d+='<div class="ln"><span class="street">SD</span>'+esc(h.heroPos)+'(HERO) '+h.heroCards.map(c=>cardHTML(c,1)).join("");
+  Object.keys(sd).forEach(p=>{d+=' ・ '+esc(p)+' '+sd[p].map(c=>cardHTML(c,1)).join("");});
+  d+='</div>';
+  const sh=h.shown||{};
+  if(Object.keys(sh).length){
+    d+='<div class="ln"><span class="street">SHOW</span>'+
+      Object.keys(sh).map(p=>esc(p)+' '+sh[p].map(c=>cardHTML(c,1)).join("")).join(" ・ ")+
+      ' <span style="font-size:11px;color:var(--faint)">（任意公開 ・ スタッツ外）</span></div>';
+  }
+  d+='<div class="ln">勝者 <b>'+(h.winners||[]).join(", ")+'</b> ・ POT <b>'+fbb(h.pot)+'bb</b> ・ '+esc(h.stakes)+' '+h.tableSize+'max</div>';
+  const nm=h.names||{};
+  if(Object.keys(nm).length)d+='<div class="ln">相手: <b>'+Object.entries(nm).map(([p,n])=>esc(p)+"="+esc(n)).join(", ")+'</b></div>';
+  if(h.memo)d+='<div class="ln">メモ: <b>'+esc(h.memo)+'</b></div>';
+  d+='<div class="btnrow cols2" style="margin-top:8px">'+
+    '<button class="btn ghost" onclick="editMemo(\''+h.id+'\')">メモ編集</button>'+
+    '<button class="btn ghost" style="color:var(--red)" onclick="delHand(\''+h.id+'\')">削除</button></div>';
+  return '<div class="hdetail">'+d+'</div>';
+}
+function renderHistory(){
+  const v=$("#view-history");
+  const q=(v.dataset.q||"").toLowerCase();
+  let list=HANDS.slice().reverse();
+  if(q)list=list.filter(h=>(h.memo||"").toLowerCase().includes(q)||Object.values(h.names||{}).some(n=>n.toLowerCase().includes(q))||h.heroPos.toLowerCase()===q);
+  let h='<h2>履歴（'+HANDS.length+' ハンド）</h2>'+
+    '<input type="text" placeholder="検索（メモ / 名前 / ポジション）Enterで確定" value="'+esc(v.dataset.q||"")+'" onchange="this.closest(\'section\').dataset.q=this.value;renderHistory()">'+
+    '<div class="btnrow cols2" style="margin:8px 0 2px">'+
+    '<button class="btn ghost" onclick="exportJSON()">JSON書き出し</button>'+
+    '<button class="btn ghost" onclick="$(\'#importFile\').click()">JSON読み込み</button></div>'+
+    '<input type="file" id="importFile" accept=".json" style="display:none" onchange="importJSON(this)">';
+  if(!list.length)h+='<div class="muted">まだハンドがありません</div>';
+  list.slice(0,histLimit).forEach(hd=>{
+    const net=hd.heroNet||0;
+    const ncls=net>0?"win":net<0?"lose":"zero";
+    h+='<div class="hitem"><div class="head" onclick="histOpen[\''+hd.id+'\']=!histOpen[\''+hd.id+'\'];renderHistory()">'+
+      '<span class="dt">'+fmtDate(hd.date)+'</span>'+
+      '<span class="hp">'+esc(hd.heroPos)+'</span>'+
+      '<span class="cards" style="flex-shrink:0">'+hd.heroCards.map(c=>cardHTML(c,1)).join("")+'</span>'+
+      '<span class="cards" style="opacity:.75">'+hd.board.slice(0,5).map(c=>cardHTML(c,1)).join("")+'</span>'+
+      '<span class="net '+ncls+'">'+(net>0?"+":"")+fbb(net)+'</span></div>'+
+      (histOpen[hd.id]?handDetailHTML(hd):"")+'</div>';
+  });
+  if(list.length>histLimit)h+='<div class="btnrow"><button class="btn ghost" onclick="histLimit+=50;renderHistory()">さらに表示（残り'+(list.length-histLimit)+'）</button></div>';
+  v.innerHTML=h;
+}
+function delHand(id){
+  if(!confirm("このハンドを削除しますか？"))return;
+  HANDS=HANDS.filter(h=>h.id!==id);
+  saveHands();renderHistory();toast("削除しました");
+}
+function editMemo(id){
+  const h=HANDS.find(x=>x.id===id);if(!h)return;
+  const m=prompt("ハンドメモ",h.memo||"");
+  if(m===null)return;
+  h.memo=m;saveHands();renderHistory();
+}
+
+/* ================= export / import ================= */
+function exportJSON(){
+  const data={app:"handlog",version:1,exportedAt:new Date().toISOString(),settings:SET,players:PLAYERS,hands:HANDS};
+  const blob=new Blob([JSON.stringify(data,null,1)],{type:"application/json"});
+  const a=document.createElement("a");
+  const d=new Date(),z=n=>String(n).padStart(2,"0");
+  a.href=URL.createObjectURL(blob);
+  a.download="handlog_"+d.getFullYear()+z(d.getMonth()+1)+z(d.getDate())+"_"+HANDS.length+"hands.json";
+  a.click();URL.revokeObjectURL(a.href);
+  toast("JSONを書き出しました");
+}
+function importJSON(input){
+  const f=input.files[0];if(!f)return;
+  const rd=new FileReader();
+  rd.onload=()=>{
+    try{
+      const data=JSON.parse(rd.result);
+      const hands=Array.isArray(data)?data:(data.hands||[]);
+      const ids=new Set(HANDS.map(h=>h.id));
+      let added=0;
+      hands.forEach(h=>{if(h&&h.id&&!ids.has(h.id)){HANDS.push(h);ids.add(h.id);added++;}});
+      HANDS.sort((a,b)=>(a.date||"").localeCompare(b.date||""));
+      if(data.players)Object.entries(data.players).forEach(([n,p])=>{if(!PLAYERS[n])PLAYERS[n]=p;});
+      saveHands();savePlayers();
+      renderHistory();
+      toast(added+" ハンドを取り込みました");
+    }catch(e){toast("読み込みに失敗しました");}
+  };
+  rd.readAsText(f);input.value="";
+}
+
+/* ================= stats engine ================= */
+function emptyStats(){
+  return {hands:0,vpip:0,pfr:0,limpO:0,limp:0,tbO:0,tb:0,f3O:0,f3:0,fbO:0,fb:0,
+    ccO:0,cc:0,stO:0,st:0,bbfsO:0,bbfs:0,
+    cbFO:0,cbF:0,cbTO:0,cbT:0,fcbO:0,fcb:0,rcb:0,donkO:0,donk:0,xrO:0,xr:0,
+    bets:0,raises:0,calls:0,sawF:0,wwsf:0,wtsd:0,wsd:0,net:0};
+}
+const STEAL_POS={CO:1,BTN:1,SB:1};
+function walkHand(h){
+  const seats=POSITIONS[h.tableSize]||[];
+  const per={};
+  const P=p=>per[p]||(per[p]=emptyStats());
+  seats.forEach(p=>{P(p).hands=1;});
+  const pf=h.actions.preflop||[];
+  let raises=0,opener=null,aggr=null,anyVpip=false,callersAfterRaise=0,openerIsSteal=false;
+  const foldedSet={};
+  const stealSet=h.tableSize===2?{SB:1}:STEAL_POS;
+  for(const a of pf){
+    const f=P(a.p);
+    const isR=a.a==="raise"||a.a==="bet";
+    if(raises===1&&a.p!==opener){f.tbO=1;if(isR)f.tb=1;}
+    if(raises>=2&&a.p===opener&&!f.f3O){f.f3O=1;if(a.a==="fold")f.f3=1;}
+    if(raises===2&&a.p!==aggr){f.fbO=1;if(isR)f.fb=1;}
+    if(raises>=1&&!f.vpip){f.ccO=1;if(a.a==="call")f.cc=1;}
+    if(raises===0&&a.p!=="BB"){f.limpO=1;if(a.a==="call")f.limp=1;}
+    if(raises===0&&!anyVpip&&stealSet[a.p]){f.stO=1;if(isR)f.st=1;}
+    if(a.p==="BB"&&raises===1&&openerIsSteal&&callersAfterRaise===0){f.bbfsO=1;if(a.a==="fold")f.bbfs=1;}
+    if(a.a==="call"){f.vpip=1;if(raises>=1)callersAfterRaise++;}
+    else if(isR){
+      f.vpip=1;f.pfr=1;raises++;
+      if(raises===1){opener=a.p;openerIsSteal=!!stealSet[a.p]&&!anyVpip;}
+      aggr=a.p;callersAfterRaise=0;
+    }
+    else if(a.a==="fold")foldedSet[a.p]=1;
+    if(f.vpip)anyVpip=true;
+  }
+  const flopSeen=(h.board||[]).length>=3;
+  const sawFlopSet=flopSeen?seats.filter(p=>!foldedSet[p]):[];
+  sawFlopSet.forEach(p=>{P(p).sawF=1;});
+  let flopCbet=false;
+  for(const st of ["flop","turn","river"]){
+    const acts=h.actions[st]||[];
+    let betCount=0,firstBettor=null;
+    const checked={};
+    for(const a of acts){
+      const f=P(a.p);
+      const isAgg=a.a==="bet"||a.a==="raise";
+      if(st==="flop"&&aggr){
+        if(betCount===0){
+          if(a.p===aggr){f.cbFO=1;if(isAgg){f.cbF=1;flopCbet=true;}}
+          else if(!foldedSet[aggr]){f.donkO=1;if(isAgg)f.donk=1;}
+        }
+        if(betCount===1&&firstBettor===aggr&&a.p!==aggr){
+          f.fcbO=1;
+          if(a.a==="fold")f.fcb=1;
+          if(a.a==="raise")f.rcb=1;
+        }
+      }
+      if(st==="flop"&&checked[a.p]&&betCount>=1){f.xrO=1;if(a.a==="raise")f.xr=1;}
+      if(st==="turn"&&betCount===0&&a.p===aggr&&flopCbet){f.cbTO=1;if(isAgg)f.cbT=1;}
+      if(isAgg){
+        if(a.a==="bet"){f.bets++;firstBettor=firstBettor||a.p;}else f.raises++;
+        betCount++;
+      }
+      else if(a.a==="call")f.calls++;
+      else if(a.a==="check")checked[a.p]=1;
+      else if(a.a==="fold")foldedSet[a.p]=1;
+    }
+  }
+  const winners=h.winners||[];
+  seats.forEach(p=>{
+    const f=P(p);
+    if(f.sawF&&winners.includes(p))f.wwsf=1;
+    if(h.wentToShowdown&&f.sawF&&!foldedSet[p]){f.wtsd=1;if(winners.includes(p))f.wsd=1;}
+  });
+  return per;
+}
+function addStats(dst,src){
+  for(const k in src)dst[k]=(dst[k]||0)+src[k];
+}
+function computeStats(hands){
+  const S={HERO:emptyStats(),_POP:emptyStats()};
+  const posStats={};
+  for(const h of hands){
+    if(!h||!h.actions)continue;
+    let per;
+    try{per=walkHand(h);}catch(e){continue;}
+    const seats=POSITIONS[h.tableSize]||[];
+    for(const p of seats){
+      const f=per[p];if(!f)continue;
+      if(p===h.heroPos){
+        addStats(S.HERO,f);
+        S.HERO.net=r2(S.HERO.net+(h.heroNet||0));
+        const ps=posStats[p]||(posStats[p]=emptyStats());
+        addStats(ps,f);
+        ps.net=r2(ps.net+(h.heroNet||0));
+      }else{
+        addStats(S._POP,f);
+        const nm=(h.names||{})[p];
+        if(nm){if(!S[nm])S[nm]=emptyStats();addStats(S[nm],f);}
+      }
+    }
+  }
+  return {S,posStats};
+}
+function pct(n,o){return o?(100*n/o).toFixed(1)+"%":"—";}
+function frac(n,o){return o?" ("+n+"/"+o+")":"";}
+
+/* ================= stats rendering ================= */
+let statsSource=null; /* null = saved data */
+function loadStatsFile(input){
+  const f=input.files[0];if(!f)return;
+  const rd=new FileReader();
+  rd.onload=()=>{
+    try{
+      const data=JSON.parse(rd.result);
+      statsSource={name:f.name,hands:Array.isArray(data)?data:(data.hands||[])};
+      renderStats();
+      toast(statsSource.hands.length+" ハンドを分析対象に読み込みました");
+    }catch(e){toast("読み込みに失敗しました");}
+  };
+  rd.readAsText(f);input.value="";
+}
+function statRow(label,n,o){
+  return '<tr><td>'+label+'</td><td>'+pct(n,o)+'</td><td style="color:var(--faint)">'+(o?n+"/"+o:"—")+'</td></tr>';
+}
+function renderStats(){
+  const v=$("#view-stats");
+  const hands=statsSource?statsSource.hands:HANDS;
+  const {S,posStats}=computeStats(hands);
+  const sel=v.dataset.sel||"HERO";
+  const keys=["HERO","_POP"].concat(Object.keys(S).filter(k=>k!=="HERO"&&k!=="_POP").sort());
+  const st=S[sel]||emptyStats();
+  const labelOf=k=>k==="HERO"?"自分 (Hero)":k==="_POP"?"相手全体":k;
+  let h='<h2>分析'+(statsSource?'（ファイル: '+esc(statsSource.name)+'）':'（保存データ '+hands.length+' ハンド）')+'</h2>';
+  h+='<div class="inline"><select onchange="this.closest(\'section\').dataset.sel=this.value;renderStats()">'+
+    keys.map(k=>'<option value="'+esc(k)+'"'+(k===sel?" selected":"")+'>'+esc(labelOf(k))+'</option>').join("")+'</select></div>';
+  h+='<div class="btnrow cols2" style="margin-top:8px">'+
+    '<button class="btn ghost" onclick="$(\'#statsFile\').click()">JSONを読み込んで分析</button>'+
+    (statsSource?'<button class="btn ghost" onclick="statsSource=null;renderStats()">保存データに戻す</button>':'<button class="btn ghost" onclick="exportJSON()">JSON書き出し</button>')+
+    '</div><input type="file" id="statsFile" accept=".json" style="display:none" onchange="loadStatsFile(this)">';
+  if(!hands.length){v.innerHTML=h+'<div class="muted">まだデータがありません</div>';return;}
+  const af=st.calls?((st.bets+st.raises)/st.calls).toFixed(2):(st.bets+st.raises?"∞":"—");
+  h+='<div class="statgrid">'+
+    '<div class="stattile"><div class="k">HANDS</div><div class="v">'+st.hands+'</div><div class="n">&nbsp;</div></div>'+
+    '<div class="stattile"><div class="k">VPIP / PFR</div><div class="v">'+pct(st.vpip,st.hands)+' <span style="color:var(--dim);font-size:15px">/ '+pct(st.pfr,st.hands)+'</span></div><div class="n">'+st.vpip+'/'+st.hands+' ・ '+st.pfr+'/'+st.hands+'</div></div>'+
+    '<div class="stattile"><div class="k">3BET</div><div class="v">'+pct(st.tb,st.tbO)+'</div><div class="n">'+(st.tbO?st.tb+"/"+st.tbO:"—")+'</div></div>'+
+    '<div class="stattile"><div class="k">AF（ポストフロップ）</div><div class="v">'+af+'</div><div class="n">B'+st.bets+' R'+st.raises+' C'+st.calls+'</div></div>';
+  if(sel==="HERO"){
+    const net=st.net,bb100=st.hands?(100*net/st.hands).toFixed(1):"—";
+    const ncls=net>0?"win":net<0?"lose":"zero";
+    h+='<div class="stattile"><div class="k">収支</div><div class="v net '+ncls+'">'+(net>0?"+":"")+fbb(net)+'<span style="font-size:13px"> bb</span></div><div class="n">bb/100: '+bb100+'</div></div>';
+    h+='<div class="stattile"><div class="k">WWSF / WTSD / W$SD</div><div class="v" style="font-size:15px">'+pct(st.wwsf,st.sawF)+' / '+pct(st.wtsd,st.sawF)+' / '+pct(st.wsd,st.wtsd)+'</div><div class="n">フロップ以降の勝率指標</div></div>';
+  }
+  h+='</div>';
+  h+='<h2>プリフロップ</h2><div class="tscroll"><table class="stt"><tr><th>スタッツ</th><th>値</th><th>回数</th></tr>'+
+    statRow("VPIP",st.vpip,st.hands)+
+    statRow("PFR",st.pfr,st.hands)+
+    statRow("リンプ",st.limp,st.limpO)+
+    statRow("3ベット",st.tb,st.tbO)+
+    statRow("フォールド to 3ベット",st.f3,st.f3O)+
+    statRow("4ベット",st.fb,st.fbO)+
+    statRow("コールドコール",st.cc,st.ccO)+
+    statRow("スチール（CO/BTN/SB）",st.st,st.stO)+
+    statRow("BBフォールド vs スチール",st.bbfs,st.bbfsO)+
+    '</table></div>';
+  h+='<h2>ポストフロップ</h2><div class="tscroll"><table class="stt"><tr><th>スタッツ</th><th>値</th><th>回数</th></tr>'+
+    statRow("フロップCB",st.cbF,st.cbFO)+
+    statRow("ターンCB",st.cbT,st.cbTO)+
+    statRow("フォールド to フロップCB",st.fcb,st.fcbO)+
+    statRow("レイズ vs フロップCB",st.rcb,st.fcbO)+
+    statRow("ドンクベット（フロップ）",st.donk,st.donkO)+
+    statRow("チェックレイズ（フロップ）",st.xr,st.xrO)+
+    '</table></div>';
+  h+='<h2>ショウダウン</h2><div class="tscroll"><table class="stt"><tr><th>スタッツ</th><th>値</th><th>回数</th></tr>'+
+    statRow("WWSF（フロップ後勝率）",st.wwsf,st.sawF)+
+    statRow("WTSD（SD到達率）",st.wtsd,st.sawF)+
+    statRow("W$SD（SD勝率）",st.wsd,st.wtsd)+
+    '</table></div>';
+  if(sel==="HERO"){
+    const posList=Object.keys(posStats);
+    if(posList.length){
+      const orderRef=POSITIONS[9].slice().reverse();
+      posList.sort((a,b)=>orderRef.indexOf(a)-orderRef.indexOf(b));
+      h+='<h2>ポジション別（Hero）</h2><div class="tscroll"><table class="stt">'+
+        '<tr><th>POS</th><th>Hands</th><th>VPIP</th><th>PFR</th><th>3B</th><th>収支bb</th></tr>'+
+        posList.map(p=>{
+          const s=posStats[p];
+          const ncls=s.net>0?"win":s.net<0?"lose":"zero";
+          return '<tr><td>'+p+'</td><td>'+s.hands+'</td><td>'+pct(s.vpip,s.hands)+'</td><td>'+pct(s.pfr,s.hands)+'</td><td>'+pct(s.tb,s.tbO)+'</td><td class="net '+ncls+'">'+(s.net>0?"+":"")+fbb(s.net)+'</td></tr>';
+        }).join("")+'</table></div>';
+    }
+  }
+  h+='<div class="hint">分母は機会ベース（例: 3ベットは「1回のレイズに直面した回数」が分母）。サンプルが少ない間は数値が荒れます。WTSD/W$SDはルール上ショウダウンに到達したハンドのみ集計し、任意で見せてもらったハンド（SHOW）は含みません。</div>';
+  v.innerHTML=h;
+}
+
+/* ================= notes ================= */
+function renderNotes(){
+  const v=$("#view-notes");
+  const names=Object.keys(PLAYERS).sort();
+  let h='<h2>プレイヤーメモ</h2>'+
+    '<div class="inline"><input type="text" id="np-name" placeholder="プレイヤー名を追加">'+
+    '<button class="btn ghost" style="flex:0 0 70px" onclick="addPlayer()">追加</button></div>';
+  if(!names.length)h+='<div class="muted">プレイヤーを追加するか、ハンド保存時に名前タグを付けると表示されます</div>';
+  names.forEach(n=>{
+    const p=PLAYERS[n];
+    const cnt=HANDS.filter(hd=>Object.values(hd.names||{}).includes(n)).length;
+    h+='<div class="pl-item"><div class="row1">'+
+      '<span class="nm">'+esc(n)+'</span>'+
+      '<span class="tag '+esc(p.tag||"UNK")+'">'+esc(p.tag||"UNK")+'</span>'+
+      '<span style="font-size:11px;color:var(--faint)">'+cnt+' hands</span>'+
+      '<button class="btn ghost" style="min-height:28px;color:var(--red)" onclick="delPlayer(\''+jsq(n)+'\')">削除</button></div>'+
+      '<div class="chiprow" style="margin-top:8px">'+["FISH","REG","AGG","NIT","UNK"].map(t=>
+        '<button class="chip'+(p.tag===t?" on":"")+'" onclick="setTag(\''+jsq(n)+'\',\''+t+'\')">'+t+'</button>').join("")+'</div>'+
+      '<textarea style="margin-top:8px" placeholder="メモ" onchange="setNote(\''+jsq(n)+'\',this.value)">'+esc(p.note||"")+'</textarea>'+
+      '</div>';
+  });
+  v.innerHTML=h;
+}
+function addPlayer(){
+  const n=$("#np-name").value.trim();
+  if(!n)return;
+  if(!PLAYERS[n])PLAYERS[n]={tag:"UNK",note:""};
+  savePlayers();renderNotes();
+}
+function delPlayer(n){
+  if(!confirm(n+" を削除しますか？（ハンド内の名前タグは残ります）"))return;
+  delete PLAYERS[n];savePlayers();renderNotes();
+}
+function setTag(n,t){PLAYERS[n].tag=t;savePlayers();renderNotes();}
+function setNote(n,txt){PLAYERS[n].note=txt;savePlayers();}
+
+/* ================= settings ================= */
+function renderSettings(){
+  const v=$("#view-settings");
+  const usage=((localStorage.getItem(K_HANDS)||"").length/1024).toFixed(0);
+  const listVal=a=>a.join(", ");
+  v.innerHTML='<h2>プリセット（カンマ区切りで編集）</h2><div class="panel" style="margin-top:6px">'+
+    '<label class="f">プリフロップ オープンサイズ (bb)</label><input type="text" id="set-open" value="'+listVal(SET.open)+'" onchange="setList(\'open\',this)">'+
+    '<label class="f">プリフロップ リレイズ倍率 (3bet/4bet ×直前レイズ)</label><input type="text" id="set-tbx" value="'+listVal(SET.tbx)+'" onchange="setList(\'tbx\',this)">'+
+    '<label class="f">ポストフロップ ベットサイズ (%ポット)</label><input type="text" id="set-pct" value="'+listVal(SET.pct)+'" onchange="setList(\'pct\',this)">'+
+    '<label class="f">ポストフロップ レイズ倍率 (×直前ベット)</label><input type="text" id="set-rx" value="'+listVal(SET.rx)+'" onchange="setList(\'rx\',this)">'+
+    '</div>'+
+    '<h2>デフォルト</h2><div class="panel" style="margin-top:6px"><div class="inline">'+
+    '<div><label class="f">ステークス</label><input type="text" value="'+esc(SET.stakes)+'" onchange="SET.stakes=this.value;saveSet()"></div>'+
+    '<div><label class="f">有効スタック (bb)</label><input type="number" value="'+SET.effStack+'" onchange="SET.effStack=parseFloat(this.value)||100;saveSet()"></div></div>'+
+    '<label class="f">テーブル人数</label><div class="chiprow">'+[2,3,4,5,6,7,8,9].map(n=>
+      '<button class="chip'+(n===SET.tableSize?" on":"")+'" onclick="SET.tableSize='+n+';saveSet();renderSettings()">'+n+'</button>').join("")+'</div></div>'+
+    '<h2>データ</h2><div class="panel" style="margin-top:6px">'+
+    '<div style="font-size:13px;color:var(--dim)">保存ハンド数: <b style="color:var(--text)">'+HANDS.length+'</b> ・ 使用容量: 約 '+usage+' KB（上限 約5MB）</div>'+
+    '<div class="hint">数千ハンドまで保存できます。定期的にJSON書き出しでバックアップを推奨。</div>'+
+    '<div class="btnrow cols2" style="margin-top:10px">'+
+    '<button class="btn ghost" onclick="exportJSON()">JSON書き出し</button>'+
+    '<button class="btn ghost" onclick="$(\'#importFile2\').click()">JSON読み込み</button></div>'+
+    '<input type="file" id="importFile2" accept=".json" style="display:none" onchange="importJSON(this)">'+
+    '<div class="btnrow" style="margin-top:8px"><button class="btn ghost" style="color:var(--red)" onclick="wipeAll()">全データ削除</button></div>'+
+    '</div>';
+}
+function setList(key,input){
+  const arr=input.value.split(/[,、\s]+/).map(parseFloat).filter(x=>x>0);
+  if(!arr.length){toast("数値をカンマ区切りで入力してください");renderSettings();return;}
+  SET[key]=arr;saveSet();toast("保存しました");
+}
+function wipeAll(){
+  if(!confirm("全ハンド・全プレイヤーメモを削除します。よろしいですか？"))return;
+  if(!confirm("本当に削除しますか？（JSON書き出しでのバックアップを推奨）"))return;
+  HANDS=[];PLAYERS={};
+  saveHands();savePlayers();
+  renderSettings();toast("削除しました");
+}
+
+/* ================= init ================= */
+loadAll();
+updateDL();
+newHand();
+/* ?tab=history 等で初期タブ指定（デバッグ・ショートカット用） */
+(function(){const t=new URLSearchParams(location.search).get("tab");
+if(["history","stats","notes","settings"].includes(t))showTab(t);})();
+/* Service Workerはサークルアプリ本体（vite-plugin-pwa）が管理するため、ここでは登録しない */
+</script>
+</body>
+</html>

@@ -29,8 +29,9 @@ export default defineConfig({
         // ビルド成果物をすべてキャッシュ
         globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
         // ナビゲーション（ルーティング）はindex.htmlにフォールバック
+        // /handlog はSPA外の静的アプリ（ハンド履歴記録）なのでフォールバック対象外
         navigateFallback: 'index.html',
-        navigateFallbackDenylist: [/^\/api\//],
+        navigateFallbackDenylist: [/^\/api\//, /^\/handlog/],
         runtimeCaching: [
           // Google Fonts キャッシュ
           {
