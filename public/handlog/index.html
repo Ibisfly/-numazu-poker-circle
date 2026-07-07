@@ -192,6 +192,26 @@ table.stt th:first-child,table.stt td:first-child{text-align:left}
 .tag.UNK{color:#9aa0a8; background:rgba(139,144,153,.14)}
 .tag.MBR{color:#d8bc82; background:rgba(200,169,110,.16)}
 
+/* ---- combobox（プルダウン＋自由入力） ---- */
+.combo{position:relative; flex:1; min-width:0; display:flex}
+.combo input{flex:1; min-width:0; padding-right:36px}
+.combo-t{
+  position:absolute; right:0; top:0; bottom:2px; width:34px;
+  background:none; border:none; color:var(--dim); font-size:10px; cursor:pointer;
+}
+.combo-dd{
+  position:absolute; left:0; right:0; top:100%; z-index:60; display:none;
+  background:var(--panel2); border:1px solid var(--line2); border-top:2px solid var(--acc);
+  max-height:210px; overflow-y:auto; box-shadow:0 10px 24px rgba(0,0,0,.55);
+}
+.combo-dd.on{display:block}
+.combo-dd .opt{
+  display:flex; align-items:center; justify-content:space-between; gap:8px;
+  padding:10px 12px; font-size:13px; cursor:pointer; border-bottom:1px solid var(--line);
+}
+.combo-dd .opt:active{background:var(--acc-soft)}
+.combo-dd .none{padding:10px 12px; font-size:12px; color:var(--faint)}
+
 .toast{
   position:fixed; bottom:24px; left:50%; transform:translateX(-50%);
   background:var(--text); color:#14161a; font-weight:700; font-size:13px;
@@ -312,6 +332,63 @@ function updateDL(){
   HANDS.forEach(h=>Object.values(h.names||{}).forEach(n=>n&&names.add(n)));
   $("#playersDL").innerHTML=[...names].map(n=>'<option value="'+esc(n)+'">').join("");
 }
+/* ---- コンボボックス（プルダウン＋自由入力）----
+   再レンダリングで要素が作り直されるため、documentへの委譲で動かす */
+function comboHTML(attrs,value,placeholder){
+  return '<div class="combo"><input type="text" '+attrs+' placeholder="'+esc(placeholder)+'" value="'+esc(value||"")+'" autocomplete="off">'+
+    '<button type="button" class="combo-t">▼</button><div class="combo-dd"></div></div>';
+}
+function nameCandidates(){
+  const seen=new Set(),out=[];
+  MEMBERS.forEach(m=>{if(!seen.has(m.name)){seen.add(m.name);out.push({n:m.name,m:true});}});
+  Object.keys(PLAYERS).forEach(k=>{const n=playerLabel(k);if(!seen.has(n)){seen.add(n);out.push({n:n,m:k.startsWith("u:")});}});
+  HANDS.forEach(h=>Object.values(h.names||{}).forEach(n=>{if(n&&!seen.has(n)){seen.add(n);out.push({n:n,m:false});}}));
+  return out;
+}
+function comboRender(combo,showAll){
+  const inp=combo.querySelector("input");
+  const q=showAll?"":(inp.value||"").trim().toLowerCase();
+  const list=nameCandidates().filter(c=>!q||c.n.toLowerCase().includes(q));
+  const dd=combo.querySelector(".combo-dd");
+  dd.innerHTML=list.length
+    ?list.slice(0,80).map(c=>'<div class="opt" data-v="'+esc(c.n)+'">'+esc(c.n)+(c.m?'<span class="tag MBR">会員</span>':"")+'</div>').join("")
+    :'<div class="none">候補なし（自由入力できます）</div>';
+  dd.classList.add("on");
+}
+function comboCloseAll(except){
+  document.querySelectorAll(".combo-dd.on").forEach(d=>{if(!except||!except.contains(d))d.classList.remove("on");});
+}
+document.addEventListener("input",e=>{
+  if(!e.target.closest)return;
+  const c=e.target.closest(".combo");
+  if(c&&e.target.tagName==="INPUT")comboRender(c,false);
+});
+document.addEventListener("focusin",e=>{
+  if(!e.target.closest)return;
+  const c=e.target.closest(".combo");
+  if(c&&e.target.tagName==="INPUT"){comboCloseAll(c);comboRender(c,e.target.value.trim()==="");}
+});
+document.addEventListener("click",e=>{
+  if(!e.target.closest)return;
+  const tog=e.target.closest(".combo-t");
+  if(tog){
+    const c=tog.closest(".combo"),dd=c.querySelector(".combo-dd");
+    comboCloseAll(c);
+    if(dd.classList.contains("on"))dd.classList.remove("on");
+    else comboRender(c,true);
+    return;
+  }
+  const opt=e.target.closest(".combo-dd .opt");
+  if(opt){
+    const c=opt.closest(".combo"),inp=c.querySelector("input");
+    inp.value=opt.dataset.v;
+    c.querySelector(".combo-dd").classList.remove("on");
+    inp.dispatchEvent(new Event("change",{bubbles:true}));
+    return;
+  }
+  if(!e.target.closest(".combo"))comboCloseAll();
+});
+
 /* サークルアプリ本体（親ウィンドウ）から登録メンバー名簿 {uid,name}[] を受け取る */
 window.addEventListener("message",e=>{
   const d=e.data;
@@ -742,7 +819,7 @@ function finishHTML(){
     vv.forEach(p=>{
       const dv=(R.namesDraft||{})[p]||"";
       h+='<div class="inline" style="margin-top:6px"><span style="flex:0 0 52px;font-weight:700;font-size:13px">'+p+'</span>'+
-        '<input type="text" class="name-in" data-pos="'+p+'" list="playersDL" placeholder="名前" value="'+esc(dv)+'"></div>';
+        comboHTML('class="name-in" data-pos="'+p+'"',dv,'名前（▼で会員一覧）')+'</div>';
     });
   }
   h+='<label class="f">ハンドメモ</label><textarea id="in-memo" placeholder="ラインの意図、相手の傾向など">'+esc(R.memo||"")+'</textarea>';
@@ -1091,7 +1168,7 @@ function renderNotes(){
   const v=$("#view-notes");
   const names=Object.keys(PLAYERS).sort((a,b)=>playerLabel(a).localeCompare(playerLabel(b),"ja"));
   let h='<h2>プレイヤーメモ</h2>'+
-    '<div class="inline"><input type="text" id="np-name" list="playersDL" placeholder="プレイヤー名を追加（会員名は候補表示）">'+
+    '<div class="inline">'+comboHTML('id="np-name"',"",'プレイヤー名を追加（▼で会員一覧）')+
     '<button class="btn ghost" style="flex:0 0 70px" onclick="addPlayer()">追加</button></div>';
   if(MEMBERS.length)h+='<div class="hint">サークル登録メンバー '+MEMBERS.length+' 名を入力候補に読み込み済み</div>';
   if(!names.length)h+='<div class="muted">プレイヤーを追加するか、ハンド保存時に名前タグを付けると表示されます</div>';
