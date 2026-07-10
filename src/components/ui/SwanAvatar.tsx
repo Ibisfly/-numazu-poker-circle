@@ -515,11 +515,14 @@ export const SwanAvatar = ({
   className = '',
 }: SwanAvatarProps) => {
   const frameDef = frame ? FRAME_DEFS[frame] : undefined
-  const variantDef = AVATAR_VARIANT_DEFS[variant] ?? AVATAR_VARIANT_DEFS.default
+  // 定義済みキー以外は画像URL/パスとして扱う（ショップ管理からアップロードした追加アイコン）
+  const imagePath =
+    AVATAR_VARIANT_DEFS[variant]?.imagePath ??
+    (variant.includes('/') ? variant : AVATAR_VARIANT_DEFS.default.imagePath)
 
   const avatarContent = (
     <img
-      src={variantDef.imagePath}
+      src={imagePath}
       alt="NUMAZU POKER CIRCLE"
       style={{ width: '80%', height: '80%', objectFit: 'contain', display: 'block' }}
       draggable={false}

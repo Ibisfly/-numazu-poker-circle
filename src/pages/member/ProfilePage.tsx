@@ -221,10 +221,10 @@ export const ProfilePage = () => {
     purchasedItems.filter((i) => i.itemSubtype === 'point_icon' && i.pointIconId).map((i) => i.pointIconId!)
   )].filter((k) => POINT_ICON_DEFS[k])
 
-  // アバターバリエーション：購入済みバリエーションID一覧
+  // アバターバリエーション：購入済みバリエーションID一覧（ビルトインID または画像URL）
   const ownedVariantIds = [...new Set(
     purchasedItems.filter((i) => i.itemSubtype === 'avatar_variant' && i.avatarVariant).map((i) => i.avatarVariant!)
-  )].filter((k) => AVATAR_VARIANT_DEFS[k])
+  )].filter((k) => AVATAR_VARIANT_DEFS[k] || k.includes('/'))
 
   // カスタムハンド称号：userItems の customValue を持つものを取得
   const customHandTitles = userItems
@@ -494,7 +494,10 @@ export const ProfilePage = () => {
                     <span className="text-sm">オリジナル（デフォルト）</span>
                   </button>
                   {ownedVariantIds.map((variantId) => {
-                    const def = AVATAR_VARIANT_DEFS[variantId]
+                    // 画像URLバリエーションは購入元アイテム名を表示名にする
+                    const label = AVATAR_VARIANT_DEFS[variantId]?.name
+                      ?? purchasedItems.find((i) => i.avatarVariant === variantId)?.name
+                      ?? 'カスタムアイコン'
                     return (
                       <button
                         key={variantId}
@@ -504,7 +507,7 @@ export const ProfilePage = () => {
                         }`}
                       >
                         <SwanAvatar color={editColor} size={32} variant={variantId} />
-                        <span className="text-sm">{def.name}</span>
+                        <span className="text-sm">{label}</span>
                       </button>
                     )
                   })}

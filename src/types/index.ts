@@ -181,7 +181,7 @@ export interface Item {
   frameStyle?: string    // FRAME_DEFS のキー
   overlayId?:  string    // OVERLAY_DEFS のキー
   pointIconId?: string   // POINT_ICON_DEFS のキー
-  avatarVariant?: string  // アバターバリエーションID
+  avatarVariant?: string  // アバターバリエーションID または画像URL（ショップ管理からアップロードした追加アイコン）
   titleTier?: 'common' | 'rare' | 'elite' | 'prime'  // 称号レアリティ
   allowMultiplePurchase?: boolean  // 複数購入可能か（custom_hand_title用）
   createdBy: string

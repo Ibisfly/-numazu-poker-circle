@@ -99,7 +99,12 @@ export const ShopAdminPage = () => {
       setFormFrameStyle(item.frameStyle ?? '')
       setFormOverlayId(item.overlayId ?? '')
       setFormPointIconId(item.pointIconId ?? '')
-      setFormAvatarVariant(item.avatarVariant ?? '')
+      // ビルトイン定義にないバリエーションはアップロード画像URL（custom扱い）
+      setFormAvatarVariant(
+        item.avatarVariant
+          ? AVATAR_VARIANT_DEFS[item.avatarVariant] ? item.avatarVariant : 'custom'
+          : ''
+      )
     } else {
       setEditItem(null)
       setFormName('')
@@ -134,6 +139,10 @@ export const ShopAdminPage = () => {
     }
   }
 
+  // 「アップロード画像を使う」選択時は商品画像URLをそのままバリエーション値にする
+  const avatarVariantValue =
+    formAvatarVariant === 'custom' ? formImageUrl.trim() : formAvatarVariant
+
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!adminUser) return
@@ -154,7 +163,7 @@ export const ShopAdminPage = () => {
         ...(formSubtype === 'avatar_decoration' && formDecoType === 'frame'   && formFrameStyle && { frameStyle: formFrameStyle }),
         ...(formSubtype === 'avatar_decoration' && formDecoType === 'overlay' && formOverlayId  && { overlayId:  formOverlayId }),
         ...(formSubtype === 'point_icon' && formPointIconId && { pointIconId: formPointIconId }),
-        ...(formSubtype === 'avatar_variant' && formAvatarVariant && { avatarVariant: formAvatarVariant }),
+        ...(formSubtype === 'avatar_variant' && avatarVariantValue && { avatarVariant: avatarVariantValue }),
         ...(formSubtype === 'custom_hand_title' && { allowMultiplePurchase: true, titleTier: 'rare' as const }),
       }
       if (editItem) {
@@ -393,7 +402,7 @@ export const ShopAdminPage = () => {
                     {formSubtype === 'avatar_variant' && (
                       <div className="mt-2 space-y-1.5 p-3 bg-swan-black rounded-lg border border-swan-border">
                         <label className="text-xs text-swan-sub block">
-                          アバターバリエーションID
+                          アイコンイラスト
                         </label>
                         <select
                           value={formAvatarVariant}
@@ -401,20 +410,28 @@ export const ShopAdminPage = () => {
                           className="w-full bg-swan-card border border-swan-border rounded px-2 py-1.5 text-xs text-swan-text focus:outline-none"
                         >
                           <option value="">選択してください</option>
+                          <option value="custom">アップロード画像を使う</option>
                           {Object.entries(AVATAR_VARIANT_DEFS)
                             .filter(([k]) => k !== 'default')
                             .map(([key, def]) => (
                               <option key={key} value={key}>{def.name}</option>
                             ))}
                         </select>
-                        {formAvatarVariant && (
+                        {formAvatarVariant === 'custom' && !formImageUrl.trim() && (
+                          <p className="text-xs text-amber-400">
+                            上の「商品画像」欄からアイコン画像をアップロードしてください
+                            （正方形・背景透過のPNG/SVG推奨）
+                          </p>
+                        )}
+                        {avatarVariantValue && avatarVariantValue !== 'custom' && (
                           <div className="flex items-center gap-3 mt-2">
-                            <SwanAvatar size={40} variant={formAvatarVariant} />
+                            <SwanAvatar size={40} variant={avatarVariantValue} />
                             <span className="text-xs text-swan-sub">プレビュー</span>
                           </div>
                         )}
                         <p className="text-xs text-swan-sub">
-                          黒鳥アイコンのイラストを変更できるアイテム
+                          黒鳥アイコンのイラストを変更できるアイテム。
+                          アップロード画像は会員の背景色の円の上に表示されます
                         </p>
                       </div>
                     )}
@@ -462,7 +479,10 @@ export const ShopAdminPage = () => {
                 )}
 
                 <div className="flex gap-2">
-                  <button type="submit" disabled={saving} className="flex-1 bg-swan-accent text-black font-bold py-2 rounded-lg text-sm disabled:opacity-50 active:scale-[0.98] transition-transform">
+                  <button
+                    type="submit"
+                    disabled={saving || (formCategory === 'cosmetic' && formSubtype === 'avatar_variant' && (!formAvatarVariant || !avatarVariantValue))}
+                    className="flex-1 bg-swan-accent text-black font-bold py-2 rounded-lg text-sm disabled:opacity-50 active:scale-[0.98] transition-transform">
                     {saving ? '保存中...' : '保存'}
                   </button>
                   <button type="button" onClick={() => setShowForm(false)} className="flex-1 bg-swan-muted text-swan-sub py-2 rounded-lg text-sm">

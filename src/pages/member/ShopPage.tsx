@@ -122,6 +122,7 @@ export const ShopPage = () => {
     if (item.decorationType === 'frame'   && item.frameStyle) await equipFrame(user.uid, item.frameStyle)
     if (item.decorationType === 'overlay' && item.overlayId)  await equipOverlay(user.uid, item.overlayId)
     if (item.itemSubtype === 'point_icon' && item.pointIconId) await equipPointIcon(user.uid, item.pointIconId)
+    if (item.itemSubtype === 'avatar_variant' && item.avatarVariant) await equipAvatarVariant(user.uid, item.avatarVariant)
     setMsg(`「${item.name}」を装備しました`)
   }
 
@@ -206,17 +207,20 @@ export const ShopPage = () => {
               const isPointIconItem = item.itemSubtype === 'point_icon'
               const isFrameItem = item.decorationType === 'frame'
               const isCustomHandItem = item.itemSubtype === 'custom_hand_title'
+              const isVariantItem = item.itemSubtype === 'avatar_variant' && !!item.avatarVariant
               const isEquippedColor = isColorItem && currentColor === item.avatarColor
               const isEquippedIcon = isPointIconItem && item.pointIconId === currentPointIcon
               const isEquippedFrame = isFrameItem && item.frameStyle === user?.equippedFrame
-              const isEquipped = isEquippedColor || isEquippedIcon || isEquippedFrame
-              const canEquip = isColorItem || isPointIconItem || isFrameItem
+              const isEquippedVariant = isVariantItem && item.avatarVariant === (user?.avatarVariant ?? 'default')
+              const isEquipped = isEquippedColor || isEquippedIcon || isEquippedFrame || isEquippedVariant
+              const canEquip = isColorItem || isPointIconItem || isFrameItem || isVariantItem
 
               return (
                 <div key={item.id} className={`bg-swan-card border rounded-xl overflow-hidden transition-colors ${
                   isEquipped ? 'border-swan-accent' : 'border-swan-border'
                 }`}>
-                  {item.imageUrl && (
+                  {/* アイコンイラスト商品は下のアバタープレビューで見せるためバナーは出さない */}
+                  {item.imageUrl && !isVariantItem && (
                     <div className="w-full aspect-video bg-swan-muted overflow-hidden">
                       <img src={item.imageUrl} alt={item.name}
                         className="w-full h-full object-cover"
@@ -232,6 +236,11 @@ export const ShopPage = () => {
                           frame={isFrameItem ? (item.frameStyle ?? undefined) : undefined}
                           overlay={item.decorationType === 'overlay' ? (item.overlayId ?? undefined) : undefined}
                         />
+                      </div>
+                    )}
+                    {isVariantItem && (
+                      <div className="flex justify-center mb-4 py-2">
+                        <SwanAvatar color={currentColor} size={64} variant={item.avatarVariant!} />
                       </div>
                     )}
                     {isPointIconItem && item.pointIconId && (
