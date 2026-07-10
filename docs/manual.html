@@ -1,0 +1,906 @@
+<title>NUMAZU POKER CIRCLE 操作マニュアル</title>
+<style>
+  :root {
+    color-scheme: light;
+    --bg: #f7f5f0;
+    --card: #ffffff;
+    --card2: #efece5;
+    --border: #e0ddd4;
+    --text: #2b2a2e;
+    --sub: #6d6b75;
+    --muted: #98959e;
+    --accent: #8f7420;
+    --accent-bg: rgba(143, 116, 32, 0.07);
+    --accent-border: rgba(143, 116, 32, 0.35);
+    --ok: #2c8f55;
+    --ok-bg: rgba(44, 143, 85, 0.08);
+    --danger: #c04545;
+    --danger-bg: rgba(192, 69, 69, 0.07);
+    --purple: #7c5cad;
+    --cyan: #22808f;
+    --shadow: 0 1px 3px rgba(20, 18, 10, 0.06);
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: "Hiragino Kaku Gothic ProN", "Hiragino Sans", "Yu Gothic", "Noto Sans JP", Meiryo, sans-serif;
+    font-size: 15px;
+    line-height: 1.85;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 760px; margin: 0 auto; padding: 0 20px 96px; }
+
+  /* ── ヘッダー ── */
+  .hero { padding: 56px 0 36px; border-bottom: 1px solid var(--border); }
+  .hero .brand {
+    font-size: 12px; letter-spacing: 0.35em; color: var(--accent);
+    font-weight: 700; text-transform: uppercase;
+  }
+  .hero h1 {
+    margin: 10px 0 8px; font-size: 30px; line-height: 1.35;
+    font-weight: 700; letter-spacing: 0.02em; text-wrap: balance;
+  }
+  .hero p { margin: 0; color: var(--sub); font-size: 14px; }
+  .hero .meta { margin-top: 16px; font-size: 12px; color: var(--muted); }
+
+  /* ── 目次 ── */
+  nav.toc { margin: 32px 0 0; }
+  nav.toc .toc-part {
+    font-size: 12px; font-weight: 700; letter-spacing: 0.18em;
+    color: var(--accent); margin: 24px 0 8px;
+  }
+  nav.toc a {
+    display: flex; justify-content: space-between; align-items: baseline; gap: 12px;
+    padding: 7px 2px;
+    border-bottom: 1px solid var(--border);
+    color: var(--text); text-decoration: none; font-size: 14px;
+  }
+  nav.toc a:hover { color: var(--accent); }
+  nav.toc a .no {
+    font-variant-numeric: tabular-nums; color: var(--muted); font-size: 12px; flex-shrink: 0;
+  }
+
+  /* ── 章 ── */
+  section.chapter { margin-top: 64px; scroll-margin-top: 24px; }
+  .ch-label {
+    display: inline-block; font-size: 11px; font-weight: 700; letter-spacing: 0.22em;
+    color: var(--accent); border: 1px solid var(--accent-border);
+    background: var(--accent-bg); border-radius: 999px; padding: 3px 12px;
+  }
+  section.chapter > h2 {
+    margin: 12px 0 6px; font-size: 22px; font-weight: 700; line-height: 1.4;
+    text-wrap: balance;
+  }
+  .ch-lead { margin: 0 0 20px; color: var(--sub); font-size: 14px; }
+  section.chapter h3 {
+    margin: 36px 0 10px; font-size: 16.5px; font-weight: 700;
+    padding-left: 12px; border-left: 3px solid var(--accent);
+    line-height: 1.5;
+  }
+  p { margin: 0 0 14px; }
+
+  /* ── 手順 ── */
+  ol.steps { list-style: none; counter-reset: step; margin: 0 0 20px; padding: 0; }
+  ol.steps > li {
+    counter-increment: step; position: relative;
+    padding: 0 0 0 32px; margin-bottom: 12px;
+  }
+  ol.steps > li::before {
+    content: counter(step) ".";
+    position: absolute; left: 4px; top: 0;
+    color: var(--accent); font-weight: 700;
+    font-variant-numeric: tabular-nums;
+  }
+  ol.steps > li b.op { color: var(--accent); }
+  ol.steps .sub { display: block; font-size: 13px; color: var(--sub); margin-top: 2px; }
+
+  ul.plain { margin: 0 0 16px; padding-left: 1.3em; }
+  ul.plain li { margin-bottom: 6px; }
+  ul.plain li::marker { color: var(--accent); }
+
+  /* ── UIラベル・キー ── */
+  .btn-ref {
+    display: inline-block; padding: 1px 9px; border-radius: 7px;
+    background: var(--card2); border: 1px solid var(--border);
+    font-size: 0.92em; font-weight: 600; white-space: nowrap;
+  }
+  code, .path {
+    font-family: ui-monospace, "Cascadia Code", Consolas, monospace;
+    font-size: 0.9em; background: var(--card2);
+    border: 1px solid var(--border); border-radius: 6px; padding: 1px 6px;
+    white-space: nowrap;
+  }
+
+  /* ── コールアウト ── */
+  .callout {
+    border-radius: 12px; padding: 12px 16px; margin: 16px 0;
+    border: 1px solid var(--border); background: var(--card);
+    font-size: 14px; box-shadow: var(--shadow);
+  }
+  .callout .co-title { font-weight: 700; display: block; margin-bottom: 2px; font-size: 13px; letter-spacing: 0.04em; }
+  .callout.warn { border-color: var(--danger); border-left-width: 4px; background: var(--danger-bg); }
+  .callout.warn .co-title { color: var(--danger); }
+  .callout.tip { border-color: var(--accent-border); border-left: 4px solid var(--accent); background: var(--accent-bg); }
+  .callout.tip .co-title { color: var(--accent); }
+  .callout.info { border-left: 4px solid var(--cyan); }
+  .callout.info .co-title { color: var(--cyan); }
+  .callout p:last-child { margin-bottom: 0; }
+
+  /* ── 図 ── */
+  figure.shot { margin: 20px 0; text-align: center; }
+  figure.shot .shot-no {
+    display: block; font-size: 12px; font-weight: 700;
+    color: var(--accent); margin-bottom: 8px;
+  }
+  figure.shot img {
+    max-width: min(100%, 360px);
+    border: 1px solid var(--border); border-radius: 4px;
+    display: block; margin: 0 auto;
+  }
+  figure.shot figcaption { font-size: 13px; color: var(--sub); margin-top: 8px; }
+  figure.shot .shot-path { font-size: 12px; color: var(--muted); margin-top: 2px; font-family: ui-monospace, Consolas, monospace; }
+
+  /* ── テーブル ── */
+  .tbl-wrap { overflow-x: auto; margin: 16px 0; border: 1px solid var(--border); border-radius: 12px; background: var(--card); box-shadow: var(--shadow); }
+  table { border-collapse: collapse; width: 100%; font-size: 13.5px; min-width: 480px; }
+  th, td { text-align: left; padding: 10px 14px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  tr:last-child td { border-bottom: none; }
+  th { font-size: 12px; letter-spacing: 0.06em; color: var(--sub); font-weight: 700; background: var(--card2); white-space: nowrap; }
+  td.num { font-variant-numeric: tabular-nums; }
+
+  /* ── バッジ ── */
+  .badge { display: inline-block; font-size: 11px; font-weight: 700; border-radius: 999px; padding: 1px 10px; border: 1px solid; white-space: nowrap; }
+  .badge.ok { color: var(--ok); border-color: var(--ok); background: var(--ok-bg); }
+  .badge.gold { color: var(--accent); border-color: var(--accent-border); background: var(--accent-bg); }
+  .badge.purple { color: var(--purple); border-color: var(--purple); }
+  .badge.cyan { color: var(--cyan); border-color: var(--cyan); }
+  .badge.red { color: var(--danger); border-color: var(--danger); background: var(--danger-bg); }
+
+  /* ── フロー図 ── */
+  .flow { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 16px 0; }
+  .flow .node {
+    background: var(--card); border: 1px solid var(--border); border-radius: 10px;
+    padding: 6px 12px; font-size: 13px; font-weight: 600; box-shadow: var(--shadow);
+  }
+  .flow .node.hl { border-color: var(--accent-border); color: var(--accent); background: var(--accent-bg); }
+  .flow .arr { color: var(--muted); font-size: 13px; }
+
+  .part-divider {
+    margin-top: 72px; padding: 20px 24px;
+    border-radius: 16px; text-align: center;
+    background: linear-gradient(135deg, var(--accent-bg), transparent);
+    border: 1px solid var(--accent-border);
+  }
+  .part-divider .pd-label { font-size: 11px; letter-spacing: 0.3em; color: var(--accent); font-weight: 700; }
+  .part-divider h2 { margin: 6px 0 4px; font-size: 24px; }
+  .part-divider p { margin: 0; color: var(--sub); font-size: 13.5px; }
+
+  dl.faq { margin: 0; }
+  dl.faq dt {
+    font-weight: 700; margin-top: 20px; padding-left: 26px; position: relative;
+  }
+  dl.faq dt::before { content: "Q"; position: absolute; left: 0; top: 0; color: var(--accent); font-weight: 700; }
+  dl.faq dd { margin: 4px 0 0 26px; color: var(--sub); font-size: 14px; }
+
+  footer.doc-footer {
+    margin-top: 80px; padding-top: 24px; border-top: 1px solid var(--border);
+    font-size: 12px; color: var(--muted); text-align: center;
+  }
+  a { color: var(--accent); }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 4px; }
+  @media (prefers-reduced-motion: no-preference) { html { scroll-behavior: smooth; } }
+</style>
+
+<div class="wrap">
+
+<header class="hero">
+  <span class="brand">Numazu Poker Circle</span>
+  <h1>サークルアプリ 操作マニュアル</h1>
+  <p>会の立て方・ポイント運用などの管理者向け操作と、メンバー向けの使い方をまとめた運営マニュアルです。</p>
+  <p class="meta">最終更新: 2026-07-10 ／ 対象: 管理者・一般メンバー</p>
+</header>
+
+<nav class="toc" aria-label="目次">
+  <div class="toc-part">はじめに</div>
+  <a href="#points"><span>ポイントの仕組み</span><span class="no">0</span></a>
+
+  <div class="toc-part">管理者編</div>
+  <a href="#a1"><span>管理画面へのアクセス</span><span class="no">A-1</span></a>
+  <a href="#a2"><span>新メンバーの承認・権限管理</span><span class="no">A-2</span></a>
+  <a href="#a3"><span>イベント（会）の立て方と当日の流れ</span><span class="no">A-3</span></a>
+  <a href="#a4"><span>来店ポイントの付与（QRスキャン）</span><span class="no">A-4</span></a>
+  <a href="#a5"><span>マッチの作成〜開始〜精算</span><span class="no">A-5</span></a>
+  <a href="#a6"><span>ポイントの手動調整・年間リセット</span><span class="no">A-6</span></a>
+  <a href="#a7"><span>ショップ管理と特典の消し込み</span><span class="no">A-7</span></a>
+  <a href="#a8"><span>ビンゴ・称号・ハンド履歴</span><span class="no">A-8</span></a>
+
+  <div class="toc-part">メンバー編</div>
+  <a href="#m1"><span>登録から利用開始まで</span><span class="no">M-1</span></a>
+  <a href="#m2"><span>画面の見方（ナビゲーション）</span><span class="no">M-2</span></a>
+  <a href="#m3"><span>会員証QRで来店ポイントをもらう</span><span class="no">M-3</span></a>
+  <a href="#m4"><span>マッチに参加する</span><span class="no">M-4</span></a>
+  <a href="#m5"><span>ショップでポイントを使う</span><span class="no">M-5</span></a>
+  <a href="#m6"><span>マイページ・ランキング・実績</span><span class="no">M-6</span></a>
+  <a href="#m7"><span>ビンゴとその他の機能</span><span class="no">M-7</span></a>
+
+  <div class="toc-part">付録</div>
+  <a href="#faq"><span>よくある質問</span><span class="no">FAQ</span></a>
+</nav>
+
+<!-- ============================================================ -->
+<section class="chapter" id="points">
+  <span class="ch-label">はじめに</span>
+  <h2>ポイントの仕組み</h2>
+  <p class="ch-lead">このアプリのポイント（🪶）には3つの数字があります。</p>
+
+  <div class="tbl-wrap">
+    <table>
+      <thead>
+        <tr><th>種類</th><th>意味</th><th>増減のタイミング</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><b>保有ポイント</b></td>
+          <td>いま使える残高。ショップ購入やマッチのエントリー費はここから支払う</td>
+          <td>来店・マッチ褒章・精算で増加／エントリー・購入で減少</td>
+        </tr>
+        <tr>
+          <td><b>累計ポイント</b></td>
+          <td>これまでの獲得実績。<b>累計ランキング</b>の順位に使われる</td>
+          <td>獲得で増加（マッチのエントリー費でも増減する）</td>
+        </tr>
+        <tr>
+          <td><b>年間ポイント</b></td>
+          <td>今年の獲得実績。<b>年間ランキング</b>の順位に使われる</td>
+          <td>累計と同様。年度末の「年間リセット」で0に戻る</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p>ポイントが増減する主な経路は次の5つで、すべて履歴（ポイントログ）に記録されます。</p>
+  <ul class="plain">
+    <li><b>来店</b> — 管理者が会員証QRをスキャンすると付与（イベントごとに設定した点数）</li>
+    <li><b>マッチ</b> — エントリー費の支払い、精算時の褒章・キャッシュバック</li>
+    <li><b>トーナメント</b> — 大会結果の一括付与</li>
+    <li><b>ショップ</b> — アイテム・特典の購入で消費</li>
+    <li><b>手動調整</b> — 管理者による加減算（理由の記録が必須）</li>
+  </ul>
+
+  <div class="callout tip">
+    <span class="co-title">運営ルール</span>
+    <p>ポイント残高がマイナスになる操作はできません。エントリーや購入の前にアプリが残高を自動チェックします。</p>
+  </div>
+</section>
+
+<!-- ============================================================ -->
+<div class="part-divider">
+  <span class="pd-label">PART A</span>
+  <h2>管理者編</h2>
+  <p>会の開催・ポイント運用・メンバー管理など、運営側の操作をまとめています。</p>
+</div>
+
+<section class="chapter" id="a1">
+  <span class="ch-label">管理 A-1</span>
+  <h2>管理画面へのアクセス</h2>
+  <p class="ch-lead">管理機能は管理者ロールを持つアカウントだけが使えます。</p>
+
+  <ol class="steps">
+    <li>管理者アカウントでログインし、URLの末尾に <code>/admin</code> を付けてアクセスする
+      <span class="sub">例: <code>https://（アプリのURL）/admin</code>。ブックマーク推奨です。</span></li>
+    <li><b>管理ダッシュボード</b>が開く。上部に「承認待ち」「開催中マッチ」の件数、その下に各管理メニューが並ぶ</li>
+    <li>作業が終わったら最下部の <span class="btn-ref">一般画面へ戻る</span> で通常画面に戻れる</li>
+  </ol>
+
+  <figure class="shot filled">
+    <span class="shot-no">図 1</span>
+    <img src="1.png" alt="管理ダッシュボード" loading="lazy">
+    <figcaption>管理ダッシュボード</figcaption>
+    <div class="shot-path">/admin</div>
+  </figure>
+
+  <div class="tbl-wrap">
+    <table>
+      <thead><tr><th>メニュー</th><th>用途</th><th>本書の章</th></tr></thead>
+      <tbody>
+        <tr><td>メンバー管理</td><td>入会承認・権限変更・退会処理</td><td>A-2</td></tr>
+        <tr><td>来店スキャン</td><td>会員証QRを読んで来店ポイント付与</td><td>A-4</td></tr>
+        <tr><td>イベント管理</td><td>会（イベント）の作成・開始・終了</td><td>A-3</td></tr>
+        <tr><td>マッチ管理</td><td>トーナメント・リングの作成と精算</td><td>A-5</td></tr>
+        <tr><td>ショップ管理</td><td>アイテム登録・特典の付与と消し込み</td><td>A-7</td></tr>
+        <tr><td>ポイント調整</td><td>手動加減算・年間ランキングリセット</td><td>A-6</td></tr>
+        <tr><td>実績管理／ビンゴカード管理／称号管理／ハンド履歴インポート</td><td>付加機能の運用</td><td>A-8</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="callout info">
+    <span class="co-title">管理者を増やしたいとき</span>
+    <p>既存の管理者が「メンバー管理」から <span class="btn-ref">管理者昇格</span> を押すだけです（A-2参照）。一番最初の管理者だけは Firebase Console で <code>users/{uid}</code> の <code>role</code> を <code>"admin"</code> に直接書き換えて設定します。</p>
+  </div>
+</section>
+
+<!-- ============================================================ -->
+<section class="chapter" id="a2">
+  <span class="ch-label">管理 A-2</span>
+  <h2>新メンバーの承認・権限管理</h2>
+  <p class="ch-lead">新規登録者は「承認待ち」状態で止まっており、管理者が承認するまでアプリを使えません。</p>
+
+  <div class="flow">
+    <span class="node">メンバーがGoogleログイン＋プロフィール登録</span>
+    <span class="arr">→</span>
+    <span class="node hl">承認待ち</span>
+    <span class="arr">→</span>
+    <span class="node">管理者が承認</span>
+    <span class="arr">→</span>
+    <span class="node">利用開始</span>
+  </div>
+
+  <h3>承認のしかた</h3>
+  <ol class="steps">
+    <li>ダッシュボードの <span class="btn-ref">メンバー管理</span> を開く
+      <span class="sub">承認待ちがいる場合はメニューに赤いバッジ（人数）が出ます。</span></li>
+    <li>「承認待ち」タブに新規登録者が表示される。プレイヤー名を確認する</li>
+    <li><span class="btn-ref">承認</span> を押すと即時に有効化され、本人がアプリを使えるようになる。身に覚えのない登録は <span class="btn-ref">拒否</span></li>
+  </ol>
+
+  <figure class="shot filled">
+    <span class="shot-no">図 2</span>
+    <img src="2.png" alt="メンバー管理の承認待ちタブ" loading="lazy">
+    <figcaption>メンバー管理（承認待ちタブ）</figcaption>
+    <div class="shot-path">/admin/members</div>
+  </figure>
+
+  <h3>権限変更・退会処理</h3>
+  <p>「全員」タブに切り替えると有効メンバー全員が表示され、各メンバーに対して次の操作ができます。</p>
+  <ul class="plain">
+    <li><span class="btn-ref">管理者昇格</span> ／ <span class="btn-ref">権限降格</span> — 管理者ロールの付け外し</li>
+    <li><span class="btn-ref">退会処理</span> — アカウントを無効化する。本人は即ログアウト扱いになる</li>
+  </ul>
+
+  <div class="callout warn">
+    <span class="co-title">注意</span>
+    <p>退会処理に確認ダイアログはありません。押し間違いに注意してください。自分自身への操作ボタンは表示されません。</p>
+  </div>
+</section>
+
+<!-- ============================================================ -->
+<section class="chapter" id="a3">
+  <span class="ch-label">管理 A-3</span>
+  <h2>イベント（会）の立て方と当日の流れ</h2>
+  <p class="ch-lead">「イベント」は開催日単位の会そのものです。来店ポイントの付与やマッチの紐付けは、すべてイベントを軸に動きます。</p>
+
+  <div class="flow">
+    <span class="node">① イベント作成</span><span class="arr">→</span>
+    <span class="node hl">② 開催開始</span><span class="arr">→</span>
+    <span class="node">③ 来店スキャン</span><span class="arr">→</span>
+    <span class="node">④ マッチ運営</span><span class="arr">→</span>
+    <span class="node hl">⑤ イベント終了</span>
+  </div>
+
+  <h3>① イベントを作成する（開催前・いつでも）</h3>
+  <ol class="steps">
+    <li><span class="btn-ref">イベント管理</span> →  <span class="btn-ref">＋ 新規イベント作成</span> を押す</li>
+    <li>フォームに入力する
+      <span class="sub"><b>イベント名</b>（例: 7月例会）／<b>開催日</b>／<b>来店ポイント付与数</b>（既定 200。QRスキャン1回で付与される点数）／<b>配布するビンゴカード</b>（任意。設定すると来店スキャン時に自動配布）</span></li>
+    <li><span class="btn-ref">作成する</span> を押す。一覧に <span class="badge">予定</span> ステータスで追加される</li>
+  </ol>
+
+  <figure class="shot filled">
+    <span class="shot-no">図 3</span>
+    <img src="3.png" alt="イベント作成フォーム" loading="lazy">
+    <figcaption>イベント作成フォーム</figcaption>
+    <div class="shot-path">/admin/events</div>
+  </figure>
+
+  <h3>② 当日、イベントを「開催開始」する</h3>
+  <ol class="steps">
+    <li>イベント一覧で対象イベントの <b>▶（開催開始）ボタン</b> を押す</li>
+    <li>ステータスが <span class="badge ok">開催中</span> に変わる</li>
+  </ol>
+
+  <div class="callout warn">
+    <span class="co-title">注意点</span>
+    <p>マッチ作成画面の「イベント紐付け」プルダウンには<b>「開催中」のイベントしか表示されません</b>。マッチを立てる前にイベントを開催開始してください。</p>
+  </div>
+
+  <h3>⑤ 会の終わりに「終了」する</h3>
+  <ol class="steps">
+    <li>開催中イベントの <span class="btn-ref">終了</span> ボタンを押す</li>
+    <li>確認モーダルの内容を確認して <span class="btn-ref">終了する</span>
+      <span class="sub">終了処理では ①参加者の成績サマリー生成 ②未終了ビンゴカードの強制終了 ③参加者への通知送信 が自動で行われます。</span></li>
+  </ol>
+
+  <figure class="shot filled">
+    <span class="shot-no">図 4</span>
+    <img src="4.png" alt="イベント一覧" loading="lazy">
+    <figcaption>イベント一覧（「開催中」バッジと終了ボタン）</figcaption>
+    <div class="shot-path">/admin/events</div>
+  </figure>
+
+  <div class="callout tip">
+    <span class="co-title">編集・削除</span>
+    <p>「予定」状態のイベントは ✏️ で編集、✕ で削除できます。開催開始後は編集・削除できないため、内容の修正は開始前に行ってください。</p>
+  </div>
+</section>
+
+<!-- ============================================================ -->
+<section class="chapter" id="a4">
+  <span class="ch-label">管理 A-4</span>
+  <h2>来店ポイントの付与（QRスキャン）</h2>
+  <p class="ch-lead">来店したメンバーの会員証QRをスマホカメラで読み取り、来店ポイントを付与します。</p>
+
+  <ol class="steps">
+    <li><span class="btn-ref">来店スキャン</span> を開き、<b>イベント選択</b>で今日のイベントを選ぶ
+      <span class="sub">プルダウンにはイベント名と付与ポイント数が表示されます。イベント未作成の場合は先にA-3へ。</span></li>
+    <li><span class="btn-ref">カメラでQRスキャン開始</span> を押す（初回はカメラ許可のダイアログが出るので許可する）</li>
+    <li>メンバーに会員証画面（M-3参照）を出してもらい、QRを枠内に合わせる</li>
+    <li>読み取りに成功すると「✓ ○○ に 200pt 付与しました」と表示され、スキャンが自動停止する
+      <span class="sub">同時に「今日のラッキーハンド」が配布され、イベントにビンゴカードを設定していればビンゴカードも自動配布されます。</span></li>
+    <li>次の人を読む場合は再度スキャン開始を押す</li>
+  </ol>
+
+  <figure class="shot filled">
+    <span class="shot-no">図 5</span>
+    <img src="5.png" alt="来店スキャン画面" loading="lazy">
+    <figcaption>来店スキャン画面</figcaption>
+    <div class="shot-path">/admin/scan</div>
+  </figure>
+
+  <div class="callout tip">
+    <span class="co-title">二重付与について</span>
+    <p>同じイベントで同じメンバーを2回スキャンしても、二重付与は自動的にブロックされます。</p>
+  </div>
+
+  <div class="callout info">
+    <span class="co-title">QRが読めないとき（手動入力）</span>
+    <p>画面下部の「手動入力（フォールバック）」にメンバーのUIDを入力して <span class="btn-ref">付与</span> でも同じ処理ができます。UIDはメンバー管理画面の名前の下に先頭8桁が表示されています（入力には完全なUIDが必要なので、Firebase Consoleか本人の会員証番号から確認してください）。</p>
+  </div>
+</section>
+
+<!-- ============================================================ -->
+<section class="chapter" id="a5">
+  <span class="ch-label">管理 A-5</span>
+  <h2>マッチの作成〜開始〜精算</h2>
+  <p class="ch-lead">マッチには2種類あります。順位を競って褒章を配る<b>トーナメント</b>と、チップの出入りをポイントで精算する<b>プレミアリング</b>です。</p>
+
+  <div class="tbl-wrap">
+    <table>
+      <thead><tr><th></th><th><span class="badge purple">🏆 トーナメント</span></th><th><span class="badge cyan">♠ プレミアリング</span></th></tr></thead>
+      <tbody>
+        <tr><td>エントリー費の既定</td><td class="num">0 🪶</td><td class="num">100 🪶</td></tr>
+        <tr><td>精算方法</td><td>順位を入力 → 順位別の褒章ポイント＋特典を自動付与</td><td>参加者ごとのキャッシュバック額を入力して返還</td></tr>
+        <tr><td>追加エントリー</td><td>リエントリー（任意設定）</td><td>リバイ（任意設定）</td></tr>
+        <tr><td>結果発表</td><td>参加者のホーム画面に表彰演出が表示される</td><td>—</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3>マッチを作成する</h3>
+  <ol class="steps">
+    <li><span class="btn-ref">マッチ管理</span> → <span class="btn-ref">＋ 新規マッチ作成</span></li>
+    <li><b>カテゴリ</b>（🏆 トーナメント ／ ♠ プレミアリング）を選ぶ</li>
+    <li>共通項目を入力する
+      <span class="sub"><b>タイトル</b>／<b>エントリー費</b>（🪶）／<b>定員</b>／<b>開催日時</b></span></li>
+    <li><b>イベント紐付け</b>で今日のイベントを選ぶ
+      <span class="sub">開催中のイベントだけが選べます。単発開催なら「紐付けなし（野良マッチ）」でもOK。</span></li>
+    <li>【トーナメントのみ】<b>順位別褒章</b>を設定する
+      <span class="sub">1位〜3位が初期表示。各順位のポイントを入力し、<span class="btn-ref">＋ 順位追加</span> で増やせます。特典アイテム（ショップで登録したもの）を副賞として付けることも可能。必要なら「リエントリー可」にチェックし、費用を設定（空欄ならエントリー費と同額）。</span></li>
+    <li>【リングのみ】必要なら「リバイ可」にチェックし、リバイ費を設定</li>
+    <li><span class="btn-ref">マッチを作成</span>。一覧に <span class="badge ok">受付中</span> で追加され、メンバーがエントリーできるようになる</li>
+  </ol>
+
+  <figure class="shot filled">
+    <span class="shot-no">図 6</span>
+    <img src="6.png" alt="マッチ作成フォーム" loading="lazy">
+    <figcaption>マッチ作成フォーム</figcaption>
+    <div class="shot-path">/admin/matches</div>
+  </figure>
+
+  <div class="callout info">
+    <span class="co-title">エントリーの通知</span>
+    <p>エントリーが3人に達すると管理者に通知が届きます。メンバーのエントリー費はエントリー時点でポイントから支払われ、受付中の間は本人がキャンセル（返金）できます。</p>
+  </div>
+
+  <h3>マッチを開始する</h3>
+  <ol class="steps">
+    <li>参加者が揃ったらマッチカードの <span class="btn-ref">開始する</span> を押す。ステータスが <span class="badge gold">開催中</span> になる
+      <span class="sub">開催中になるとリバイ／リエントリーの受付が始まり、削除はできなくなります。</span></li>
+  </ol>
+
+  <h3>タイマーアプリ連携（任意）</h3>
+  <p>各マッチカードの下部に「タイマーアプリ」欄があります。</p>
+  <ul class="plain">
+    <li><span class="btn-ref">セッション作成 ↗</span> — 連携タイマーアプリ（timer-black-swan.web.app）にマッチIDを引き継いでセッションを作成。作成後はカードに <span class="btn-ref">タイマー管理 ↗</span> と進行状況（レベル・残り人数）が表示される</li>
+    <li><span class="btn-ref">外部URL</span> — 他のタイマーアプリを使う場合、URLを貼り付けて保存。メンバーのマッチ詳細にもリンクが表示される</li>
+  </ul>
+
+  <h3>精算する（トーナメント）</h3>
+  <ol class="steps">
+    <li>ゲーム終了後、<span class="btn-ref">終了・精算（順位）</span> を押す</li>
+    <li>参加者ごとの順位を入力する
+      <span class="sub">タイマーセッションと連携していれば暫定順位が自動で入ります。必ず確認・修正してください。</span></li>
+    <li><span class="btn-ref">精算実行</span>。順位に応じた褒章ポイント・特典が自動付与され、参加者のホームに結果が発表される</li>
+  </ol>
+
+  <h3>精算する（プレミアリング）</h3>
+  <ol class="steps">
+    <li><span class="btn-ref">終了・精算（キャッシュバック）</span> を押す</li>
+    <li>参加者ごとに<b>返すポイント額</b>（最終チップ相当）を入力する
+      <span class="sub">初期値はエントリー費と同額。右側に±差分、下部に合計支払とプール額（エントリー＋リバイの総額）が表示されるので、合計がプールと合っているか確認してください。</span></li>
+    <li><span class="btn-ref">精算実行</span></li>
+  </ol>
+
+  <figure class="shot filled">
+    <span class="shot-no">図 7</span>
+    <img src="7.png" alt="トーナメント精算モーダル" loading="lazy">
+    <figcaption>トーナメント精算モーダル（順位入力）</figcaption>
+    <div class="shot-path">/admin/matches（精算モーダル）</div>
+  </figure>
+  <figure class="shot filled">
+    <span class="shot-no">図 8</span>
+    <img src="8.png" alt="リング精算モーダル" loading="lazy">
+    <figcaption>リング精算モーダル（キャッシュバック入力・プール表示）</figcaption>
+    <div class="shot-path">/admin/matches（精算モーダル）</div>
+  </figure>
+
+  <div class="callout warn">
+    <span class="co-title">精算は取り消せません</span>
+    <p>精算実行でポイントが即時に動きます。順位・金額をよく確認してから実行してください。誤って精算した場合は「ポイント調整」（A-6）で個別に補正し、理由を必ず記録します。</p>
+  </div>
+
+  <div class="callout info">
+    <span class="co-title">旧「トーナメント結果入力」画面について</span>
+    <p><code>/admin/tournament</code> に大会名と順位・ポイントを一括登録する旧画面が残っています（ダッシュボードのメニューには表示されません）。エントリー管理が不要な外部大会の結果だけ反映したい場合に使えますが、通常はマッチ管理での精算を使ってください。</p>
+  </div>
+</section>
+
+<!-- ============================================================ -->
+<section class="chapter" id="a6">
+  <span class="ch-label">管理 A-6</span>
+  <h2>ポイントの手動調整・年間リセット</h2>
+  <p class="ch-lead">誤付与の訂正やイレギュラー対応のための機能です。すべての操作に理由の記録が必須です。</p>
+
+  <h3>手動でポイントを加減算する</h3>
+  <ol class="steps">
+    <li><span class="btn-ref">ポイント調整</span> を開き、<b>対象メンバー</b>を選ぶ
+      <span class="sub">選ぶと保有・累計・年間の現在値が表示されます。</span></li>
+    <li><b>操作</b>（加算／減算）と<b>対象</b>を選ぶ
+      <span class="sub">「保有+累積」= 両方を変更（通常はこれ）／「保有のみ」= 残高だけ変更しランキングに影響させない／「累積のみ」= ランキングだけ補正し残高は変えない。</span></li>
+    <li><b>ポイント数</b>と<b>理由</b>（必須。例: 誤付与の訂正）を入力して実行
+      <span class="sub">減算時は残高チェックが働き、不足していればエラーになります。</span></li>
+  </ol>
+
+  <figure class="shot filled">
+    <span class="shot-no">図 9</span>
+    <img src="9.png" alt="ポイント調整フォーム" loading="lazy">
+    <figcaption>ポイント調整フォーム（3種の残高表示）</figcaption>
+    <div class="shot-path">/admin/points</div>
+  </figure>
+
+  <h3>年間ランキングの確定・リセット（年1回）</h3>
+  <ol class="steps">
+    <li>同じ画面の下部「年間ランキング確定・リセット」で<b>対象年度</b>を確認する</li>
+    <li><span class="btn-ref">◯◯年のランキングを確定してリセット</span> → 確認ダイアログで <span class="btn-ref">実行する</span>
+      <span class="sub">①その年のランキングスナップショットを保存 ②年間1位に「年間王者」実績を付与 ③全メンバーの年間ポイントを0にリセット、が実行されます。</span></li>
+  </ol>
+
+  <div class="callout warn">
+    <span class="co-title">年間リセットは取り消せません</span>
+    <p>年度の切り替わりに1回だけ実行してください。実行後に年間1位と対象人数が画面に表示されます。</p>
+  </div>
+</section>
+
+<!-- ============================================================ -->
+<section class="chapter" id="a7">
+  <span class="ch-label">管理 A-7</span>
+  <h2>ショップ管理と特典の消し込み</h2>
+  <p class="ch-lead">メンバーがポイントで買えるアイテムを登録し、特典（クーポン）の利用を店頭で消し込みます。</p>
+
+  <h3>アイテムの種類</h3>
+  <div class="tbl-wrap">
+    <table>
+      <thead><tr><th>カテゴリ</th><th>種別</th><th>内容</th></tr></thead>
+      <tbody>
+        <tr><td rowspan="6"><b>装飾品</b><br>（アプリ内の見た目）</td><td>アイコン(背景)</td><td>アバターの背景色。カラーピッカーで色を指定</td></tr>
+        <tr><td>アイコン(装飾)</td><td>フレーム（gold / flame / metallic 等）またはオーバーレイ（hat / sunglasses / crown 等）</td></tr>
+        <tr><td>アイコン(イラスト)</td><td>黒鳥アイコンのイラスト差し替え</td></tr>
+        <tr><td>ポイントアイコン</td><td>🪶の代わりに表示されるアイコン（feather / chips）</td></tr>
+        <tr><td>称号</td><td>名前の下に表示される称号。レアリティ4段階（COMMON / RARE / ELITE / PRIME）</td></tr>
+        <tr><td>ハンド称号</td><td>購入時に好きなハンドを入力できるコレクション称号（複数購入可）</td></tr>
+        <tr><td><b>特典</b></td><td>—</td><td>ドリンク無料券などの現物特典。購入するとクーポンコードが発行される</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3>アイテムを登録する</h3>
+  <ol class="steps">
+    <li><span class="btn-ref">ショップ管理</span> の「アイテム」タブ → <span class="btn-ref">＋ アイテム追加</span></li>
+    <li>名前・カテゴリ・コスト（🪶）・説明を入力。商品画像は端末からアップロードできる</li>
+    <li>装飾品の場合は<b>種別</b>を選び、種別ごとの追加設定（色、フレームキー、レアリティ等）を入力する</li>
+    <li><span class="btn-ref">保存</span>。一覧の 👁 ボタンで公開／非公開をいつでも切り替えられる</li>
+  </ol>
+
+  <figure class="shot filled">
+    <span class="shot-no">図 10</span>
+    <img src="10.png" alt="ショップ管理のアイテム追加フォーム" loading="lazy">
+    <figcaption>ショップ管理のアイテム追加フォーム</figcaption>
+    <div class="shot-path">/admin/shop</div>
+  </figure>
+
+  <h3>特典の消し込み（店頭オペレーション）</h3>
+  <p>メンバーが特典を使うときの流れです。</p>
+  <ol class="steps">
+    <li>メンバーがマイページの「所持中の特典」からクーポンコード（例: <code>AB12-CD34</code>）を提示する</li>
+    <li>管理者はショップ管理の「特典保有状況」タブでコードを検索する</li>
+    <li>該当の特典の <span class="btn-ref">使用済みに</span> を押して消し込む</li>
+  </ol>
+
+  <figure class="shot filled">
+    <span class="shot-no">図 11</span>
+    <img src="11.png" alt="特典保有状況タブ" loading="lazy">
+    <figcaption>特典保有状況タブ（コード検索と「使用済みに」ボタン）</figcaption>
+    <div class="shot-path">/admin/shop（特典保有状況タブ）</div>
+  </figure>
+
+  <div class="callout tip">
+    <span class="co-title">特典のプレゼント付与</span>
+    <p>同じタブの「特典を付与する」から、ポイントを消費させずに特典を配れます（景品・お詫びなど運営からのプレゼント用）。メンバー・特典・枚数を選んで <span class="btn-ref">付与する</span>。</p>
+  </div>
+</section>
+
+<!-- ============================================================ -->
+<section class="chapter" id="a8">
+  <span class="ch-label">管理 A-8</span>
+  <h2>ビンゴ・称号・ハンド履歴</h2>
+  <p class="ch-lead">会を盛り上げる付加機能です。</p>
+
+  <h3>ビンゴカード管理（Ring de BINGO）</h3>
+  <ol class="steps">
+    <li><span class="btn-ref">ビンゴカード管理</span> で「ミッション」タブにお題を登録しておく（例: フロップでセットを引く）</li>
+    <li>「カード」タブで <span class="btn-ref">新規作成</span>。名前・説明と報酬ポイント（1マス達成／1ビンゴ／全達成）を設定する</li>
+    <li>25マスのミッションを入力する。<span class="btn-ref">ランダム生成</span> でテンプレートから自動で埋められる（中央はFREE）</li>
+    <li>作成したカードをイベント作成時（A-3）に「配布するビンゴカード」として選ぶと、来店スキャン時に自動配布される</li>
+    <li>会の最中は <code>/admin/bingo/stamp</code>（スタンプ画面）で、メンバーを検索またはQRで選び、達成したマスにスタンプを押す</li>
+  </ol>
+
+  <figure class="shot filled">
+    <span class="shot-no">図 12</span>
+    <img src="12.png" alt="ビンゴカード管理" loading="lazy">
+    <figcaption>ビンゴカード管理（カード編集画面）</figcaption>
+    <div class="shot-path">/admin/bingo</div>
+  </figure>
+
+  <h3>称号管理</h3>
+  <ul class="plain">
+    <li><span class="btn-ref">称号管理</span> で称号テンプレート（称号名・レアリティ・説明）を作成</li>
+    <li>🎁 ボタンからメンバーを選んで付与。メンバーはマイページで装備できる</li>
+  </ul>
+
+  <h3>ハンド履歴インポート</h3>
+  <ul class="plain">
+    <li><span class="btn-ref">ハンド履歴インポート</span> に、連携タイマーアプリ等が出力したJSONを貼り付けて取り込む</li>
+    <li>取り込んだハンドはメンバーの「ハンド履歴」画面（<code>/hands</code>）で閲覧できる</li>
+  </ul>
+
+  <h3>実績管理</h3>
+  <ul class="plain">
+    <li><span class="btn-ref">実績管理</span> で実績の確認・運用ができる。来店やマッチの節目で自動解除されるものが中心</li>
+  </ul>
+</section>
+
+<!-- ============================================================ -->
+<div class="part-divider">
+  <span class="pd-label">PART M</span>
+  <h2>メンバー編</h2>
+  <p>一般メンバー向けの使い方ガイドです。そのまま新メンバーに共有できます。</p>
+</div>
+
+<section class="chapter" id="m1">
+  <span class="ch-label">メンバー M-1</span>
+  <h2>登録から利用開始まで</h2>
+
+  <ol class="steps">
+    <li>アプリのURLを開き、<span class="btn-ref">Googleでサインイン</span></li>
+    <li>プロフィールを作成する
+      <span class="sub"><b>プレイヤーネーム</b>（20文字以内・重複不可）／<b>ひとこと</b>（任意）／<b>初心者マーク</b>（ONにすると名前に🔰が表示される）</span></li>
+    <li><span class="btn-ref">登録する</span> を押すと「承認待ち」画面になる。管理者が承認するまで待つ</li>
+    <li>承認されるとホーム画面が使えるようになる</li>
+  </ol>
+</section>
+
+<section class="chapter" id="m2">
+  <span class="ch-label">メンバー M-2</span>
+  <h2>画面の見方（ナビゲーション）</h2>
+
+  <p>画面下部のナビゲーションから主要な5画面に移動できます。右上のベル🔔は通知センターです。</p>
+
+  <div class="tbl-wrap">
+    <table>
+      <thead><tr><th>タブ</th><th>内容</th></tr></thead>
+      <tbody>
+        <tr><td><b>ホーム</b></td><td>保有ポイント・今日のラッキーハンド・直近のマッチ・イベント成績・トーナメント結果発表。会員証やショップへの入り口もここ</td></tr>
+        <tr><td><b>ランキング</b></td><td>累計／年間ポイントランキング</td></tr>
+        <tr><td><b>メンバー</b></td><td>メンバー名鑑。タップで各メンバーのプロフィールを見られる</td></tr>
+        <tr><td><b>マッチ</b></td><td>開催予定・開催中のマッチ一覧とエントリー</td></tr>
+        <tr><td><b>マイページ</b></td><td>プロフィール編集・ポイント履歴・実績・所持特典</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <figure class="shot filled">
+    <span class="shot-no">図 14</span>
+    <img src="14.png" alt="ホーム画面" loading="lazy">
+    <figcaption>ホーム画面（下部ナビゲーション）</figcaption>
+    <div class="shot-path">/</div>
+  </figure>
+
+  <div class="callout tip">
+    <span class="co-title">ポーカー初心者の方へ</span>
+    <p>アプリ内の「ガイドブック」（<code>/guide</code>）に役の強さ・ゲーム進行・用語集がまとまっています。ホームから開けます。</p>
+  </div>
+</section>
+
+<section class="chapter" id="m3">
+  <span class="ch-label">メンバー M-3</span>
+  <h2>会員証QRで来店ポイントをもらう</h2>
+
+  <ol class="steps">
+    <li>来店したらホームから <span class="btn-ref">会員証</span> を開く</li>
+    <li>表示されたQRコードをスタッフ（管理者）のスキャナーにかざす</li>
+    <li>来店ポイントが付与され、「今日のラッキーハンド」が配布される
+      <span class="sub">その日のビンゴイベントがあればビンゴカードも同時に配られます。付与は1イベントにつき1回です。</span></li>
+  </ol>
+
+  <figure class="shot filled">
+    <span class="shot-no">図 15</span>
+    <img src="15.png" alt="会員証画面" loading="lazy">
+    <figcaption>会員証画面（QRコード表示）</figcaption>
+    <div class="shot-path">/card</div>
+  </figure>
+</section>
+
+<section class="chapter" id="m4">
+  <span class="ch-label">メンバー M-4</span>
+  <h2>マッチに参加する</h2>
+
+  <ol class="steps">
+    <li>「マッチ」タブで参加したいマッチを選ぶ
+      <span class="sub"><span class="badge purple">トーナメント</span> は順位で褒章、<span class="badge cyan">プレミアリング</span> は終了時にチップ相当をポイントで精算する形式です。</span></li>
+    <li>詳細画面でエントリー費・定員・賞金プール・褒章を確認し、<span class="btn-ref">エントリー</span>
+      <span class="sub">エントリー費は保有ポイントから支払われます。残高不足だとエントリーできません。</span></li>
+    <li>都合が悪くなったら、受付中の間は<b>エントリーをキャンセル</b>できる（ポイントは返還）</li>
+    <li>マッチ開催中は、設定があれば <b>リエントリー</b>（トーナメント）／<b>リバイ</b>（リング）ボタンが使える</li>
+    <li>終了後、トーナメントは結果がホーム画面で発表される。順位に応じた褒章ポイント・特典は自動で付与される</li>
+  </ol>
+
+  <figure class="shot filled">
+    <span class="shot-no">図 16</span>
+    <img src="16.png" alt="マッチ詳細画面" loading="lazy">
+    <figcaption>マッチ詳細画面（エントリーボタンと褒章）</figcaption>
+    <div class="shot-path">/matches/:matchId</div>
+  </figure>
+  <figure class="shot filled">
+    <span class="shot-no">図 17</span>
+    <img src="17.png" alt="トーナメント結果発表の演出" loading="lazy">
+    <figcaption>トーナメント結果発表の演出（精算後にホームへ表示）</figcaption>
+    <div class="shot-path">/（精算直後のホーム）</div>
+  </figure>
+</section>
+
+<section class="chapter" id="m5">
+  <span class="ch-label">メンバー M-5</span>
+  <h2>ショップでポイントを使う</h2>
+
+  <h3>装飾アイテム（アプリ内の見た目）</h3>
+  <ul class="plain">
+    <li>「ショップ」の装飾タブで <b>背景／装飾／アイコン／称号／ハンド称号</b> を購入できる</li>
+    <li>購入すると自動で装備される。装備の切り替えはマイページ・ショップからいつでも可能</li>
+    <li>ハンド称号は購入時に好きなハンド（例: AKs）を入力するコレクションアイテム</li>
+  </ul>
+
+  <h3>特典（クーポン）</h3>
+  <ol class="steps">
+    <li>「特典」タブで欲しい特典と枚数を選んで購入する</li>
+    <li>購入するとクーポンコード（例: <code>AB12-CD34</code>)が発行され、マイページの「所持中の特典」に入る</li>
+    <li>使うときは店頭でスタッフにコードを提示 → スタッフが使用済み処理をして完了</li>
+  </ol>
+
+  <figure class="shot filled">
+    <span class="shot-no">図 18</span>
+    <img src="18.png" alt="ショップ画面" loading="lazy">
+    <figcaption>ショップ画面（装飾タブ）</figcaption>
+    <div class="shot-path">/shop</div>
+  </figure>
+</section>
+
+<section class="chapter" id="m6">
+  <span class="ch-label">メンバー M-6</span>
+  <h2>マイページ・ランキング・実績</h2>
+
+  <ul class="plain">
+    <li><b>マイページ</b> — プレイヤーネーム・ひとことの編集、称号の付け替え、ポイント履歴の確認、所持特典の表示</li>
+    <li><b>ランキング</b> — 累計／年間タブで切り替え。年間は毎年リセットされ、1位には「年間王者」実績が贈られる</li>
+    <li><b>実績</b> — 来店回数やマッチ成績などの節目で自動解除されるバッジ。解除の瞬間はカットイン演出が入る。一覧は <code>/achievements</code></li>
+  </ul>
+
+  <figure class="shot filled">
+    <span class="shot-no">図 19</span>
+    <img src="19.png" alt="マイページ" loading="lazy">
+    <figcaption>マイページ（ポイント・実績）</figcaption>
+    <div class="shot-path">/profile</div>
+  </figure>
+  <figure class="shot filled">
+    <span class="shot-no">図 20</span>
+    <img src="20.png" alt="ランキング画面" loading="lazy">
+    <figcaption>ランキング画面</figcaption>
+    <div class="shot-path">/ranking</div>
+  </figure>
+</section>
+
+<section class="chapter" id="m7">
+  <span class="ch-label">メンバー M-7</span>
+  <h2>ビンゴとその他の機能</h2>
+
+  <h3>Ring de BINGO</h3>
+  <ul class="plain">
+    <li>ビンゴイベントの日に来店すると、来店スキャンと同時にビンゴカードが配られる（<code>/bingo</code>）</li>
+    <li>プレイ中にマスのお題を達成したらスタッフに申告。スタッフがスタンプを押してくれる</li>
+    <li>マス達成・ビンゴ成立・全マス達成のそれぞれでポイントがもらえる</li>
+  </ul>
+
+  <h3>その他</h3>
+  <ul class="plain">
+    <li><b>ハンド履歴</b>（<code>/hands</code>）— 対戦のハンド履歴を後から振り返られる（管理者がインポートした分）</li>
+    <li><b>通知</b> — マッチの開催・結果・実績解除などが右上のベルに届く</li>
+    <li><b>メンバー名鑑</b> — 他のメンバーのプロフィール・実績を見られる</li>
+  </ul>
+
+  <figure class="shot filled">
+    <span class="shot-no">図 21</span>
+    <img src="21.png" alt="ビンゴカード画面" loading="lazy">
+    <figcaption>ビンゴカード画面</figcaption>
+    <div class="shot-path">/bingo</div>
+  </figure>
+</section>
+
+<!-- ============================================================ -->
+<section class="chapter" id="faq">
+  <span class="ch-label">付録</span>
+  <h2>よくある質問</h2>
+
+  <dl class="faq">
+    <dt>登録したのにアプリが使えない</dt>
+    <dd>管理者の承認待ちです。管理者は「メンバー管理」の承認待ちタブを確認してください（A-2）。</dd>
+
+    <dt>マッチ作成時に「イベント紐付け」の選択肢が空</dt>
+    <dd>イベントが「開催中」になっていません。イベント管理で ▶ 開催開始を押してから作成してください（A-3）。</dd>
+
+    <dt>来店スキャンでカメラが起動しない</dt>
+    <dd>ブラウザのカメラ許可を確認してください。それでも読めない場合は手動UID入力で付与できます（A-4）。</dd>
+
+    <dt>同じ人を2回スキャンしてしまった</dt>
+    <dd>二重付与は自動でブロックされるので問題ありません。</dd>
+
+    <dt>エントリーできない（ポイント残高が不足しています）</dt>
+    <dd>保有ポイントがエントリー費に足りていません。会員証・マイページで残高を確認してください。</dd>
+
+    <dt>精算の順位・金額を間違えた</dt>
+    <dd>精算のやり直しはできません。「ポイント調整」で対象者ごとに加減算し、理由欄に経緯を記録してください（A-6）。</dd>
+
+    <dt>ポイントを増やしたのにランキングが変わらない／残高が変わらない</dt>
+    <dd>ポイント調整の「対象」設定を確認してください。「保有のみ」はランキングに影響せず、「累積のみ」は残高に影響しません（A-6）。</dd>
+
+    <dt>特典を買ったのにどこにあるか分からない（メンバー）</dt>
+    <dd>マイページの「所持中の特典」にクーポンコードが入っています。店頭でスタッフに見せてください（M-5）。</dd>
+  </dl>
+</section>
+
+<footer class="doc-footer">
+  NUMAZU POKER CIRCLE — 操作マニュアル ／ このドキュメントはアプリの実装（2026年7月時点）をもとに作成されています。
+</footer>
+
+</div>
