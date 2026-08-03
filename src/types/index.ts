@@ -64,11 +64,18 @@ export interface PointLog {
 export interface DistributionRule {
   rank: number
   points: number  // 付与ポイント実数値
-  itemId?: string    // 順位報酬として付与する特典アイテムID
+  itemId?: string    // 順位報酬として付与する特典アイテムID（レガシー：現在は精算時に付与）
   itemName?: string  // 表示用に作成時のアイテム名を保持
 }
 
 export type MatchCategory = 'tournament' | 'ring'
+
+/**
+ * auto   … エントリー数から賞金を自動配分（作成時にプライズを入力しない）
+ * manual … 管理者が入力した distributionRules をそのまま使う
+ * 未設定のレガシーマッチは manual 相当として扱う
+ */
+export type PrizeMode = 'auto' | 'manual'
 
 export interface Match {
   id: string
@@ -77,6 +84,8 @@ export interface Match {
   entryFee: number
   capacity: number
   status: MatchStatus
+  prizeMode?: PrizeMode                  // tournament のみ使用（未設定は manual）
+  // auto の場合は精算時に自動配分結果が書き込まれる
   distributionRules: DistributionRule[]  // tournament のみ使用
   participants: string[]
   scheduledAt: Timestamp

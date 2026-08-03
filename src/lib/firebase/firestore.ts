@@ -20,6 +20,7 @@ import {
   arrayRemove,
 } from 'firebase/firestore'
 import { db } from './config'
+import { computeMatchPrizes, toDistributionRules } from '@/lib/prizeDistribution'
 import type {
   User,
   Event,
@@ -931,23 +932,44 @@ export const purchaseCustomHandTitle = async (
 
 // ── Admin: Match Settlement ────────────────────────────────────────────────
 
+/**
+ * トーナメントを精算する。
+ * prizeMode が auto のマッチは、リエントリーを含む最終エントリー数から賞金を確定させる。
+ * 特典アイテムは（自動・手動を問わず）この精算時に管理者が指定した内容で付与する。
+ */
 export const settleMatch = async (
   match: Match,
   rankings: { uid: string; rank: number }[],
   adminUid: string,
-  playerNames: Record<string, string> = {}
+  playerNames: Record<string, string> = {},
+  perks: Record<string, { itemId: string; itemName: string }> = {}
 ) => {
   const batch = writeBatch(db)
 
+  const isAutoPrize = (match.prizeMode ?? 'manual') === 'auto'
+  let rules: { rank: number; points: number; itemId?: string; itemName?: string }[] =
+    match.distributionRules ?? []
+
+  if (isAutoPrize) {
+    const dist = computeMatchPrizes(match)
+    if (!dist.ok) throw new Error(`賞金を自動配分できません（${dist.reason}）`)
+    rules = toDistributionRules(dist.prizes)
+  }
+
   const resultRef = doc(collection(db, 'matchResults'))
   const rankingWithPoints = rankings.map(({ uid, rank }) => {
-    const rule = match.distributionRules.find((r) => r.rank === rank)
+    const rule = rules.find((r) => r.rank === rank)
+    // 精算時の指定を最優先（itemId 空 = 明示的に付与しない）。未指定ならレガシーの順位報酬を使う
+    const specified = perks[uid]
+    const perk = specified
+      ? (specified.itemId ? specified : null)
+      : (rule?.itemId ? { itemId: rule.itemId, itemName: rule.itemName ?? '特典' } : null)
     return {
       uid,
       rank,
       earnedPoints: rule ? rule.points : 0,
-      itemId: rule?.itemId ?? null,
-      itemName: rule?.itemName ?? null,
+      itemId: perk?.itemId ?? null,
+      itemName: perk?.itemName ?? null,
     }
   })
 
@@ -956,7 +978,11 @@ export const settleMatch = async (
     rankings: rankingWithPoints.map(({ uid, rank, earnedPoints }) => ({ uid, rank, earnedPoints })),
     settledAt: serverTimestamp(),
   })
-  batch.update(doc(db, 'matches', match.id), { status: 'finished' })
+  // 自動配分は確定した賞金表をマッチへ書き戻す（実績判定・履歴表示が同じ値を参照するため）
+  batch.update(doc(db, 'matches', match.id), {
+    status: 'finished',
+    ...(isAutoPrize && { distributionRules: rules }),
+  })
 
   // リザルト発表用の上位3名（入賞者）
   const podium = rankingWithPoints

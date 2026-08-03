@@ -4,6 +4,8 @@ import { AppShell } from '@/components/layout/AppShell'
 import { FeatherIcon } from '@/components/ui/FeatherIcon'
 import { useAuth } from '@/lib/hooks/useAuth'
 import { subscribeMatch, subscribeAllUsers, performRebuy, performReentry, cancelMatchEntry, notifyAdminsMatchReady } from '@/lib/firebase/firestore'
+import { PrizeTable } from '@/components/ui/PrizeTable'
+import { computeMatchPrizes } from '@/lib/prizeDistribution'
 import type { Match, User } from '@/types'
 import { writeBatch, doc, collection, increment, serverTimestamp, arrayUnion } from 'firebase/firestore'
 import { db } from '@/lib/firebase/config'
@@ -48,7 +50,13 @@ export const MatchDetailPage = () => {
   const totalRebuys = Object.values(match.rebuys ?? {}).reduce((s, n) => s + n, 0)
   const totalReentries = Object.values(match.reentries ?? {}).reduce((s, n) => s + n, 0)
   const extraEntries = cat === 'ring' ? totalRebuys : totalReentries
-  const totalPool = match.entryFee * (match.participants.length + extraEntries)
+  const extraEntryFee = cat === 'ring' ? (match.rebuyFee ?? match.entryFee) : (match.reentryFee ?? match.entryFee)
+  const totalPool = match.entryFee * match.participants.length + extraEntryFee * extraEntries
+
+  // 自動配分プライズ（エントリー数が変わるたびに暫定額を再計算する）
+  const isAutoPrize = cat === 'tournament' && (match.prizeMode ?? 'manual') === 'auto'
+  const autoEntries = match.participants.length + totalReentries
+  const autoPrize = isAutoPrize ? computeMatchPrizes(match) : null
 
   const handleEntry = async () => {
     if (!matchId) return
@@ -194,10 +202,27 @@ export const MatchDetailPage = () => {
           )}
         </div>
 
-        {/* 分配率（トーナメントのみ） */}
-        {cat === 'tournament' && match.distributionRules.length > 0 && (
+        {/* プライズ：自動配分は現在のエントリー数から暫定額を出す */}
+        {isAutoPrize && autoPrize && (
           <div className="bg-swan-card border border-swan-border rounded-xl p-4">
-            <h3 className="text-sm font-semibold mb-3 text-swan-sub">褒章</h3>
+            <h3 className="text-sm font-semibold mb-3 text-swan-sub">
+              {match.status === 'finished' ? 'プライズ（確定）' : 'プライズ（暫定）'}
+            </h3>
+            <PrizeTable
+              result={autoPrize}
+              note={
+                match.status === 'finished'
+                  ? `エントリー ${autoEntries}名で確定`
+                  : `現在のエントリー ${autoEntries}名時点の暫定額です。エントリー・リエントリーの増加に応じて変動します`
+              }
+            />
+          </div>
+        )}
+
+        {/* プライズ（手動設定） */}
+        {cat === 'tournament' && !isAutoPrize && match.distributionRules.length > 0 && (
+          <div className="bg-swan-card border border-swan-border rounded-xl p-4">
+            <h3 className="text-sm font-semibold mb-3 text-swan-sub">プライズ</h3>
             {match.distributionRules.map((rule) => (
               <div key={rule.rank} className="flex justify-between py-1 border-b border-swan-border last:border-0">
                 <span className="text-sm">{rule.rank}位</span>

@@ -10,6 +10,8 @@ import { useAuth } from '@/lib/hooks/useAuth'
 import type { Match, MatchStatus, User, DistributionRule, MatchCategory, Event, Item } from '@/types'
 import { Timestamp } from 'firebase/firestore'
 import { ChevronLeft, Plus, FeatherPtIcon, Pencil } from '@/components/ui/Icons'
+import { PrizeTable } from '@/components/ui/PrizeTable'
+import { computePrizeDistribution, computeMatchPrizes } from '@/lib/prizeDistribution'
 
 // ── タイマーアプリ連携セクション ──────────────────────────────────────────
 const TimerAppSection = ({ match }: { match: Match }) => {
@@ -158,6 +160,8 @@ export const MatchesAdminPage = () => {
   const [formCapacity, setFormCapacity] = useState('8')
   const [formDate, setFormDate] = useState('')
   const [formDist, setFormDist] = useState<DistributionRule[]>(DEFAULT_DIST)
+  // 既定は自動配分。チェックしたときだけ手動プライズを入力する
+  const [formManualPrize, setFormManualPrize] = useState(false)
   const [formReentry, setFormReentry] = useState(false)
   const [formReentryFee, setFormReentryFee] = useState('')
   const [formRebuy, setFormRebuy] = useState(false)
@@ -171,6 +175,8 @@ export const MatchesAdminPage = () => {
   const [deletingMatchId, setDeletingMatchId] = useState<string | null>(null)
   const [settlingMatch, setSettlingMatch] = useState<Match | null>(null)
   const [rankings, setRankings] = useState<{ uid: string; rank: string }[]>([])
+  // 精算時に付与する特典アイテム（uid → itemId）
+  const [settlePerks, setSettlePerks] = useState<Record<string, string>>({})
 
   // リング精算
   const [settlingRing, setSettlingRing] = useState<Match | null>(null)
@@ -203,12 +209,10 @@ export const MatchesAdminPage = () => {
         entryFee: parseInt(formFee) || 0,
         capacity: parseInt(formCapacity) || 0,
         status: 'recruiting',
-        distributionRules: formCat === 'tournament'
-          ? formDist.map(({ rank, points, itemId, itemName }) => ({
-              rank,
-              points,
-              ...(itemId && { itemId, itemName }),
-            }))
+        ...(formCat === 'tournament' && { prizeMode: formManualPrize ? 'manual' as const : 'auto' as const }),
+        // 自動配分の賞金は精算時にエントリー数から確定するため、作成時は空にする
+        distributionRules: formCat === 'tournament' && formManualPrize
+          ? formDist.map(({ rank, points }) => ({ rank, points }))
           : [],
         participants: [],
         scheduledAt: Timestamp.fromDate(new Date(formDate)),
@@ -225,7 +229,7 @@ export const MatchesAdminPage = () => {
       })
       setShowForm(false)
       setFormTitle(''); setFormCat('tournament'); setFormReentry(false); setFormReentryFee(''); setFormRebuy(false); setFormRebuyFee(''); setFormEventId('')
-      setFormDist(DEFAULT_DIST)
+      setFormDist(DEFAULT_DIST); setFormManualPrize(false)
     } catch (err) {
       console.error('マッチ作成に失敗:', err)
       setFormError('マッチの作成に失敗しました。もう一度お試しください。')
@@ -254,6 +258,7 @@ export const MatchesAdminPage = () => {
   // ── トーナメント精算開始 ──────────────────────────────────────────────────
   const startTournamentSettle = async (match: Match) => {
     setSettleError('')
+    setSettlePerks({})
     setSettlingMatch(match)
 
     // タイマーセッションがあれば暫定順位を取得
@@ -294,15 +299,29 @@ export const MatchesAdminPage = () => {
       setSettleError(`順位が未入力の参加者がいます（${invalid.map((r) => getUserName(r.uid)).join('、')}）`)
       return
     }
+    // 同順位があると同じ賞金を二重に配ってプールを超えるため許可しない
+    const dupRanks = parsed.map((r) => r.rank).filter((rank, i, arr) => arr.indexOf(rank) !== i)
+    if (dupRanks.length > 0) {
+      setSettleError(`同じ順位が重複しています（${[...new Set(dupRanks)].join('位、')}位）`)
+      return
+    }
     setSaving(true)
     try {
       const playerNames = Object.fromEntries(allUsers.map((u) => [u.uid, u.playerName]))
-      await settleMatch(settlingMatch, parsed, adminUser.uid, playerNames)
+      const perks: Record<string, { itemId: string; itemName: string }> = {}
+      for (const [uid, itemId] of Object.entries(settlePerks)) {
+        const item = benefitItems.find((it) => it.id === itemId)
+        // 空選択も「付与しない」という明示指定として渡す
+        perks[uid] = item ? { itemId: item.id, itemName: item.name } : { itemId: '', itemName: '' }
+      }
+      await settleMatch(settlingMatch, parsed, adminUser.uid, playerNames, perks)
       settlingMatch.participants.forEach((uid) => checkAndUnlockAchievements(uid).catch(() => {}))
       setSettlingMatch(null)
     } catch (err) {
       console.error('精算に失敗:', err)
-      setSettleError('精算に失敗しました。もう一度お試しください。')
+      setSettleError(err instanceof Error && err.message.includes('自動配分')
+        ? err.message
+        : '精算に失敗しました。もう一度お試しください。')
     } finally { setSaving(false) }
   }
 
@@ -324,6 +343,21 @@ export const MatchesAdminPage = () => {
       settlingRing.participants.forEach((uid) => checkAndUnlockAchievements(uid).catch(() => {}))
       setSettlingRing(null)
     } finally { setSaving(false) }
+  }
+
+  // ── 精算モーダル用の賞金表 ──────────────────────────────────────────────
+  // 自動配分は精算時点のエントリー数（リエントリー込み）で確定させる
+  const settleDist =
+    settlingMatch && (settlingMatch.prizeMode ?? 'manual') === 'auto'
+      ? computeMatchPrizes(settlingMatch)
+      : null
+  const settleEntries = settlingMatch
+    ? settlingMatch.participants.length +
+      Object.values(settlingMatch.reentries ?? {}).reduce((s, n) => s + n, 0)
+    : 0
+  const settlePrizeForRank = (rank: number): number => {
+    if (settleDist) return settleDist.ok ? settleDist.prizes[rank - 1] ?? 0 : 0
+    return settlingMatch?.distributionRules.find((r) => r.rank === rank)?.points ?? 0
   }
 
   if (!adminUser) return null
@@ -419,55 +453,58 @@ export const MatchesAdminPage = () => {
             {/* トーナメント専用 */}
             {formCat === 'tournament' && (
               <>
-                <div>
-                  <label className="text-xs text-swan-sub mb-1 block flex items-center gap-1">
-                    順位別褒章 <FeatherPtIcon size={10} className="text-swan-accent" />
+                {/* プライズ設定（既定は自動配分） */}
+                <div className="space-y-2">
+                  <label className="flex items-center gap-2 cursor-pointer text-sm">
+                    <input
+                      type="checkbox"
+                      checked={formManualPrize}
+                      onChange={(e) => setFormManualPrize(e.target.checked)}
+                      className="accent-swan-accent"
+                    />
+                    プライズを手動設定する
                   </label>
-                  {formDist.map((rule, i) => (
-                    <div key={i} className="mb-2 space-y-1">
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs text-swan-sub w-8">{rule.rank}位</span>
-                        <input
-                          type="number" value={rule.points} min="0"
-                          onChange={(e) => setFormDist(formDist.map((r, idx) =>
-                            idx === i ? { ...r, points: parseInt(e.target.value) || 0 } : r
-                          ))}
-                          placeholder="0"
-                          className="flex-1 bg-swan-black border border-swan-border rounded px-2 py-1 text-xs text-swan-text"
-                        />
-                        <span className="text-xs text-swan-sub">pt</span>
-                        {formDist.length > 1 && (
-                          <button type="button" onClick={() => setFormDist(formDist.filter((_, idx) => idx !== i))}
-                            className="text-xs text-red-400">×</button>
-                        )}
-                      </div>
-                      {benefitItems.length > 0 && (
-                        <div className="flex items-center gap-2 pl-10">
-                          <select
-                            value={rule.itemId ?? ''}
-                            onChange={(e) => {
-                              const item = benefitItems.find((it) => it.id === e.target.value)
-                              setFormDist(formDist.map((r, idx) =>
-                                idx === i
-                                  ? item
-                                    ? { ...r, itemId: item.id, itemName: item.name }
-                                    : { rank: r.rank, points: r.points }
-                                  : r
-                              ))
-                            }}
-                            className="flex-1 bg-swan-black border border-swan-border rounded px-2 py-1 text-xs text-swan-text"
-                          >
-                            <option value="">特典報酬なし</option>
-                            {benefitItems.map((it) => (
-                              <option key={it.id} value={it.id}>🎁 {it.name}</option>
+
+                  {formManualPrize ? (
+                    <div>
+                      <label className="text-xs text-swan-sub mb-1 block flex items-center gap-1">
+                        順位別プライズ <FeatherPtIcon size={10} className="text-swan-accent" />
+                      </label>
+                      {formDist.map((rule, i) => (
+                        <div key={i} className="flex items-center gap-2 mb-2">
+                          <span className="text-xs text-swan-sub w-8">{rule.rank}位</span>
+                          <input
+                            type="number" value={rule.points} min="0"
+                            onChange={(e) => setFormDist(formDist.map((r, idx) =>
+                              idx === i ? { ...r, points: parseInt(e.target.value) || 0 } : r
                             ))}
-                          </select>
+                            placeholder="0"
+                            className="flex-1 bg-swan-black border border-swan-border rounded px-2 py-1 text-xs text-swan-text"
+                          />
+                          <span className="text-xs text-swan-sub">pt</span>
+                          {formDist.length > 1 && (
+                            <button type="button" onClick={() => setFormDist(formDist.filter((_, idx) => idx !== i))}
+                              className="text-xs text-red-400">×</button>
+                          )}
                         </div>
-                      )}
+                      ))}
+                      <button type="button" onClick={() => setFormDist([...formDist, { rank: formDist.length + 1, points: 0 }])}
+                        className="text-xs text-swan-accent mt-1">+ 順位追加</button>
                     </div>
-                  ))}
-                  <button type="button" onClick={() => setFormDist([...formDist, { rank: formDist.length + 1, points: 0 }])}
-                    className="text-xs text-swan-accent mt-1">+ 順位追加</button>
+                  ) : (
+                    <div className="bg-swan-black/40 border border-swan-border rounded-lg p-3">
+                      <p className="text-xs text-purple-400 mb-2">
+                        エントリー数に応じてプライズを自動配分します
+                      </p>
+                      <PrizeTable
+                        result={computePrizeDistribution({
+                          entries: parseInt(formCapacity) || 0,
+                          entryFee: parseInt(formFee) || 0,
+                        })}
+                        note={`定員 ${parseInt(formCapacity) || 0}名が満席になった場合の想定配分（実際はエントリー数・リエントリー数で変動します）`}
+                      />
+                    </div>
+                  )}
                 </div>
                 <div className="space-y-2">
                   <label className="flex items-center gap-2 cursor-pointer text-sm">
@@ -601,26 +638,65 @@ export const MatchesAdminPage = () => {
         {/* ── トーナメント精算モーダル ── */}
         {settlingMatch && (
           <div className="fixed inset-0 bg-black/80 z-50 flex items-end">
-            <div className="bg-swan-dark border-t border-swan-border w-full max-w-md mx-auto rounded-t-2xl p-6 space-y-4 max-h-[80vh] overflow-y-auto">
+            <div className="bg-swan-dark border-t border-swan-border w-full max-w-md mx-auto rounded-t-2xl p-6 space-y-4 max-h-[85vh] overflow-y-auto">
               <h3 className="font-bold">精算：{settlingMatch.title}</h3>
-              <p className="text-xs text-swan-sub">各参加者の順位を入力してください</p>
-              {rankings.map((r, i) => (
-                <div key={r.uid} className="flex items-center gap-3">
-                  <span className="text-sm text-swan-text w-28 truncate">{getUserName(r.uid)}</span>
-                  <input
-                    type="number" value={r.rank}
-                    onChange={(e) => setRankings(rankings.map((rk, idx) =>
-                      idx === i ? { ...rk, rank: e.target.value } : rk
-                    ))}
-                    min="1"
-                    className="w-16 bg-swan-black border border-swan-border rounded px-2 py-1 text-sm text-swan-text"
+
+              {/* 確定プライズ（自動配分はこの時点のエントリー数で確定する） */}
+              {settleDist ? (
+                <div className="bg-swan-black/40 border border-swan-border rounded-lg p-3">
+                  <p className="text-xs text-purple-400 mb-2">自動配分プライズ（確定）</p>
+                  <PrizeTable
+                    result={settleDist}
+                    note={`エントリー ${settleEntries}名（リエントリー込み）で確定します`}
+                    collapseOver={8}
                   />
-                  <span className="text-xs text-swan-sub">位</span>
                 </div>
-              ))}
+              ) : (
+                <p className="text-xs text-swan-sub">
+                  手動設定のプライズ（
+                  {settlingMatch.distributionRules.filter((r) => r.points > 0).length}順位）を適用します
+                </p>
+              )}
+
+              <p className="text-xs text-swan-sub">各参加者の順位と、付与する特典を指定してください</p>
+              {rankings.map((r, i) => {
+                const rank = parseInt(r.rank)
+                const prize = Number.isInteger(rank) ? settlePrizeForRank(rank) : 0
+                return (
+                  <div key={r.uid} className="space-y-1 border-b border-swan-border/40 pb-2 last:border-0">
+                    <div className="flex items-center gap-3">
+                      <span className="text-sm text-swan-text w-24 truncate">{getUserName(r.uid)}</span>
+                      <input
+                        type="number" value={r.rank}
+                        onChange={(e) => setRankings(rankings.map((rk, idx) =>
+                          idx === i ? { ...rk, rank: e.target.value } : rk
+                        ))}
+                        min="1"
+                        className="w-14 bg-swan-black border border-swan-border rounded px-2 py-1 text-sm text-swan-text"
+                      />
+                      <span className="text-xs text-swan-sub">位</span>
+                      <span className={`text-xs ml-auto flex items-center gap-0.5 ${prize > 0 ? 'text-swan-accent' : 'text-swan-muted'}`}>
+                        <FeatherPtIcon size={10} />{prize.toLocaleString()}
+                      </span>
+                    </div>
+                    {benefitItems.length > 0 && (
+                      <select
+                        value={settlePerks[r.uid] ?? ''}
+                        onChange={(e) => setSettlePerks({ ...settlePerks, [r.uid]: e.target.value })}
+                        className="w-full bg-swan-black border border-swan-border rounded px-2 py-1 text-xs text-swan-text"
+                      >
+                        <option value="">特典なし</option>
+                        {benefitItems.map((it) => (
+                          <option key={it.id} value={it.id}>🎁 {it.name}</option>
+                        ))}
+                      </select>
+                    )}
+                  </div>
+                )
+              })}
               {settleError && <p className="text-red-400 text-xs text-center">{settleError}</p>}
               <div className="flex gap-2">
-                <button onClick={handleTournamentSettle} disabled={saving}
+                <button onClick={handleTournamentSettle} disabled={saving || (settleDist !== null && !settleDist.ok)}
                   className="flex-1 bg-swan-accent text-black font-bold py-2 rounded-lg text-sm disabled:opacity-50 active:scale-[0.98] transition-transform">
                   {saving ? '精算中...' : '精算実行'}
                 </button>
@@ -707,6 +783,15 @@ export const MatchesAdminPage = () => {
                       )}
                       {!match.eventId && (
                         <span className="text-xs text-swan-muted">野良</span>
+                      )}
+                      {cat === 'tournament' && (
+                        <span className={`text-xs px-1.5 py-0.5 rounded border ${
+                          (match.prizeMode ?? 'manual') === 'auto'
+                            ? 'text-purple-300 border-purple-400/30 bg-purple-400/10'
+                            : 'text-swan-sub border-swan-border'
+                        }`}>
+                          {(match.prizeMode ?? 'manual') === 'auto' ? '自動プライズ' : '手動プライズ'}
+                        </span>
                       )}
                     </div>
                     <p className="font-semibold truncate">{match.title}</p>
