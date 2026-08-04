@@ -11,6 +11,8 @@ import type { Match, MatchStatus, User, DistributionRule, MatchCategory, Event, 
 import { Timestamp } from 'firebase/firestore'
 import { ChevronLeft, Plus, FeatherPtIcon, Pencil } from '@/components/ui/Icons'
 import { PrizeTable } from '@/components/ui/PrizeTable'
+import { MatchFilterBar } from '@/components/ui/MatchFilterBar'
+import { filterMatches, DEFAULT_MATCH_FILTERS, type MatchFilters } from '@/lib/matchFilter'
 import { computePrizeDistribution, computeMatchPrizes } from '@/lib/prizeDistribution'
 
 // ── タイマーアプリ連携セクション ──────────────────────────────────────────
@@ -162,6 +164,7 @@ export const MatchesAdminPage = () => {
   const [allUsers, setAllUsers] = useState<User[]>([])
   const [activeEvents, setActiveEvents] = useState<Event[]>([])
   const [items, setItems] = useState<Item[]>([])
+  const [filters, setFilters] = useState<MatchFilters>(DEFAULT_MATCH_FILTERS)
   const [showForm, setShowForm] = useState(false)
   const [formError, setFormError] = useState('')
   const [settleError, setSettleError] = useState('')
@@ -213,6 +216,7 @@ export const MatchesAdminPage = () => {
   }, [])
 
   const benefitItems = items.filter((i) => i.category === 'benefit')
+  const visibleMatches = filterMatches(matches, filters)
 
   const getUserName = (uid: string) =>
     allUsers.find((u) => u.uid === uid)?.playerName ?? uid.slice(0, 8)
@@ -836,8 +840,14 @@ export const MatchesAdminPage = () => {
         )}
 
         {/* ── マッチ一覧 ── */}
+        <MatchFilterBar
+          filters={filters}
+          onChange={setFilters}
+          shown={visibleMatches.length}
+          total={matches.length}
+        />
         <div className="space-y-3">
-          {matches.map((match) => {
+          {visibleMatches.map((match) => {
             const cat = match.matchCategory ?? 'tournament'
             const linkedEvent = activeEvents.find((e) => e.id === match.eventId)
             return (
@@ -926,6 +936,9 @@ export const MatchesAdminPage = () => {
           })}
           {matches.length === 0 && (
             <p className="text-center text-swan-sub py-8">マッチはありません</p>
+          )}
+          {matches.length > 0 && visibleMatches.length === 0 && (
+            <p className="text-center text-swan-sub py-8">条件に一致するマッチがありません</p>
           )}
         </div>
       </div>

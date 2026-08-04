@@ -4,6 +4,8 @@ import { AppShell } from '@/components/layout/AppShell'
 import { FeatherIcon } from '@/components/ui/FeatherIcon'
 import { SpadeIcon } from '@/components/ui/Icons'
 import { subscribeMatches } from '@/lib/firebase/firestore'
+import { MatchFilterBar } from '@/components/ui/MatchFilterBar'
+import { filterMatches, DEFAULT_MATCH_FILTERS, type MatchFilters } from '@/lib/matchFilter'
 import type { Match, MatchStatus } from '@/types'
 
 const STATUS_CONFIG: Record<MatchStatus, { label: string; color: string }> = {
@@ -14,21 +16,43 @@ const STATUS_CONFIG: Record<MatchStatus, { label: string; color: string }> = {
 
 export const MatchListPage = () => {
   const [matches, setMatches] = useState<Match[]>([])
+  const [filters, setFilters] = useState<MatchFilters>(DEFAULT_MATCH_FILTERS)
 
   useEffect(() => {
     return subscribeMatches(setMatches)
   }, [])
 
+  const visibleMatches = filterMatches(matches, filters)
+
   return (
     <AppShell title="ポイントマッチ">
       <div className="py-4 space-y-3">
+        <MatchFilterBar
+          filters={filters}
+          onChange={setFilters}
+          shown={visibleMatches.length}
+          total={matches.length}
+        />
+
         {matches.length === 0 && (
           <div className="flex flex-col items-center gap-3 py-16 text-swan-sub">
             <SpadeIcon size={40} className="opacity-30" />
             <p className="text-sm">マッチはまだありません</p>
           </div>
         )}
-        {matches.map((match) => {
+        {matches.length > 0 && visibleMatches.length === 0 && (
+          <div className="flex flex-col items-center gap-3 py-16 text-swan-sub">
+            <SpadeIcon size={40} className="opacity-30" />
+            <p className="text-sm">条件に一致するマッチがありません</p>
+            <button
+              onClick={() => setFilters({ category: 'all', status: 'all', period: 'all' })}
+              className="text-xs text-swan-accent underline"
+            >
+              絞り込みを解除する
+            </button>
+          </div>
+        )}
+        {visibleMatches.map((match) => {
           const { label, color } = STATUS_CONFIG[match.status]
           return (
             <Link
