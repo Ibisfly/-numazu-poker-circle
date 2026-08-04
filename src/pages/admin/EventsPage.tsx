@@ -22,8 +22,19 @@ const StatusBadge = ({ status }: { status: EventStatus }) => {
   )
 }
 
-// フォームの初期値
+// フォームの初期値（新規作成は当日の日付と定型のイベント名を入れておく）
 const EMPTY = { title: '', date: '', attendancePoint: '200', bingoCardId: '' }
+
+const defaultForm = () => {
+  const today = new Date()
+  const localDate = new Date(today.getTime() - today.getTimezoneOffset() * 60000)
+  return {
+    title: `${today.getMonth() + 1}月${today.getDate()}日 ポーカー会`,
+    date: localDate.toISOString().slice(0, 10),
+    attendancePoint: '200',
+    bingoCardId: '',
+  }
+}
 
 export const EventsPage = () => {
   const { user } = useAuth()
@@ -42,7 +53,7 @@ export const EventsPage = () => {
   useEffect(() => { return subscribeBingoCards(setBingoCards) }, [])
 
   const openCreate = () => {
-    setForm(EMPTY)
+    setForm(defaultForm())
     setEditingId(null)
     setShowForm(true)
   }

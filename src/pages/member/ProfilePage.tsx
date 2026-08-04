@@ -27,6 +27,7 @@ import {
 } from '@/lib/firebase/firestore'
 import { FRAME_DEFS, POINT_ICON_DEFS, DynamicPointIcon } from '@/components/ui/SwanAvatar'
 import { logOut } from '@/lib/firebase/auth'
+import { formatRank } from '@/lib/rankLabel'
 import type { PointLog, UserAchievement, UserItem, Item, UserTitle, EventParticipantSummary } from '@/types'
 import { ACHIEVEMENTS } from '@/lib/achievements'
 
@@ -713,7 +714,7 @@ export const ProfilePage = () => {
                       )}
                       {summary.tournamentResults.map((r) => (
                         <p key={r.matchId}>
-                          {r.title} ({r.rank}位): {r.earnedPoints >= 0 ? '+' : ''}{r.earnedPoints}
+                          {r.title} ({formatRank(r.rank)}): {r.earnedPoints >= 0 ? '+' : ''}{r.earnedPoints}
                         </p>
                       ))}
                       {summary.ringResults.map((r) => (

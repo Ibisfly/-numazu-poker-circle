@@ -10,6 +10,7 @@ import {
   subscribeMatches, subscribeRecentEventSummaries, markEventSummaryAsRead,
   subscribeUnreadMatchAnnouncements, markMatchAnnouncementRead,
 } from '@/lib/firebase/firestore'
+import { formatRank } from '@/lib/rankLabel'
 import type { Match, EventParticipantSummary, MatchResultAnnouncement } from '@/types'
 
 const SUIT_COLORS: Record<string, string> = {
@@ -67,7 +68,7 @@ const TournamentResultOverlay = ({
   const winner = announcement.podium.find((p) => p.rank === 1)
   const others = announcement.podium.filter((p) => p.rank !== 1)
   const isWinner = announcement.myRank === 1
-  const isPodium = announcement.myRank <= 3
+  const isPodium = announcement.myRank >= 1 && announcement.myRank <= 3
 
   return (
     <div className="fixed inset-0 bg-black/90 z-50 flex items-center justify-center px-5 overflow-y-auto">
@@ -118,7 +119,7 @@ const TournamentResultOverlay = ({
         }`}>
           <p className="text-xs text-swan-sub">あなたの成績</p>
           <p className="text-lg font-bold text-swan-text mt-0.5">
-            {RANK_MEDALS[announcement.myRank] ?? ''} {announcement.myRank}位
+            {RANK_MEDALS[announcement.myRank] ?? ''} {formatRank(announcement.myRank)}
             {announcement.myPoints > 0 && (
               <span className="text-swan-accent ml-2 text-base">
                 +{announcement.myPoints.toLocaleString()} 🪶
@@ -259,7 +260,7 @@ export const HomePage = () => {
                     <p className="text-xs text-purple-400 font-semibold">トーナメント</p>
                     {summary.tournamentResults.map((r) => (
                       <div key={r.matchId} className="flex justify-between text-sm pl-2">
-                        <span className="text-swan-sub">{r.title} ({r.rank}位)</span>
+                        <span className="text-swan-sub">{r.title} ({formatRank(r.rank)})</span>
                         <span className={r.earnedPoints >= 0 ? 'text-green-400' : 'text-red-400'}>
                           {r.earnedPoints >= 0 ? '+' : ''}{r.earnedPoints}
                         </span>

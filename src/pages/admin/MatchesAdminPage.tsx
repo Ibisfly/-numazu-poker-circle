@@ -130,6 +130,25 @@ const StatusLabel = ({ status }: { status: MatchStatus }) => {
   return <span className={`text-xs font-medium ${cls}`}>{text}</span>
 }
 
+// ── 精算入力 ────────────────────────────────────────────────────────────────
+
+/** インマネ人数（賞金が出る順位数） */
+const itmCountOf = (match: Match): number => {
+  if ((match.prizeMode ?? 'manual') === 'auto') {
+    const dist = computeMatchPrizes(match)
+    return dist.ok ? dist.itmCount : 0
+  }
+  return match.distributionRules.filter((r) => r.points > 0).length
+}
+
+/**
+ * 精算で順位入力が必要な行数。
+ * インマネ圏＋バブル（その直下1名）までは称号・順位報酬に関わるため必須とし、
+ * それ以下は順位づけしない（Busted）。
+ */
+const settleRowCount = (match: Match): number =>
+  Math.min(itmCountOf(match) + 1, match.participants.length)
+
 // ── フォームの初期値 ───────────────────────────────────────────────────────
 const DEFAULT_DIST: DistributionRule[] = [
   { rank: 1, points: 0 },
@@ -170,11 +189,14 @@ export const MatchesAdminPage = () => {
 
   // マッチ編集
   const [editingMatch, setEditingMatch] = useState<Match | null>(null)
+  const [editCapacity, setEditCapacity] = useState('')
+  const [editError, setEditError] = useState('')
 
   // トーナメント精算
   const [deletingMatchId, setDeletingMatchId] = useState<string | null>(null)
   const [settlingMatch, setSettlingMatch] = useState<Match | null>(null)
-  const [rankings, setRankings] = useState<{ uid: string; rank: string }[]>([])
+  // 順位 → uid の割り当て（index 0 が1位）。バブルラインまでを入力する
+  const [rankAssign, setRankAssign] = useState<string[]>([])
   // 精算時に付与する特典アイテム（uid → itemId）
   const [settlePerks, setSettlePerks] = useState<Record<string, string>>({})
 
@@ -241,10 +263,26 @@ export const MatchesAdminPage = () => {
   // ── マッチ編集保存 ──────────────────────────────────────────────────────────
   const handleSaveEdit = async () => {
     if (!editingMatch) return
+    const capacity = parseInt(editCapacity)
+    if (!Number.isInteger(capacity) || capacity < 2) {
+      setEditError('定員は2名以上で入力してください')
+      return
+    }
+    if (capacity < editingMatch.participants.length) {
+      setEditError(`すでに${editingMatch.participants.length}名がエントリーしています`)
+      return
+    }
     setSaving(true)
+    setEditError('')
     try {
       await setMatchEvent(editingMatch.id, formEventId || null)
+      if (capacity !== editingMatch.capacity) {
+        await updateMatch(editingMatch.id, { capacity })
+      }
       setEditingMatch(null)
+    } catch (err) {
+      console.error('マッチ編集に失敗:', err)
+      setEditError('保存に失敗しました。もう一度お試しください。')
     } finally {
       setSaving(false)
     }
@@ -252,6 +290,8 @@ export const MatchesAdminPage = () => {
 
   const openEdit = (match: Match) => {
     setFormEventId(match.eventId ?? '')
+    setEditCapacity(String(match.capacity))
+    setEditError('')
     setEditingMatch(match)
   }
 
@@ -261,50 +301,39 @@ export const MatchesAdminPage = () => {
     setSettlePerks({})
     setSettlingMatch(match)
 
-    // タイマーセッションがあれば暫定順位を取得
+    const rowCount = settleRowCount(match)
+    const assign = new Array<string>(rowCount).fill('')
+
+    // タイマーセッションがあれば暫定順位を初期値として流し込む
     if (match.timerSessionId) {
       try {
         const provisionalRankings = await getTimerProvisionalRankings(match.timerSessionId)
-        if (provisionalRankings.length > 0) {
-          // 暫定順位をマッチの参加者と紐付け
-          const rankMap = new Map(
-            provisionalRankings
-              .filter(r => r.uid)
-              .map(r => [r.uid!, r.rank])
-          )
-          setRankings(
-            match.participants.map(uid => ({
-              uid,
-              rank: String(rankMap.get(uid) ?? match.participants.indexOf(uid) + 1),
-            }))
-          )
-          return
+        for (const r of provisionalRankings) {
+          if (!r.uid || !match.participants.includes(r.uid)) continue
+          if (r.rank >= 1 && r.rank <= rowCount) assign[r.rank - 1] = r.uid
         }
       } catch (err) {
         console.error('暫定順位の取得に失敗:', err)
       }
     }
-
-    // フォールバック: 参加順に仮の順位を設定
-    setRankings(match.participants.map((uid, i) => ({ uid, rank: String(i + 1) })))
+    setRankAssign(assign)
   }
 
   const handleTournamentSettle = async () => {
     if (!adminUser || !settlingMatch) return
     setSettleError('')
-    // 順位未入力（NaN）のまま精算すると不正なデータが保存されるため事前に検証
-    const parsed = rankings.map((r) => ({ uid: r.uid, rank: parseInt(r.rank) }))
-    const invalid = parsed.filter((r) => !Number.isInteger(r.rank) || r.rank < 1)
-    if (invalid.length > 0) {
-      setSettleError(`順位が未入力の参加者がいます（${invalid.map((r) => getUserName(r.uid)).join('、')}）`)
+    // バブルラインまでは称号・順位報酬に関わるため必須
+    const missing = rankAssign.findIndex((uid) => !uid)
+    if (missing >= 0) {
+      setSettleError(`${missing + 1}位の参加者が未選択です`)
       return
     }
-    // 同順位があると同じ賞金を二重に配ってプールを超えるため許可しない
-    const dupRanks = parsed.map((r) => r.rank).filter((rank, i, arr) => arr.indexOf(rank) !== i)
-    if (dupRanks.length > 0) {
-      setSettleError(`同じ順位が重複しています（${[...new Set(dupRanks)].join('位、')}位）`)
-      return
-    }
+    // 順位づけしなかった参加者は Busted（rank: 0）として記録する
+    const busted = settlingMatch.participants.filter((uid) => !rankAssign.includes(uid))
+    const parsed = [
+      ...rankAssign.map((uid, i) => ({ uid, rank: i + 1 })),
+      ...busted.map((uid) => ({ uid, rank: 0 })),
+    ]
     setSaving(true)
     try {
       const playerNames = Object.fromEntries(allUsers.map((u) => [u.uid, u.playerName]))
@@ -359,6 +388,10 @@ export const MatchesAdminPage = () => {
     if (settleDist) return settleDist.ok ? settleDist.prizes[rank - 1] ?? 0 : 0
     return settlingMatch?.distributionRules.find((r) => r.rank === rank)?.points ?? 0
   }
+  const settleItm = settlingMatch ? itmCountOf(settlingMatch) : 0
+  const settleBusted = settlingMatch
+    ? settlingMatch.participants.filter((uid) => !rankAssign.includes(uid))
+    : []
 
   if (!adminUser) return null
 
@@ -616,6 +649,20 @@ export const MatchesAdminPage = () => {
                   ))}
                 </select>
               </div>
+              <div>
+                <label className="text-xs text-swan-sub mb-1 block">定員</label>
+                <input
+                  type="number"
+                  value={editCapacity}
+                  onChange={(e) => setEditCapacity(e.target.value)}
+                  min={Math.max(2, editingMatch.participants.length)}
+                  className="w-full bg-swan-black border border-swan-border rounded-lg px-3 py-2 text-sm text-swan-text focus:outline-none"
+                />
+                <p className="text-xs text-swan-muted mt-1">
+                  現在 {editingMatch.participants.length}名エントリー済み
+                </p>
+              </div>
+              {editError && <p className="text-red-400 text-xs">{editError}</p>}
               <div className="flex gap-2">
                 <button
                   onClick={handleSaveEdit}
@@ -658,31 +705,44 @@ export const MatchesAdminPage = () => {
                 </p>
               )}
 
-              <p className="text-xs text-swan-sub">各参加者の順位と、付与する特典を指定してください</p>
-              {rankings.map((r, i) => {
-                const rank = parseInt(r.rank)
-                const prize = Number.isInteger(rank) ? settlePrizeForRank(rank) : 0
+              <p className="text-xs text-swan-sub">
+                インマネ圏（{settleItm}名）とバブルの{Math.min(settleItm + 1, settlingMatch.participants.length)}位までを選択してください。
+                選ばれなかった参加者は Busted（順位なし）として記録されます。
+              </p>
+
+              {/* 順位ごとに参加者を選ぶ */}
+              {rankAssign.map((uid, i) => {
+                const rank = i + 1
+                const prize = settlePrizeForRank(rank)
+                const isBubble = rank > settleItm
                 return (
-                  <div key={r.uid} className="space-y-1 border-b border-swan-border/40 pb-2 last:border-0">
-                    <div className="flex items-center gap-3">
-                      <span className="text-sm text-swan-text w-24 truncate">{getUserName(r.uid)}</span>
-                      <input
-                        type="number" value={r.rank}
-                        onChange={(e) => setRankings(rankings.map((rk, idx) =>
-                          idx === i ? { ...rk, rank: e.target.value } : rk
-                        ))}
-                        min="1"
-                        className="w-14 bg-swan-black border border-swan-border rounded px-2 py-1 text-sm text-swan-text"
-                      />
-                      <span className="text-xs text-swan-sub">位</span>
-                      <span className={`text-xs ml-auto flex items-center gap-0.5 ${prize > 0 ? 'text-swan-accent' : 'text-swan-muted'}`}>
+                  <div key={rank} className="space-y-1 border-b border-swan-border/40 pb-2 last:border-0">
+                    <div className="flex items-center gap-2">
+                      <span className={`text-sm font-bold w-14 shrink-0 ${isBubble ? 'text-swan-sub' : 'text-swan-accent'}`}>
+                        {rank}位
+                      </span>
+                      <select
+                        value={uid}
+                        onChange={(e) => setRankAssign(rankAssign.map((v, idx) => (idx === i ? e.target.value : v)))}
+                        className="flex-1 min-w-0 bg-swan-black border border-swan-border rounded px-2 py-1 text-sm text-swan-text"
+                      >
+                        <option value="">選択してください</option>
+                        {settlingMatch.participants
+                          // 他の順位で選択済みの参加者は候補から外す（重複防止）
+                          .filter((p) => p === uid || !rankAssign.includes(p))
+                          .map((p) => (
+                            <option key={p} value={p}>{getUserName(p)}</option>
+                          ))}
+                      </select>
+                      <span className={`text-xs shrink-0 flex items-center gap-0.5 ${prize > 0 ? 'text-swan-accent' : 'text-swan-muted'}`}>
                         <FeatherPtIcon size={10} />{prize.toLocaleString()}
                       </span>
                     </div>
-                    {benefitItems.length > 0 && (
+                    {isBubble && <p className="text-[10px] text-swan-muted pl-16">バブル（賞金なし）</p>}
+                    {benefitItems.length > 0 && uid && (
                       <select
-                        value={settlePerks[r.uid] ?? ''}
-                        onChange={(e) => setSettlePerks({ ...settlePerks, [r.uid]: e.target.value })}
+                        value={settlePerks[uid] ?? ''}
+                        onChange={(e) => setSettlePerks({ ...settlePerks, [uid]: e.target.value })}
                         className="w-full bg-swan-black border border-swan-border rounded px-2 py-1 text-xs text-swan-text"
                       >
                         <option value="">特典なし</option>
@@ -694,6 +754,17 @@ export const MatchesAdminPage = () => {
                   </div>
                 )
               })}
+
+              {/* 順位づけしない参加者 */}
+              {settleBusted.length > 0 && (
+                <div className="bg-swan-black/40 border border-swan-border rounded-lg p-3">
+                  <p className="text-xs text-swan-sub mb-1">Busted（順位なし・{settleBusted.length}名）</p>
+                  <p className="text-xs text-swan-muted leading-relaxed">
+                    {settleBusted.map(getUserName).join('、')}
+                  </p>
+                </div>
+              )}
+
               {settleError && <p className="text-red-400 text-xs text-center">{settleError}</p>}
               <div className="flex gap-2">
                 <button onClick={handleTournamentSettle} disabled={saving || (settleDist !== null && !settleDist.ok)}

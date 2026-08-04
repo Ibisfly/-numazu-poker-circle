@@ -21,6 +21,7 @@ import {
 } from 'firebase/firestore'
 import { db } from './config'
 import { computeMatchPrizes, toDistributionRules } from '@/lib/prizeDistribution'
+import { formatRank } from '@/lib/rankLabel'
 import type {
   User,
   Event,
@@ -1032,7 +1033,7 @@ export const settleMatch = async (
     batch.set(notifRef, {
       uid,
       type: 'match_result',
-      message: `${match.title} が終了しました。${rank}位 / 獲得 ${earnedPoints}pt${itemSuffix}`,
+      message: `${match.title} が終了しました。${formatRank(rank)} / 獲得 ${earnedPoints}pt${itemSuffix}`,
       isRead: false,
       createdAt: serverTimestamp(),
     })
@@ -1079,7 +1080,11 @@ export interface MatchPointsTotals {
   ringNet: Map<string, number>             // uid → リング収支（キャッシュバック − エントリー費 − リバイ費）
 }
 
-export const getMatchPointsTotals = async (): Promise<MatchPointsTotals> => {
+/**
+ * マッチ成績を集計する。
+ * year を渡すとその年に精算されたマッチだけを対象にする（年間ランキング用）。
+ */
+export const getMatchPointsTotals = async (year?: number): Promise<MatchPointsTotals> => {
   const [resultsSnap, matchesSnap] = await Promise.all([
     getDocs(collection(db, 'matchResults')),
     getDocs(collection(db, 'matches')),
@@ -1093,6 +1098,10 @@ export const getMatchPointsTotals = async (): Promise<MatchPointsTotals> => {
     const result = resultDoc.data()
     const match = matchMap.get(result.matchId)
     if (!match) continue
+    if (year !== undefined) {
+      const settledAt: Timestamp | undefined = result.settledAt
+      if (!settledAt || settledAt.toDate().getFullYear() !== year) continue
+    }
 
     if (match.matchCategory === 'ring') {
       const cashbacks: { uid: string; amount: number }[] = result.cashbacks ?? []

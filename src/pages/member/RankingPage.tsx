@@ -6,16 +6,18 @@ import { GoldMedalIcon, SilverMedalIcon, BronzeMedalIcon, BeginnerIcon } from '@
 import { TitleBadge } from '@/components/ui/TitleBadge'
 import { useAuth } from '@/lib/hooks/useAuth'
 import { subscribeRanking, getMatchPointsTotals } from '@/lib/firebase/firestore'
+import type { MatchPointsTotals } from '@/lib/firebase/firestore'
 import type { User } from '@/types'
 
-type Tab = 'total' | 'year' | 'tournament' | 'ring'
+type Tab = 'year' | 'tournament' | 'ring'
 
 const TAB_LABELS: Record<Tab, string> = {
-  total: '累計',
   year: '年間',
   tournament: 'トナメ',
   ring: 'リング',
 }
+
+const TOP_COUNT = 5
 
 const RankBadge = ({ rank }: { rank: number }) => {
   if (rank === 1) return <GoldMedalIcon size={36} />
@@ -43,32 +45,105 @@ const getRankBorder = (rank: number, isMe: boolean) => {
   return 'border-swan-border'
 }
 
+// ── ランキング1行 ───────────────────────────────────────────────────────────
+const RankRow = ({
+  entry,
+  rank,
+  isMe,
+  showPlus,
+}: {
+  entry: { user: User; value: number }
+  rank: number
+  isMe: boolean
+  showPlus: boolean
+}) => {
+  const u = entry.user
+  const points = entry.value
+  const gradient = getRankGradient(rank)
+
+  return (
+    <div
+      className={`relative overflow-hidden flex items-center gap-3 px-4 py-4 rounded-2xl border-2 transition-all ${getRankBorder(rank, isMe)} ${
+        isMe ? 'bg-swan-accent/10' : 'bg-swan-card'
+      } ${rank <= 3 ? 'shadow-lg' : ''}`}
+    >
+      {gradient && (
+        <div className={`absolute inset-0 bg-gradient-to-r ${gradient} pointer-events-none`} />
+      )}
+      <div className="relative z-10 flex items-center gap-3 flex-1 min-w-0">
+        <RankBadge rank={rank} />
+        <SwanAvatar
+          color={u.avatarColor ?? DEFAULT_AVATAR_COLOR}
+          size={40}
+          frame={u.equippedFrame}
+          variant={u.avatarVariant}
+        />
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-1.5">
+            <p className={`font-bold truncate ${rank === 1 ? 'text-yellow-400' : isMe ? 'text-swan-accent' : 'text-swan-text'}`}>
+              {u.playerName}
+            </p>
+            {u.isBeginner && <BeginnerIcon size={14} />}
+            {u.role === 'admin' && (
+              <span className="text-[10px] text-swan-sub border border-swan-border px-1 py-0.5 rounded shrink-0">運営</span>
+            )}
+            {isMe && <span className="text-xs text-swan-accent shrink-0">(自分)</span>}
+          </div>
+          {u.equippedTitle && (
+            <div className="mt-0.5">
+              <TitleBadge title={u.equippedTitle} tier={u.equippedTitleTier ?? 'common'} />
+            </div>
+          )}
+        </div>
+      </div>
+      <div className="relative z-10 text-right shrink-0">
+        <p className={`font-bold text-lg flex items-center gap-1 justify-end ${
+          points < 0 ? 'text-red-400' : rank === 1 ? 'text-yellow-400' : 'text-swan-accent'
+        }`}>
+          <FeatherIcon size={16} />
+          {showPlus && points > 0 ? '+' : ''}{points.toLocaleString()}
+        </p>
+      </div>
+    </div>
+  )
+}
+
+const CURRENT_YEAR = new Date().getFullYear()
+
 export const RankingPage = () => {
   const { user } = useAuth()
-  const [tab, setTab] = useState<Tab>('total')
+  const [tab, setTab] = useState<Tab>('year')
   const [allUsers, setAllUsers] = useState<User[]>([])
-  const [matchTotals, setMatchTotals] = useState<{
-    tournamentEarnings: Map<string, number>
-    ringNet: Map<string, number>
-  } | null>(null)
+  // 年間タブは当年分、トナメ／リングタブは通算の集計を使う
+  const [yearTotals, setYearTotals] = useState<MatchPointsTotals | null>(null)
+  const [matchTotals, setMatchTotals] = useState<MatchPointsTotals | null>(null)
 
   useEffect(() => {
-    // 全タブでアクティブユーザー一覧が必要（マッチ系タブは集計値と突き合わせる）
-    const field = tab === 'year' ? 'yearPoints' : 'totalPoints'
-    return subscribeRanking(field, setAllUsers)
-  }, [tab])
+    // 全タブでアクティブユーザー一覧が必要（マッチ集計値と突き合わせる）
+    return subscribeRanking('totalPoints', setAllUsers)
+  }, [])
 
   useEffect(() => {
-    if (tab !== 'tournament' && tab !== 'ring') return
-    getMatchPointsTotals().then(setMatchTotals).catch(() => setMatchTotals(null))
-  }, [tab])
+    if (tab === 'year') {
+      if (yearTotals) return
+      getMatchPointsTotals(CURRENT_YEAR).then(setYearTotals).catch(() => setYearTotals(null))
+    } else {
+      if (matchTotals) return
+      getMatchPointsTotals().then(setMatchTotals).catch(() => setMatchTotals(null))
+    }
+  }, [tab, yearTotals, matchTotals])
 
-  // 管理者もランキングに表示する
-  const rankedEntries: { user: User; value: number }[] = (() => {
-    if (tab === 'total' || tab === 'year') {
+  // 管理者もランキングに表示する。年間はトーナメント賞金＋リング収支で算出
+  const allEntries: { user: User; value: number }[] = (() => {
+    if (tab === 'year') {
+      if (!yearTotals) return []
       return allUsers
-        .map((u) => ({ user: u, value: tab === 'total' ? u.totalPoints : u.yearPoints }))
-        .slice(0, 5)
+        .map((u) => ({
+          user: u,
+          value: (yearTotals.tournamentEarnings.get(u.uid) ?? 0) + (yearTotals.ringNet.get(u.uid) ?? 0),
+        }))
+        .filter((e) => yearTotals.tournamentEarnings.has(e.user.uid) || yearTotals.ringNet.has(e.user.uid))
+        .sort((a, b) => b.value - a.value)
     }
     if (!matchTotals) return []
     const totals = tab === 'tournament' ? matchTotals.tournamentEarnings : matchTotals.ringNet
@@ -76,17 +151,21 @@ export const RankingPage = () => {
       .filter((u) => totals.has(u.uid))
       .map((u) => ({ user: u, value: totals.get(u.uid) ?? 0 }))
       .sort((a, b) => b.value - a.value)
-      .slice(0, 5)
   })()
 
+  const rankedEntries = allEntries.slice(0, TOP_COUNT)
   const rankedUsers = rankedEntries.map((e) => e.user)
+
+  // 上位5名に入っていない場合は、自分の順位を下に別枠で表示する
+  const myIndex = user ? allEntries.findIndex((e) => e.user.uid === user.uid) : -1
+  const myEntry = myIndex >= TOP_COUNT ? allEntries[myIndex] : null
 
   return (
     <AppShell title="ランキング">
       <div className="py-4">
         {/* タブ */}
         <div className="flex bg-swan-card rounded-xl p-1 mb-2">
-          {(['total', 'year', 'tournament', 'ring'] as Tab[]).map((t) => (
+          {(['year', 'tournament', 'ring'] as Tab[]).map((t) => (
             <button
               key={t}
               onClick={() => setTab(t)}
@@ -99,10 +178,9 @@ export const RankingPage = () => {
           ))}
         </div>
         <p className="text-xs text-swan-muted text-center mb-6">
-          {tab === 'total' && '獲得ポイントの累計ランキング'}
-          {tab === 'year' && '今年の獲得ポイントランキング'}
-          {tab === 'tournament' && 'トーナメント賞金の合計ランキング'}
-          {tab === 'ring' && 'プレミアリングの収支ランキング'}
+          {tab === 'year' && `${CURRENT_YEAR}年のトーナメント賞金＋リング収支ランキング`}
+          {tab === 'tournament' && 'トーナメント賞金の合計ランキング（通算）'}
+          {tab === 'ring' && 'プレミアリングの収支ランキング（通算）'}
         </p>
 
         {/* トップ3 ポディウム */}
@@ -160,67 +238,40 @@ export const RankingPage = () => {
 
         {/* ランキングリスト */}
         <div className="space-y-3">
-          {rankedEntries.map(({ user: u, value: points }, i) => {
-            const rank = i + 1
-            const isMe = u.uid === user?.uid
-            const gradient = getRankGradient(rank)
-            const borderColor = getRankBorder(rank, isMe)
-
-            return (
-              <div
-                key={u.uid}
-                className={`relative overflow-hidden flex items-center gap-3 px-4 py-4 rounded-2xl border-2 transition-all ${borderColor} ${
-                  isMe ? 'bg-swan-accent/10' : 'bg-swan-card'
-                } ${rank <= 3 ? 'shadow-lg' : ''}`}
-              >
-                {gradient && (
-                  <div className={`absolute inset-0 bg-gradient-to-r ${gradient} pointer-events-none`} />
-                )}
-                <div className="relative z-10 flex items-center gap-3 flex-1 min-w-0">
-                  <RankBadge rank={rank} />
-                  <SwanAvatar
-                    color={u.avatarColor ?? DEFAULT_AVATAR_COLOR}
-                    size={40}
-                    frame={u.equippedFrame}
-                    variant={u.avatarVariant}
-                  />
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-1.5">
-                      <p className={`font-bold truncate ${rank === 1 ? 'text-yellow-400' : isMe ? 'text-swan-accent' : 'text-swan-text'}`}>
-                        {u.playerName}
-                      </p>
-                      {u.isBeginner && <BeginnerIcon size={14} />}
-                      {u.role === 'admin' && (
-                        <span className="text-[10px] text-swan-sub border border-swan-border px-1 py-0.5 rounded shrink-0">運営</span>
-                      )}
-                      {isMe && <span className="text-xs text-swan-accent shrink-0">(自分)</span>}
-                    </div>
-                    {u.equippedTitle && (
-                      <div className="mt-0.5">
-                        <TitleBadge title={u.equippedTitle} tier={u.equippedTitleTier ?? 'common'} />
-                      </div>
-                    )}
-                  </div>
-                </div>
-                <div className="relative z-10 text-right shrink-0">
-                  <p className={`font-bold text-lg flex items-center gap-1 justify-end ${
-                    points < 0 ? 'text-red-400' : rank === 1 ? 'text-yellow-400' : 'text-swan-accent'
-                  }`}>
-                    <FeatherIcon size={16} />
-                    {tab === 'ring' && points > 0 ? '+' : ''}{points.toLocaleString()}
-                  </p>
-                </div>
-              </div>
-            )
-          })}
+          {rankedEntries.map((entry, i) => (
+            <RankRow
+              key={entry.user.uid}
+              entry={entry}
+              rank={i + 1}
+              isMe={entry.user.uid === user?.uid}
+              showPlus={tab !== 'tournament'}
+            />
+          ))}
           {rankedUsers.length === 0 && (
             <p className="text-center text-swan-sub py-12">データがありません</p>
           )}
         </div>
 
+        {/* 6位以下の自分の順位 */}
+        {myEntry && (
+          <div className="mt-8">
+            <div className="flex items-center justify-center gap-1 mb-2 text-swan-muted">
+              <span className="text-xs">・・・</span>
+            </div>
+            <RankRow entry={myEntry} rank={myIndex + 1} isMe showPlus={tab !== 'tournament'} />
+          </div>
+        )}
+
+        {/* 集計対象外（まだ記録がない）場合 */}
+        {user && myIndex < 0 && rankedUsers.length > 0 && (
+          <p className="text-xs text-swan-muted text-center mt-8">
+            あなたはまだこのランキングに記録がありません
+          </p>
+        )}
+
         {/* 注釈 */}
         <p className="text-xs text-swan-muted text-center mt-6">
-          上位5名を表示しています
+          上位{TOP_COUNT}名を表示しています
         </p>
       </div>
     </AppShell>
