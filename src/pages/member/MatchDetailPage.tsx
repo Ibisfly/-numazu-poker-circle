@@ -3,9 +3,11 @@ import { useParams, useNavigate, Link } from 'react-router-dom'
 import { AppShell } from '@/components/layout/AppShell'
 import { FeatherIcon } from '@/components/ui/FeatherIcon'
 import { useAuth } from '@/lib/hooks/useAuth'
-import { subscribeMatch, subscribeAllUsers, performRebuy, performReentry, cancelMatchEntry, notifyAdminsMatchReady } from '@/lib/firebase/firestore'
+import { subscribeMatch, subscribeAllUsers, performRebuy, performReentry, cancelMatchEntry, notifyAdminsMatchReady, subscribeMatchResult } from '@/lib/firebase/firestore'
+import type { MatchResultDetail } from '@/lib/firebase/firestore'
 import { PrizeTable } from '@/components/ui/PrizeTable'
 import { computeMatchPrizes } from '@/lib/prizeDistribution'
+import { formatRank, isRanked } from '@/lib/rankLabel'
 import type { Match, User } from '@/types'
 import { writeBatch, doc, collection, increment, serverTimestamp, arrayUnion } from 'firebase/firestore'
 import { db } from '@/lib/firebase/config'
@@ -16,6 +18,7 @@ export const MatchDetailPage = () => {
   const navigate = useNavigate()
   const [match, setMatch] = useState<Match | null>(null)
   const [allUsers, setAllUsers] = useState<User[]>([])
+  const [result, setResult] = useState<MatchResultDetail | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
@@ -35,6 +38,12 @@ export const MatchDetailPage = () => {
   useEffect(() => {
     return subscribeAllUsers(setAllUsers)
   }, [])
+
+  // 終了後は全員分の結果を表示する
+  useEffect(() => {
+    if (!matchId) return
+    return subscribeMatchResult(matchId, setResult)
+  }, [matchId])
 
   const getName = (uid: string) =>
     allUsers.find((u) => u.uid === uid)?.playerName ?? uid.slice(0, 8) + '...'
@@ -201,6 +210,91 @@ export const MatchDetailPage = () => {
             </div>
           )}
         </div>
+
+        {/* 終了後：全員分の結果 */}
+        {match.status === 'finished' && result && (
+          <div className="bg-swan-card border border-swan-border rounded-xl p-4">
+            <h3 className="text-sm font-semibold mb-3 text-swan-sub">結果</h3>
+
+            {cat === 'tournament' ? (
+              <div className="space-y-1">
+                {/* 順位づけされた人が上、Busted は下に回す */}
+                {[...(result.rankings ?? [])]
+                  .sort((a, b) => {
+                    if (isRanked(a.rank) !== isRanked(b.rank)) return isRanked(a.rank) ? -1 : 1
+                    return a.rank - b.rank
+                  })
+                  .map((r) => {
+                    const isMe = r.uid === user.uid
+                    return (
+                      <div
+                        key={r.uid}
+                        className={`flex items-center gap-2 py-1.5 border-b border-swan-border/50 last:border-0 ${
+                          isMe ? 'text-swan-accent' : ''
+                        }`}
+                      >
+                        <span className={`text-sm w-16 shrink-0 font-bold ${
+                          r.rank === 1 ? 'text-yellow-400' : isRanked(r.rank) ? 'text-swan-text' : 'text-swan-muted'
+                        }`}>
+                          {formatRank(r.rank)}
+                        </span>
+                        <Link
+                          to={`/members/${r.uid}`}
+                          className={`text-sm flex-1 min-w-0 truncate hover:underline ${
+                            isMe ? 'text-swan-accent font-medium' : 'text-swan-sub'
+                          }`}
+                        >
+                          {getName(r.uid)}{isMe && '（自分）'}
+                        </Link>
+                        <span className={`text-sm shrink-0 flex items-center gap-0.5 ${
+                          r.earnedPoints > 0 ? 'text-swan-accent' : 'text-swan-muted'
+                        }`}>
+                          <FeatherIcon />{r.earnedPoints.toLocaleString()}
+                        </span>
+                      </div>
+                    )
+                  })}
+              </div>
+            ) : (
+              <div className="space-y-1">
+                {[...(result.cashbacks ?? [])]
+                  .map((c) => {
+                    // 収支＝キャッシュバック − （エントリー費＋リバイ費）
+                    const rebuyCount = (match.rebuys ?? {})[c.uid] ?? 0
+                    const paid = match.entryFee + rebuyCount * (match.rebuyFee ?? match.entryFee)
+                    return { ...c, net: c.amount - paid }
+                  })
+                  .sort((a, b) => b.net - a.net)
+                  .map((c) => {
+                    const isMe = c.uid === user.uid
+                    return (
+                      <div
+                        key={c.uid}
+                        className="flex items-center gap-2 py-1.5 border-b border-swan-border/50 last:border-0"
+                      >
+                        <Link
+                          to={`/members/${c.uid}`}
+                          className={`text-sm flex-1 min-w-0 truncate hover:underline ${
+                            isMe ? 'text-swan-accent font-medium' : 'text-swan-sub'
+                          }`}
+                        >
+                          {getName(c.uid)}{isMe && '（自分）'}
+                        </Link>
+                        <span className="text-xs text-swan-muted shrink-0">
+                          払戻 {c.amount.toLocaleString()}
+                        </span>
+                        <span className={`text-sm shrink-0 w-20 text-right font-bold ${
+                          c.net > 0 ? 'text-green-400' : c.net < 0 ? 'text-red-400' : 'text-swan-sub'
+                        }`}>
+                          {c.net > 0 ? '+' : ''}{c.net.toLocaleString()}
+                        </span>
+                      </div>
+                    )
+                  })}
+              </div>
+            )}
+          </div>
+        )}
 
         {/* プライズ：自動配分は現在のエントリー数から暫定額を出す */}
         {isAutoPrize && autoPrize && (

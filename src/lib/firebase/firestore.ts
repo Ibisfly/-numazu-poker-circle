@@ -1055,6 +1055,28 @@ export const settleMatch = async (
   await batch.commit()
 }
 
+// ── マッチ結果の取得（マッチ詳細の全員分表示用）────────────────────────────
+
+export interface MatchResultDetail {
+  id: string
+  matchId: string
+  rankings?: { uid: string; rank: number; earnedPoints: number }[]  // トーナメント
+  cashbacks?: { uid: string; amount: number }[]                     // プレミアリング
+  settledAt?: Timestamp
+}
+
+export const subscribeMatchResult = (
+  matchId: string,
+  cb: (result: MatchResultDetail | null) => void
+) =>
+  onSnapshot(
+    query(collection(db, 'matchResults'), where('matchId', '==', matchId)),
+    (snap) => {
+      const d = snap.docs[0]
+      cb(d ? ({ id: d.id, ...d.data() } as MatchResultDetail) : null)
+    }
+  )
+
 // ── リザルト発表（ホーム画面表示用）───────────────────────────────────────
 export const subscribeUnreadMatchAnnouncements = (
   uid: string,

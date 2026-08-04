@@ -20,8 +20,14 @@ import type { User, PointLog, UserAchievement } from '@/types'
 import { ACHIEVEMENTS } from '@/lib/achievements'
 import { TitleBadge } from '@/components/ui/TitleBadge'
 
-interface TournamentStats { entries: number; wins: number; placements: number }
-interface RingStats      { entries: number; netProfit: number }
+interface TournamentStats {
+  entries: number
+  wins: number
+  placements: number
+  buyIn: number    // 支払ったエントリー費＋リエントリー費の合計
+  earned: number   // 獲得賞金の合計
+}
+interface RingStats { entries: number; netProfit: number }
 
 export const MemberProfilePage = () => {
   const { uid } = useParams<{ uid: string }>()
@@ -30,7 +36,7 @@ export const MemberProfilePage = () => {
   const [member, setMember]       = useState<User | null>(null)
   const [pointLogs, setPointLogs] = useState<PointLog[]>([])
   const [achievements, setAchievements] = useState<UserAchievement[]>([])
-  const [tournamentStats, setTournamentStats] = useState<TournamentStats>({ entries: 0, wins: 0, placements: 0 })
+  const [tournamentStats, setTournamentStats] = useState<TournamentStats>({ entries: 0, wins: 0, placements: 0, buyIn: 0, earned: 0 })
   const [ringStats, setRingStats]             = useState<RingStats>({ entries: 0, netProfit: 0 })
 
   // メモ機能
@@ -68,7 +74,7 @@ export const MemberProfilePage = () => {
         matchesSnap.docs.map((d) => [d.id, d.data()])
       )
 
-      const tourn: TournamentStats = { entries: 0, wins: 0, placements: 0 }
+      const tourn: TournamentStats = { entries: 0, wins: 0, placements: 0, buyIn: 0, earned: 0 }
       const ring:  RingStats       = { entries: 0, netProfit: 0 }
 
       for (const doc of resultsSnap.docs) {
@@ -96,6 +102,11 @@ export const MemberProfilePage = () => {
             tourn.entries++
             if (entry.rank === 1) tourn.wins++
             if (entry.earnedPoints > 0) tourn.placements++  // 入賞 = ポイント獲得順位
+            // ROI 算出のため、リエントリー分を含む支払総額を積み上げる
+            const reentryCount = (match.reentries as Record<string, number> ?? {})[uid] ?? 0
+            const reentryFee = match.reentryFee ?? match.entryFee ?? 0
+            tourn.buyIn += (match.entryFee ?? 0) + reentryCount * reentryFee
+            tourn.earned += entry.earnedPoints
           }
         }
       }
@@ -121,6 +132,10 @@ export const MemberProfilePage = () => {
   }))
 
   const attendanceLogs = pointLogs.filter((l) => l.type === 'attendance').length
+
+  // トーナメント収支と ROI（投資額 0 のときは算出不能）
+  const tournamentNet = tournamentStats.earned - tournamentStats.buyIn
+  const tournamentRoi = tournamentStats.buyIn > 0 ? (tournamentNet / tournamentStats.buyIn) * 100 : null
 
   const handleSaveNote = async () => {
     if (!currentUser || !uid) return
@@ -220,6 +235,36 @@ export const MemberProfilePage = () => {
                   <p className="text-[10px] text-swan-sub">入賞</p>
                 </div>
               </div>
+
+              {/* 収支と ROI（獲得賞金 − 支払ったエントリー費） */}
+              <div className="grid grid-cols-2 gap-2 text-center mt-3 pt-3 border-t border-swan-border/60">
+                <div>
+                  <p className={`text-xl font-bold ${
+                    tournamentNet > 0 ? 'text-green-400'
+                    : tournamentNet < 0 ? 'text-red-400'
+                    : 'text-swan-sub'
+                  }`}>
+                    {tournamentNet > 0 ? '+' : ''}{tournamentNet.toLocaleString()}
+                  </p>
+                  <p className="text-[10px] text-swan-sub">収支 (pt)</p>
+                </div>
+                <div>
+                  <p className={`text-xl font-bold ${
+                    tournamentRoi === null ? 'text-swan-sub'
+                    : tournamentRoi > 0 ? 'text-green-400'
+                    : tournamentRoi < 0 ? 'text-red-400'
+                    : 'text-swan-sub'
+                  }`}>
+                    {tournamentRoi === null
+                      ? '—'
+                      : `${tournamentRoi > 0 ? '+' : ''}${tournamentRoi.toFixed(1)}%`}
+                  </p>
+                  <p className="text-[10px] text-swan-sub">ROI</p>
+                </div>
+              </div>
+              <p className="text-[10px] text-swan-muted mt-1.5 text-center">
+                投資額 {tournamentStats.buyIn.toLocaleString()} / 獲得 {tournamentStats.earned.toLocaleString()}
+              </p>
             </div>
 
             {/* プレミアリング */}
@@ -270,14 +315,15 @@ export const MemberProfilePage = () => {
         {unlockedAchievements.length > 0 && (
           <div>
             <h3 className="text-xs font-semibold text-swan-sub uppercase tracking-wide mb-2">解除済み実績</h3>
-            <div className="flex flex-wrap gap-2">
+            {/* 文字数で幅がばらつかないよう等幅グリッドに並べる */}
+            <div className="grid grid-cols-2 gap-2">
               {unlockedAchievements.map((ua) => (
                 <div key={ua.id}
-                  className="bg-swan-card border border-swan-accent/30 rounded-lg px-3 py-2 text-xs flex items-center gap-1"
+                  className="bg-swan-card border border-swan-accent/30 rounded-lg px-3 py-2 text-xs flex items-center gap-1.5 min-w-0"
                   title={ua.def?.description}
                 >
                   <AchievementIcon achievementId={ua.achievementId} size={18} />
-                  {ua.def?.name ?? ua.achievementId}
+                  <span className="truncate">{ua.def?.name ?? ua.achievementId}</span>
                 </div>
               ))}
             </div>

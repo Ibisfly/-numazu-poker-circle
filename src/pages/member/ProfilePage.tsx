@@ -26,7 +26,7 @@ import {
   subscribeUserEventSummaries,
 } from '@/lib/firebase/firestore'
 import { FRAME_DEFS, POINT_ICON_DEFS, DynamicPointIcon } from '@/components/ui/SwanAvatar'
-import { logOut } from '@/lib/firebase/auth'
+import { logOut, linkGoogleAccount, authErrorMessage } from '@/lib/firebase/auth'
 import { formatRank } from '@/lib/rankLabel'
 import type { PointLog, UserAchievement, UserItem, Item, UserTitle, EventParticipantSummary } from '@/types'
 import { ACHIEVEMENTS } from '@/lib/achievements'
@@ -99,7 +99,9 @@ const DecoSection = ({
 }
 
 export const ProfilePage = () => {
-  const { user } = useAuth()
+  const { user, firebaseUser } = useAuth()
+  const [linking, setLinking] = useState(false)
+  const [linkMessage, setLinkMessage] = useState('')
   const [pointLogs, setPointLogs] = useState<PointLog[]>([])
   const [achievements, setAchievements] = useState<UserAchievement[]>([])
   const [userItems, setUserItems] = useState<UserItem[]>([])
@@ -150,6 +152,25 @@ export const ProfilePage = () => {
     setEditVariant(user.avatarVariant ?? 'default')
     setSaveError('')
     setEditing(true)
+  }
+
+  // ゲスト → Google 連携。uid が変わらないため既存データはそのまま引き継がれる
+  const handleLinkGoogle = async () => {
+    setLinking(true)
+    setLinkMessage('')
+    try {
+      const result = await linkGoogleAccount()
+      // リダイレクト方式では画面遷移するのでここに来ない
+      if (result) {
+        setLinkMessage('連携しました')
+        // isAnonymous の変化を確実に反映させるため再読み込みする
+        window.location.reload()
+      }
+    } catch (e) {
+      setLinkMessage(authErrorMessage(e) || '連携をキャンセルしました')
+    } finally {
+      setLinking(false)
+    }
   }
 
   const handleSave = async () => {
@@ -761,6 +782,31 @@ export const ProfilePage = () => {
           >
             <Shield size={16} /> 管理パネルへ
           </Link>
+        )}
+
+        {/* ゲストアカウントの引き継ぎ（uid は変わらないのでデータはそのまま残る） */}
+        {firebaseUser?.isAnonymous && (
+          <div className="border border-yellow-500/40 bg-yellow-500/10 rounded-xl p-4 space-y-2">
+            <p className="text-sm font-bold text-yellow-400">ゲストアカウントで利用中</p>
+            <p className="text-xs text-swan-sub leading-relaxed">
+              このアカウントは今の端末・ブラウザにのみ保存されています。
+              アプリを削除したりデータを消すと復元できません。
+              Google アカウントを連携すると、ポイント・戦績・実績をそのまま引き継いで
+              どの端末からでもログインできるようになります。
+            </p>
+            {linkMessage && (
+              <p className={`text-xs ${linkMessage.startsWith('連携') ? 'text-green-400' : 'text-red-400'}`}>
+                {linkMessage}
+              </p>
+            )}
+            <button
+              onClick={handleLinkGoogle}
+              disabled={linking}
+              className="w-full bg-white text-gray-800 font-semibold py-2.5 rounded-lg text-sm disabled:opacity-60 active:scale-[0.98] transition-transform"
+            >
+              {linking ? '連携中...' : 'Google アカウントを連携する'}
+            </button>
+          </div>
         )}
 
         <button
