@@ -26,7 +26,7 @@ import {
   subscribeUserEventSummaries,
 } from '@/lib/firebase/firestore'
 import { FRAME_DEFS, POINT_ICON_DEFS, DynamicPointIcon } from '@/components/ui/SwanAvatar'
-import { logOut, linkGoogleAccount, authErrorMessage } from '@/lib/firebase/auth'
+import { logOut, linkGoogleAccount, authErrorMessage, consumeRedirectResult } from '@/lib/firebase/auth'
 import { formatRank } from '@/lib/rankLabel'
 import type { PointLog, UserAchievement, UserItem, Item, UserTitle, EventParticipantSummary } from '@/types'
 import { ACHIEVEMENTS } from '@/lib/achievements'
@@ -102,6 +102,7 @@ export const ProfilePage = () => {
   const { user, firebaseUser } = useAuth()
   const [linking, setLinking] = useState(false)
   const [linkMessage, setLinkMessage] = useState('')
+  const [linkConflict, setLinkConflict] = useState(false)
   const [pointLogs, setPointLogs] = useState<PointLog[]>([])
   const [achievements, setAchievements] = useState<UserAchievement[]>([])
   const [userItems, setUserItems] = useState<UserItem[]>([])
@@ -155,19 +156,40 @@ export const ProfilePage = () => {
   }
 
   // ゲスト → Google 連携。uid が変わらないため既存データはそのまま引き継がれる
+  const handleLinkResult = (e: unknown) => {
+    // 選んだ Google アカウントが既に別の会員アカウントとして存在する場合、
+    // Firebase のリンクでは統合できない（リンク＝認証方法の追加のため）
+    if ((e as { code?: string }).code === 'auth/credential-already-in-use') {
+      setLinkConflict(true)
+      setLinkMessage('')
+      return
+    }
+    setLinkMessage(authErrorMessage(e) || '連携をキャンセルしました')
+  }
+
+  // リダイレクト方式で連携した場合、戻ってきたときに結果を受け取る
+  // （これがないと失敗が無言になり、何度押しても同じ画面が出続ける）
+  useEffect(() => {
+    consumeRedirectResult()
+      .then((result) => { if (result) setLinkMessage('連携しました') })
+      .catch(handleLinkResult)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
   const handleLinkGoogle = async () => {
     setLinking(true)
     setLinkMessage('')
+    setLinkConflict(false)
     try {
       const result = await linkGoogleAccount()
-      // リダイレクト方式では画面遷移するのでここに来ない
+      // リダイレクト方式では画面遷移するのでここには来ない
       if (result) {
         setLinkMessage('連携しました')
         // isAnonymous の変化を確実に反映させるため再読み込みする
         window.location.reload()
       }
     } catch (e) {
-      setLinkMessage(authErrorMessage(e) || '連携をキャンセルしました')
+      handleLinkResult(e)
     } finally {
       setLinking(false)
     }
@@ -176,6 +198,7 @@ export const ProfilePage = () => {
   const handleSave = async () => {
     if (!user) return
     setSaveError('')
+
     const trimmed = playerName.trim()
     if (!trimmed) { setSaveError('プレイヤーネームを入力してください'); return }
     if (trimmed !== user.playerName) {
@@ -799,13 +822,35 @@ export const ProfilePage = () => {
                 {linkMessage}
               </p>
             )}
-            <button
-              onClick={handleLinkGoogle}
-              disabled={linking}
-              className="w-full bg-white text-gray-800 font-semibold py-2.5 rounded-lg text-sm disabled:opacity-60 active:scale-[0.98] transition-transform"
-            >
-              {linking ? '連携中...' : 'Google アカウントを連携する'}
-            </button>
+
+            {/* 選んだ Google アカウントが既に会員登録済みだった場合 */}
+            {linkConflict ? (
+              <div className="border border-red-500/40 bg-red-500/10 rounded-lg p-3 space-y-2">
+                <p className="text-xs text-red-400 font-bold">
+                  この Google アカウントは既に会員登録されています
+                </p>
+                <p className="text-[11px] text-swan-sub leading-relaxed">
+                  連携は「ログイン方法を追加する」機能のため、すでにアカウントを持っている
+                  Google アカウントとゲストを1つにまとめることはできません。
+                  元のアカウントでログインし直してください。
+                  ゲスト中に貯めたポイントの移行が必要な場合は管理者にご相談ください。
+                </p>
+                <button
+                  onClick={() => logOut()}
+                  className="w-full border border-swan-border text-swan-sub py-2 rounded-lg text-xs hover:border-red-400 hover:text-red-400 transition-colors"
+                >
+                  ログアウトして Google でログインし直す
+                </button>
+              </div>
+            ) : (
+              <button
+                onClick={handleLinkGoogle}
+                disabled={linking}
+                className="w-full bg-white text-gray-800 font-semibold py-2.5 rounded-lg text-sm disabled:opacity-60 active:scale-[0.98] transition-transform"
+              >
+                {linking ? '連携中...' : 'Google アカウントを連携する'}
+              </button>
+            )}
           </div>
         )}
 
