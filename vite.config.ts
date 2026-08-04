@@ -30,8 +30,11 @@ export default defineConfig({
         globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
         // ナビゲーション（ルーティング）はindex.htmlにフォールバック
         // /handlog はSPA外の静的アプリ（ハンド履歴記録）なのでフォールバック対象外
+        // /__/ は Firebase が予約する領域（/__/auth/handler など）。
+        // authDomain をアプリと同一ドメインにしたため、ここを除外しないと
+        // Service Worker が認証ハンドラの代わりに index.html を返してしまう
         navigateFallback: 'index.html',
-        navigateFallbackDenylist: [/^\/api\//, /^\/handlog/],
+        navigateFallbackDenylist: [/^\/api\//, /^\/handlog/, /^\/__\//],
         runtimeCaching: [
           // Google Fonts キャッシュ
           {
