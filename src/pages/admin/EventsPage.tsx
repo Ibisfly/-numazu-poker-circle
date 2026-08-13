@@ -44,6 +44,7 @@ export const EventsPage = () => {
   const [editingId, setEditingId] = useState<string | null>(null)  // 編集中のイベントID（nullなら新規）
   const [form, setForm]         = useState(EMPTY)
   const [saving, setSaving]     = useState(false)
+  const [saveError, setSaveError] = useState<string | null>(null)
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const [finishingEvent, setFinishingEvent] = useState<Event | null>(null)
   const [actionLoading, setActionLoading] = useState<string | null>(null)
@@ -55,6 +56,7 @@ export const EventsPage = () => {
   const openCreate = () => {
     setForm(defaultForm())
     setEditingId(null)
+    setSaveError(null)
     setShowForm(true)
   }
 
@@ -66,15 +68,17 @@ export const EventsPage = () => {
       bingoCardId:     ev.bingoCardId ?? '',
     })
     setEditingId(ev.id)
+    setSaveError(null)
     setShowForm(true)
   }
 
-  const closeForm = () => { setShowForm(false); setEditingId(null) }
+  const closeForm = () => { setShowForm(false); setEditingId(null); setSaveError(null) }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!user || !form.title.trim() || !form.date) return
     setSaving(true)
+    setSaveError(null)
     try {
       const payload = {
         title:           form.title.trim(),
@@ -88,6 +92,9 @@ export const EventsPage = () => {
         await createEvent({ ...payload, createdBy: user.uid })
       }
       closeForm()
+    } catch (e: unknown) {
+      console.error('saveEvent error:', e)
+      setSaveError(e instanceof Error ? e.message : 'イベントの保存に失敗しました。もう一度お試しください。')
     } finally {
       setSaving(false)
     }
@@ -199,6 +206,11 @@ export const EventsPage = () => {
                 来店スキャン時に自動でビンゴカードを配布します
               </p>
             </div>
+            {saveError && (
+              <p className="text-xs text-red-400 bg-red-400/10 border border-red-400/30 rounded-lg p-2">
+                {saveError}
+              </p>
+            )}
             <div className="flex gap-2">
               <button type="submit" disabled={saving}
                 className="flex-1 bg-swan-accent text-black font-bold py-2 rounded-lg text-sm disabled:opacity-50 active:scale-[0.98] transition-transform">

@@ -157,11 +157,21 @@ export const subscribeEvents = (cb: (events: Event[]) => void) =>
     (snap) => cb(snap.docs.map((d) => ({ id: d.id, ...d.data() } as Event)))
   )
 
-export const createEvent = (data: Omit<Event, 'id' | 'createdAt' | 'status'>) =>
-  addDoc(collection(db, 'events'), { ...data, status: 'scheduled', createdAt: serverTimestamp() })
+export const createEvent = (data: Omit<Event, 'id' | 'createdAt' | 'status'>) => {
+  // undefined を含むと addDoc が例外を投げるため、未設定の任意フィールド（bingoCardId 等）は落とす
+  const payload = Object.fromEntries(
+    Object.entries(data).filter(([, v]) => v !== undefined)
+  )
+  return addDoc(collection(db, 'events'), { ...payload, status: 'scheduled', createdAt: serverTimestamp() })
+}
 
-export const updateEvent = (eventId: string, data: Partial<Omit<Event, 'id' | 'createdAt' | 'createdBy'>>) =>
-  updateDoc(doc(db, 'events', eventId), data as Record<string, unknown>)
+export const updateEvent = (eventId: string, data: Partial<Omit<Event, 'id' | 'createdAt' | 'createdBy'>>) => {
+  // undefined は「フィールドを削除する」意図として扱う（updateDoc は undefined を受け付けない）
+  const payload = Object.fromEntries(
+    Object.entries(data).map(([k, v]) => [k, v === undefined ? deleteField() : v])
+  )
+  return updateDoc(doc(db, 'events', eventId), payload)
+}
 
 export const deleteEvent = (eventId: string) =>
   deleteDoc(doc(db, 'events', eventId))
