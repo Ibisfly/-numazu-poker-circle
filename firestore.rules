@@ -228,5 +228,93 @@ service cloud.firestore {
       allow read: if isActiveUser();
       allow create, update, delete: if isAdmin();
     }
+
+    // ── clockPings（端末時計のズレ計測）────────────────────────────────────────
+    // 自分の1ドキュメントに serverTimestamp を書いて読み返すだけの用途
+    match /clockPings/{uid} {
+      allow read, write: if isSignedIn() && isSelf(uid);
+    }
+
+    // ── ライブタイマー / トーナメント表（ログイン不要の公開アプリ）───────────────
+    //
+    // 会員アカウントを持たない外部ディーラーにも使わせるため、会員ロールで守らない。
+    //   閲覧: 誰でも可（リンクを踏んだ全員が進行状況を見られるという要件）
+    //   操作: 「操作キー」を知っている端末が admins/{uid} を作れた場合のみ
+    //
+    // キー本体は読み取り禁止の secret/control に置き、照合はルール内の get() で行う。
+    // ルール内の get() はセキュリティルールを迂回して読めるため、キーはクライアントに漏れない。
+
+    function knowsTimerKey(sessionId) {
+      return request.resource.data.controlKey ==
+        get(/databases/$(database)/documents/liveTimers/$(sessionId)/secret/control).data.key;
+    }
+    function controlsTimer(sessionId) {
+      return isSignedIn() &&
+        exists(/databases/$(database)/documents/liveTimers/$(sessionId)/admins/$(request.auth.uid));
+    }
+    function knowsBracketKey(bracketId) {
+      return request.resource.data.controlKey ==
+        get(/databases/$(database)/documents/liveBrackets/$(bracketId)/secret/control).data.key;
+    }
+    function controlsBracket(bracketId) {
+      return isSignedIn() &&
+        exists(/databases/$(database)/documents/liveBrackets/$(bracketId)/admins/$(request.auth.uid));
+    }
+
+    match /liveTimers/{sessionId} {
+      allow read: if true;
+      // 荒らし対策として最低限のサイズ制限をかける
+      allow create: if isSignedIn()
+        && request.resource.data.ownerUid == request.auth.uid
+        && request.resource.data.title is string
+        && request.resource.data.title.size() <= 60
+        && request.resource.data.levels.size() > 0
+        && request.resource.data.levels.size() <= 80;
+      // 所有者の書き換えは禁止（操作権の付与元がすり替わらないようにする）
+      allow update: if controlsTimer(sessionId)
+        && request.resource.data.ownerUid == resource.data.ownerUid
+        && request.resource.data.levels.size() <= 80;
+      allow delete: if controlsTimer(sessionId);
+
+      match /secret/{docId} {
+        // クライアントからは一切読めない。作成後の変更も不可
+        allow read: if false;
+        allow create: if isSignedIn();
+        allow update, delete: if false;
+      }
+
+      match /admins/{uid} {
+        allow read: if isSignedIn() && isSelf(uid);
+        // 同じ端末が再訪したときは上書きになるため update も許可する（キー照合は毎回行う）
+        allow create, update: if isSignedIn() && isSelf(uid) && knowsTimerKey(sessionId);
+        allow delete: if isSignedIn() && isSelf(uid);
+      }
+    }
+
+    match /liveBrackets/{bracketId} {
+      allow read: if true;
+      allow create: if isSignedIn()
+        && request.resource.data.ownerUid == request.auth.uid
+        && request.resource.data.title is string
+        && request.resource.data.title.size() <= 60
+        && request.resource.data.entrants.size() >= 2
+        && request.resource.data.entrants.size() <= 64;
+      allow update: if controlsBracket(bracketId)
+        && request.resource.data.ownerUid == resource.data.ownerUid
+        && request.resource.data.entrants.size() <= 64;
+      allow delete: if controlsBracket(bracketId);
+
+      match /secret/{docId} {
+        allow read: if false;
+        allow create: if isSignedIn();
+        allow update, delete: if false;
+      }
+
+      match /admins/{uid} {
+        allow read: if isSignedIn() && isSelf(uid);
+        allow create, update: if isSignedIn() && isSelf(uid) && knowsBracketKey(bracketId);
+        allow delete: if isSignedIn() && isSelf(uid);
+      }
+    }
   }
 }

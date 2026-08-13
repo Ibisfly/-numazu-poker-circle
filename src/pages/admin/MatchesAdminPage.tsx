@@ -15,10 +15,19 @@ import { MatchFilterBar } from '@/components/ui/MatchFilterBar'
 import { filterMatches, DEFAULT_MATCH_FILTERS, type MatchFilters } from '@/lib/matchFilter'
 import { computePrizeDistribution, computeMatchPrizes } from '@/lib/prizeDistribution'
 
-// ── タイマーアプリ連携セクション ──────────────────────────────────────────
+// ── タイマー / トーナメント表 連携セクション ────────────────────────────────
+// 内蔵の /timer（ログイン不要のライブタイマー）に、マッチの情報を引き継いで飛ぶ。
+// 作成後は閲覧リンクを timerAppUrl に保存し、メンバーのマッチ詳細から開けるようにする。
 const TimerAppSection = ({ match }: { match: Match }) => {
   const [editing, setEditing] = useState(false)
   const [url, setUrl] = useState(match.timerAppUrl ?? '')
+
+  const entries = match.participants.length
+  const timerQuery = new URLSearchParams({
+    title: match.title,
+    entries: String(entries),
+    matchId: match.id,
+  }).toString()
   const [timerState, setTimerState] = useState<{
     state: string
     currentLevel: number
@@ -41,9 +50,31 @@ const TimerAppSection = ({ match }: { match: Match }) => {
   const timerAppBase = 'https://timer-black-swan.web.app'
 
   return (
-    <div className="border-t border-swan-border/50 pt-2 mt-1">
+    <div className="border-t border-swan-border/50 pt-2 mt-1 space-y-1.5">
+      {/* 内蔵ライブタイマー / トーナメント表 */}
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-xs text-swan-sub">ライブタイマー</span>
+        <div className="flex items-center gap-1.5 flex-wrap justify-end">
+          <Link
+            to={`/timer/new?${timerQuery}`}
+            className="text-xs text-swan-accent border border-swan-accent/40 px-2 py-1 rounded-lg hover:bg-swan-accent/10"
+          >
+            タイマー作成
+          </Link>
+          <Link
+            to={`/timer/new-bracket?${timerQuery}`}
+            className="text-xs text-purple-400 border border-purple-400/30 px-2 py-1 rounded-lg hover:bg-purple-400/10"
+          >
+            トーナメント表
+          </Link>
+          <Link to="/timer" className="text-xs text-swan-sub underline">
+            一覧
+          </Link>
+        </div>
+      </div>
+
       <div className="flex items-center justify-between">
-        <span className="text-xs text-swan-sub">タイマーアプリ</span>
+        <span className="text-xs text-swan-sub">外部タイマー</span>
         <div className="flex items-center gap-2">
           {match.timerSessionId ? (
             <>

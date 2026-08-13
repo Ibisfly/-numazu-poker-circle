@@ -122,28 +122,73 @@ firebase deploy --only firestore:rules  # ルールのみデプロイ
 - ブラックスワン飛距離アニメーション（ウィッシュリスト）
 - カスタムアイコン（Firebase Storage）
 
-## 外部タイマーアプリ連携（設計メモ）
+## ALL IN CLOCK（内蔵ライブタイマー / トーナメント表）
 
-**現状の拡張ポイント：**
-- `Match.timerAppUrl?: string` — 外部タイマーアプリのセッションURLを記録するフィールド（実装済み）
-- 管理マッチ画面の `TimerAppSection` コンポーネントがURL管理UIを担当
-- メンバーのマッチ詳細でURLが設定されている場合にリンクボタンを表示
+`/timer` 以下は**会員アプリとは別物として設計された、ログイン不要の公開アプリ**。
+外部ディーラーやゲスト参加者に Google 認証を要求せずに使わせるのが目的。
 
-**連携を深めるために必要な作業：**
+### 画面
+
+| ルート | 内容 |
+|---|---|
+| `/timer` | トップ。作成導線・自分の部屋・プリセット管理 |
+| `/timer/new` | タイマー作成（ストラクチャー生成・編集） |
+| `/timer/new-bracket` | トーナメント表作成（ヘッズアップ / 3on3） |
+| `/timer/t/:id` | ライブタイマー（閲覧は誰でも / 操作は操作キー保持者のみ） |
+| `/timer/b/:id` | トーナメント表（同上） |
+
+### 権限モデル（重要）
+
+会員ロールでは守っていない。`firestore.rules` で以下を実装している。
+
+- **閲覧**: `allow read: if true`（リンクを踏んだ全員が進行状況を見られるという要件）
+- **操作**: `liveTimers/{id}/admins/{uid}` が存在する端末のみ
+  - 操作キーは読み取り禁止の `liveTimers/{id}/secret/control` に置く
+  - `admins/{uid}` の作成時に**ルール内の `get()` でキーを照合**する
+    （ルール内の `get()` はセキュリティルールを迂回して読めるため、キーはクライアントに漏れない）
+- 操作キーは URL の**ハッシュ**に載せる（`#k=...`）。読み取り直後に `replaceState` で消し、
+  localStorage に退避する（画面共有・スクショでの漏洩防止）
+
+**匿名サインインは「部屋を作る」「操作キーで操作権を得る」ときだけ呼ぶ。**
+閲覧者に匿名アカウントを作らせると、会員アプリ側で未登録ゲスト扱いになり
+`/register` に流れてしまうため、閲覧経路からは `ensureAuthUid()` を呼ばない。
+
+### タイマーの時間管理
+
+- 秒単位のカウントダウンは **Firestore に書かない**。`levelEndsAt`（レベル終了時刻）だけを持ち、
+  各クライアントが `projectRunning()` でローカル計算する（書き込みは状態変化時のみ）
+- 操作端末は `clockPings/{uid}` に `serverTimestamp` を書いて読み返し、端末時計のズレを実測補正する
+- 操作端末がスリープしていても閲覧側が正しいレベルに追いつけるよう、
+  `projectRunning()` は 0 を割り込んだ分を次レベルへ繰り越して前進させる
+  （Firestore への書き戻しは操作権を持つ端末だけが行う）
+
+### ファイル構成
+
 ```
-現状（フェーズ1・実装済み）:
-  管理者が外部アプリのURLを手動貼り付け → ワンタップで開くだけ
-
-フェーズ2（URLパラメータ連携）:
-  外部アプリが ?players=N&entryFee=100 等のURLパラメータを受け付ければ
-  createTimerAppUrl(match) 関数で自動生成できる
-  → MatchesAdminPage.tsx の TimerAppSection に「セッション自動作成」ボタンを追加
-
-フェーズ3（双方向同期）:
-  外部アプリがAPIを公開、またはFirestoreプロジェクトを共有する場合
-  → settleMatch() と連携してトーナメント結果を自動取込み可能
-  → src/lib/firebase/timerAppSync.ts を新規作成して分離実装を推奨
+src/lib/liveTimer/
+├── access.ts     # 匿名認証・操作キー照合・時刻補正・URL生成
+├── firestore.ts  # liveTimers / liveBrackets の CRUD と操作
+├── structure.ts  # ストラクチャーの純粋関数（生成・投影・平均スタック）
+├── bracket.ts    # シングルエリミネーションの純粋関数
+├── presets.ts    # プリセット・部屋履歴（localStorage）
+└── runtime.ts    # 効果音・Wake Lock・全画面・クリップボード
+src/pages/timer/  # 5画面 + StructureEditor + shared
+src/styles/timer.css  # 専用デザインシステム（Tailwind に寄せない／黒・グレー禁止）
 ```
+
+### デザイン方針
+
+会員アプリ（swan パレット・黒基調・角丸2px）とは**意図的に別の見た目**にしている。
+
+- 背景は「カードルームのフェルト（深緑）」と「アイボリー紙」の2系統。**黒・グレーは使わない**
+- 状態で画面全体の色温度が変わる（通常=緑 / 休憩=琥珀 / 残り1分=テラコッタ）
+- 見出しは Bodoni Moda、数字は Oswald、日本語は Noto Sans JP
+- テーマは `[data-tm-theme]`、状態は `[data-tm-phase]` で切り替える
+
+### 会員アプリとの連携
+
+`MatchesAdminPage` の `TimerAppSection` から、マッチの情報（タイトル・参加者数・matchId）を
+クエリで引き継いで `/timer/new` に飛べる。旧来の外部タイマー（`timerAppUrl` /
+`timerSessionId` / `getTimerProvisionalRankings`）はレガシーとして残してある。
 
 **参考リポジトリ:** https://github.com/Kujo-n/ALLin-Timer
-- 実績マスタの管理者編集

@@ -1,3 +1,4 @@
+import { lazy, Suspense } from 'react'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { AuthProvider } from '@/contexts/AuthContext'
 import { AchievementProvider } from '@/contexts/AchievementContext'
@@ -38,6 +39,25 @@ import { BingoAdminPage } from '@/pages/admin/BingoAdminPage'
 import { BingoStampPage } from '@/pages/admin/BingoStampPage'
 import { TitlesAdminPage } from '@/pages/admin/TitlesAdminPage'
 
+// Live Timer / Bracket（ログイン不要の公開アプリ）
+// 会員が使わない画面なので、本体バンドルに載せず遅延読み込みにする
+const TimerLandingPage = lazy(() => import('@/pages/timer/TimerLandingPage').then((m) => ({ default: m.TimerLandingPage })))
+const TimerNewPage     = lazy(() => import('@/pages/timer/TimerNewPage').then((m) => ({ default: m.TimerNewPage })))
+const TimerLivePage    = lazy(() => import('@/pages/timer/TimerLivePage').then((m) => ({ default: m.TimerLivePage })))
+const BracketNewPage   = lazy(() => import('@/pages/timer/BracketNewPage').then((m) => ({ default: m.BracketNewPage })))
+const BracketLivePage  = lazy(() => import('@/pages/timer/BracketLivePage').then((m) => ({ default: m.BracketLivePage })))
+
+/** 遅延読み込み中も背景色が本体アプリの黒に落ちないよう、緑地のプレースホルダを出す */
+const TimerRoute = ({ children }: { children: React.ReactNode }) => (
+  <Suspense
+    fallback={
+      <div style={{ minHeight: '100vh', background: 'radial-gradient(120% 90% at 50% 0%, #106d53, #0d5843 42%, #073a2d 100%)' }} />
+    }
+  >
+    {children}
+  </Suspense>
+)
+
 export const App = () => (
   <BrowserRouter>
     <AuthProvider>
@@ -47,6 +67,13 @@ export const App = () => (
         <Route path="/login" element={<LoginPage />} />
         <Route path="/register" element={<RegisterPage />} />
         <Route path="/pending" element={<PendingPage />} />
+
+        {/* ── Live Timer / Bracket（ログイン不要・リンクを知っている全員が閲覧可）── */}
+        <Route path="/timer" element={<TimerRoute><TimerLandingPage /></TimerRoute>} />
+        <Route path="/timer/new" element={<TimerRoute><TimerNewPage /></TimerRoute>} />
+        <Route path="/timer/new-bracket" element={<TimerRoute><BracketNewPage /></TimerRoute>} />
+        <Route path="/timer/t/:id" element={<TimerRoute><TimerLivePage /></TimerRoute>} />
+        <Route path="/timer/b/:id" element={<TimerRoute><BracketLivePage /></TimerRoute>} />
 
         {/* ── Member (requires active status) ── */}
         <Route path="/" element={<RequireAuth><HomePage /></RequireAuth>} />

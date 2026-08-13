@@ -49,6 +49,22 @@ export {
   Clock,
   History,
   Upload,
+  Pause,
+  SkipForward,
+  SkipBack,
+  Maximize2,
+  Minimize2,
+  Volume2,
+  VolumeX,
+  Copy,
+  Timer,
+  GitFork,
+  Wand2,
+  Link2,
+  Download,
+  Save,
+  MonitorPlay,
+  Coffee,
 } from 'lucide-react'
 
 import type { SVGProps } from 'react'

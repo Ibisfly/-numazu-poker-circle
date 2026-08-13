@@ -421,3 +421,83 @@ export interface HandHistory {
   importedBy: string
 }
 
+
+// ── ライブタイマー / トーナメント表（ログイン不要の公開アプリ）─────────────────
+// 会員アカウントを持たない外部ディーラーでも使えるよう、Google 認証を必須にせず
+// 「操作キーを知っている人だけが操作できる」モデルにしている。
+// 閲覧は誰でも可（リンクを踏んだ全員が進行状況を見られる）。
+
+export interface TimerLevel {
+  sb: number
+  bb: number
+  ante: number
+  minutes: number
+  isBreak: boolean
+  note?: string        // 休憩の内容（"チップカラーアップ" 等）
+}
+
+export type LiveTimerState = 'idle' | 'running' | 'paused' | 'finished'
+
+export type LiveTheme = 'felt' | 'ivory' | 'bordeaux'
+
+export interface LiveTimer {
+  id: string
+  title: string
+  levels: TimerLevel[]
+  state: LiveTimerState
+  levelIndex: number
+  /** running 中のみ有効。サーバー時刻基準のレベル終了時刻 */
+  levelEndsAt: Timestamp | null
+  /** idle / paused 中の残りミリ秒。running 中は参照しない */
+  remainingMs: number
+  // 表示用のトーナメント情報（任意）
+  entryCount: number
+  remainingCount: number
+  startingStack: number
+  prizeNote: string
+  theme: LiveTheme
+  /** 効果音・レベルアップ告知を出すか */
+  chimeEnabled: boolean
+  // 紐付け・所有
+  ownerUid: string
+  matchId?: string
+  createdAt: Timestamp
+  updatedAt: Timestamp
+}
+
+export type BracketMode = 'headsup' | 'team'
+
+export interface BracketEntrant {
+  id: string
+  name: string
+  members: string[]    // team モードのみ使用（3on3 なら 3 名）
+  seed: number
+}
+
+export interface BracketMatch {
+  id: string           // 'r0m1' 形式
+  round: number
+  index: number
+  aId: string | null   // entrant.id / null は未確定
+  bId: string | null
+  /** 勝者が進む先のマッチID（決勝は undefined） */
+  nextId?: string
+  winnerId: string | null
+  scoreA: number
+  scoreB: number
+}
+
+export interface LiveBracket {
+  id: string
+  title: string
+  mode: BracketMode
+  /** 1マッチの先取数（headsup: 1 or 2、3on3: 2） */
+  winsNeeded: number
+  entrants: BracketEntrant[]
+  matches: BracketMatch[]
+  theme: LiveTheme
+  ownerUid: string
+  matchId?: string
+  createdAt: Timestamp
+  updatedAt: Timestamp
+}

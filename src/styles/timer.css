@@ -1,0 +1,859 @@
+/* ===========================================================================
+   ライブタイマー / トーナメント表 — 専用デザインシステム
+   ---------------------------------------------------------------------------
+   本体アプリ（swan パレット・角丸2px のブラック基調）とは意図的に別の見た目にする。
+   会場のモニタに映して数時間見続けるものなので、
+     ・背景はカードルームのフェルト（深緑）とアイボリー紙の2系統。黒／グレーは使わない
+     ・数字は遠くから読めるコンデンス体、見出しは活版印刷風のディドネ体
+     ・状態（進行中／終盤／休憩／残り1分）で画面全体の色温度が変わる
+   Tailwind に寄せず素の CSS で書いているのは、角丸・階調・キーフレームを
+   本体アプリの設定に引きずられずに作り込むため。
+   =========================================================================== */
+
+@import url('https://fonts.googleapis.com/css2?family=Bodoni+Moda:ital,opsz,wght@0,6..96,400;0,6..96,600;1,6..96,400&family=Oswald:wght@300;400;500;600&family=Noto+Sans+JP:wght@400;500;700&display=swap');
+
+.tm {
+  /* ── 基本パレット ── */
+  --gold:        #e3c07d;
+  --gold-hi:     #f8eac2;
+  --gold-deep:   #b8944f;
+  --cream:       #fdf8ec;
+  --ivory:       #f6efdf;
+  --paper:       #fffbf2;
+  --ink:         #1b3d33;
+  --bordeaux:    #7d1f3c;
+  --bordeaux-hi: #a63152;
+  --amber:       #d98f42;
+  --terracotta:  #d55a30;
+  --jade:        #17836a;
+
+  /* ── テーマ変数（下の [data-tm-theme] で上書き）── */
+  --bg-1: #0d5843;
+  --bg-2: #073a2d;
+  --bg-3: #106d53;
+  --fg:   var(--cream);
+  --fg-soft: rgba(253, 248, 236, 0.66);
+  --fg-faint: rgba(253, 248, 236, 0.34);
+  --line: rgba(227, 192, 125, 0.28);
+  --line-strong: rgba(227, 192, 125, 0.6);
+  --accent: var(--gold);
+  --surface: rgba(255, 251, 242, 0.06);
+  --surface-2: rgba(255, 251, 242, 0.1);
+  --win-bg: rgba(227, 192, 125, 0.24);
+  --win-bar: var(--gold);
+
+  font-family: 'Noto Sans JP', system-ui, sans-serif;
+  color: var(--fg);
+  min-height: 100vh;
+  min-height: 100dvh;
+  position: relative;
+  isolation: isolate;
+  overflow-x: hidden;
+  background:
+    radial-gradient(120% 90% at 50% 0%, var(--bg-3) 0%, var(--bg-1) 42%, var(--bg-2) 100%);
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* フェルトの織り目。生成画像に頼らず SVG ノイズで質感を出す */
+.tm::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: -2;
+  pointer-events: none;
+  opacity: 0.5;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='180' height='180' filter='url(%23n)' opacity='0.32'/%3E%3C/svg%3E");
+  mix-blend-mode: soft-light;
+}
+
+/* 中央にだけ光が落ちるビネット。長時間見ても目が疲れない */
+.tm::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background: radial-gradient(115% 80% at 50% 34%, transparent 30%, rgba(3, 26, 20, 0.42) 100%);
+}
+
+/* ── テーマ ─────────────────────────────────────────────────────────────── */
+
+.tm[data-tm-theme='ivory'] {
+  --bg-1: #f7f0e0;
+  --bg-2: #efe4cd;
+  --bg-3: #fffaf0;
+  --fg: var(--ink);
+  --fg-soft: rgba(27, 61, 51, 0.66);
+  --fg-faint: rgba(27, 61, 51, 0.3);
+  --line: rgba(27, 61, 51, 0.16);
+  --line-strong: rgba(27, 61, 51, 0.34);
+  --accent: var(--bordeaux);
+  --surface: rgba(255, 255, 255, 0.62);
+  --surface-2: rgba(27, 61, 51, 0.05);
+  --win-bg: rgba(184, 148, 79, 0.3);
+  --win-bar: var(--gold-deep);
+}
+.tm[data-tm-theme='ivory']::after {
+  background: radial-gradient(120% 80% at 50% 30%, transparent 42%, rgba(120, 96, 54, 0.16) 100%);
+}
+.tm[data-tm-theme='ivory']::before { opacity: 0.75; mix-blend-mode: multiply; }
+
+.tm[data-tm-theme='bordeaux'] {
+  --bg-1: #6f1c37;
+  --bg-2: #47101f;
+  --bg-3: #8d2745;
+  --accent: var(--gold-hi);
+}
+
+/* 休憩中は暖色に振る。「今は休んでいい時間」が遠目でも伝わる */
+.tm[data-tm-phase='break'] {
+  --bg-1: #b0702e;
+  --bg-2: #7c451b;
+  --bg-3: #c98a3e;
+  --fg: #fff8ea;
+  --line: rgba(255, 248, 234, 0.3);
+  --accent: #ffe6b8;
+}
+
+/* 残り1分。画面全体をわずかに焦らせる */
+.tm[data-tm-phase='urgent'] {
+  --bg-1: #a83a24;
+  --bg-2: #6d2013;
+  --bg-3: #c2512f;
+  --fg: #fff4ec;
+  --accent: #ffd9c0;
+  --line: rgba(255, 244, 236, 0.3);
+}
+
+.tm[data-tm-phase='finished'] {
+  --bg-1: #135443;
+  --bg-2: #08322a;
+}
+
+.tm[data-tm-theme],
+.tm {
+  transition: background 900ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* ── レイアウト ──────────────────────────────────────────────────────────── */
+
+.tm-wrap {
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 0 clamp(14px, 3.4vw, 34px);
+}
+
+.tm-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 0 12px;
+  border-bottom: 1px solid var(--line);
+}
+
+.tm-mark {
+  font-family: 'Bodoni Moda', Georgia, serif;
+  font-size: 13px;
+  letter-spacing: 0.34em;
+  text-transform: uppercase;
+  color: var(--accent);
+  white-space: nowrap;
+}
+.tm-mark small {
+  display: block;
+  font-family: 'Noto Sans JP', sans-serif;
+  font-size: 9px;
+  letter-spacing: 0.22em;
+  color: var(--fg-faint);
+  margin-top: 2px;
+}
+
+.tm-title {
+  font-family: 'Bodoni Moda', Georgia, serif;
+  font-size: clamp(15px, 2.2vw, 21px);
+  letter-spacing: 0.04em;
+  text-align: center;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ── 見出し・ラベル ──────────────────────────────────────────────────────── */
+
+.tm-eyebrow {
+  font-family: 'Bodoni Moda', Georgia, serif;
+  font-size: 11px;
+  letter-spacing: 0.42em;
+  text-transform: uppercase;
+  color: var(--fg-faint);
+}
+
+.tm-h {
+  font-family: 'Bodoni Moda', Georgia, serif;
+  font-size: clamp(20px, 3.6vw, 30px);
+  letter-spacing: 0.02em;
+  line-height: 1.2;
+}
+
+/* 上下二重罫の飾り。活版印刷の扉ページの雰囲気 */
+.tm-rule {
+  border: 0;
+  border-top: 1px solid var(--line-strong);
+  border-bottom: 1px solid var(--line);
+  height: 3px;
+  margin: 0;
+}
+
+/* ── 時計 ───────────────────────────────────────────────────────────────── */
+
+.tm-stage {
+  display: grid;
+  place-items: center;
+  padding: clamp(18px, 4vw, 40px) 0 clamp(10px, 2vw, 22px);
+}
+
+.tm-dial {
+  position: relative;
+  width: min(78vw, 46vh, 430px);
+  aspect-ratio: 1;
+  display: grid;
+  place-items: center;
+}
+
+.tm-dial svg { position: absolute; inset: 0; width: 100%; height: 100%; transform: rotate(-90deg); }
+.tm-dial-track { fill: none; stroke: var(--line); stroke-width: 2.5; }
+.tm-dial-arc {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 4;
+  stroke-linecap: round;
+  transition: stroke-dashoffset 480ms linear, stroke 700ms ease;
+  filter: drop-shadow(0 0 5px color-mix(in srgb, var(--accent) 55%, transparent));
+}
+.tm[data-tm-phase='urgent'] .tm-dial-arc { stroke-width: 5.5; }
+
+/* 文字盤の内側に薄い光の回転。静止画にならないための最小限の動き */
+.tm-dial-sheen {
+  position: absolute;
+  inset: 9%;
+  border-radius: 50%;
+  background: conic-gradient(from 0deg, transparent 0deg, color-mix(in srgb, var(--accent) 12%, transparent) 40deg, transparent 90deg);
+  animation: tm-spin 14s linear infinite;
+  pointer-events: none;
+}
+
+.tm-clock {
+  font-family: 'Oswald', 'Bodoni Moda', sans-serif;
+  font-weight: 400;
+  font-variant-numeric: tabular-nums;
+  font-size: min(20vw, 12.4vh, 118px);
+  line-height: 0.92;
+  letter-spacing: -0.012em;
+  text-shadow: 0 2px 26px rgba(0, 0, 0, 0.22);
+  animation: tm-tick 1s ease-out infinite;
+}
+.tm[data-tm-theme='ivory'] .tm-clock { text-shadow: 0 1px 0 rgba(255, 255, 255, 0.7); }
+.tm[data-tm-phase='urgent'] .tm-clock { animation: tm-tick-hard 1s ease-out infinite; }
+.tm-clock[data-paused='true'] { animation: tm-fade-breathe 2.6s ease-in-out infinite; }
+
+.tm-level-tag {
+  font-family: 'Bodoni Moda', Georgia, serif;
+  font-size: clamp(12px, 1.6vw, 15px);
+  letter-spacing: 0.4em;
+  text-transform: uppercase;
+  color: var(--accent);
+  margin-bottom: 2px;
+}
+
+/* ── ブラインド表示 ──────────────────────────────────────────────────────── */
+
+.tm-blinds {
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: clamp(8px, 1.4vw, 16px);
+  font-family: 'Oswald', sans-serif;
+  font-variant-numeric: tabular-nums;
+  font-size: clamp(30px, 6.6vw, 62px);
+  font-weight: 400;
+  letter-spacing: 0.01em;
+}
+.tm-blinds .sep { color: var(--fg-faint); font-weight: 300; }
+.tm-blinds .ante {
+  font-size: 0.42em;
+  color: var(--accent);
+  letter-spacing: 0.1em;
+  padding-left: 4px;
+}
+.tm-blinds .ante em { font-style: normal; font-size: 0.72em; color: var(--fg-faint); letter-spacing: 0.16em; }
+
+.tm-next {
+  margin-top: 10px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 8px 18px;
+  font-size: 12px;
+  letter-spacing: 0.06em;
+  color: var(--fg-soft);
+}
+.tm-next b { font-family: 'Oswald', sans-serif; font-weight: 400; color: var(--fg); font-variant-numeric: tabular-nums; }
+
+/* ── 上部レール（トーナメント全体の進行）──────────────────────────────────── */
+
+.tm-rail { display: flex; gap: 2px; height: 5px; margin: 12px 0 2px; }
+.tm-rail i {
+  flex: 1;
+  background: var(--line);
+  border-radius: 3px;
+  transition: background 500ms ease, transform 500ms ease;
+}
+.tm-rail i[data-done='true'] { background: color-mix(in srgb, var(--accent) 62%, transparent); }
+.tm-rail i[data-now='true'] {
+  background: var(--accent);
+  transform: scaleY(2.1);
+  box-shadow: 0 0 9px color-mix(in srgb, var(--accent) 60%, transparent);
+}
+.tm-rail i[data-break='true'] { background: color-mix(in srgb, var(--amber) 46%, transparent); }
+
+/* ── スタット ────────────────────────────────────────────────────────────── */
+
+.tm-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(112px, 1fr));
+  gap: 1px;
+  background: var(--line);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  overflow: hidden;
+  margin-top: clamp(14px, 2.4vw, 24px);
+}
+.tm-stat {
+  background: var(--surface);
+  padding: 12px 10px 11px;
+  text-align: center;
+  backdrop-filter: blur(3px);
+}
+.tm-stat dt {
+  font-family: 'Bodoni Moda', Georgia, serif;
+  font-size: 9.5px;
+  letter-spacing: 0.28em;
+  text-transform: uppercase;
+  color: var(--fg-faint);
+  margin-bottom: 5px;
+}
+.tm-stat dd {
+  font-family: 'Oswald', sans-serif;
+  font-variant-numeric: tabular-nums;
+  font-size: clamp(19px, 2.6vw, 25px);
+  line-height: 1;
+  letter-spacing: 0.01em;
+}
+.tm-stat dd s { text-decoration: none; font-size: 0.52em; color: var(--fg-faint); padding-left: 2px; }
+
+/* ── ボタン ─────────────────────────────────────────────────────────────── */
+
+.tm-btn {
+  font-family: 'Noto Sans JP', sans-serif;
+  font-size: 12.5px;
+  font-weight: 500;
+  letter-spacing: 0.1em;
+  color: var(--fg);
+  background: var(--surface);
+  border: 1px solid var(--line-strong);
+  border-radius: 3px;
+  padding: 10px 15px;
+  cursor: pointer;
+  position: relative;
+  overflow: hidden;
+  transition: background 200ms ease, border-color 200ms ease, transform 90ms ease, color 200ms ease;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  white-space: nowrap;
+}
+.tm-btn:hover { background: var(--surface-2); border-color: var(--accent); }
+.tm-btn:active { transform: translateY(1px) scale(0.985); }
+.tm-btn:disabled { opacity: 0.36; cursor: not-allowed; transform: none; }
+.tm-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* 金箔の帯が横切る主要アクション */
+.tm-btn--gold {
+  color: #2c1d05;
+  border-color: transparent;
+  background:
+    linear-gradient(100deg, transparent 0%, rgba(255, 255, 255, 0.65) 46%, transparent 62%) no-repeat,
+    linear-gradient(180deg, var(--gold-hi), var(--gold) 52%, var(--gold-deep));
+  background-size: 220% 100%, 100% 100%;
+  background-position: -120% 0, 0 0;
+  font-weight: 700;
+}
+.tm-btn--gold:hover { background-position: 220% 0, 0 0; transition: background-position 900ms ease; }
+.tm-btn--danger { color: #fff2ec; background: color-mix(in srgb, var(--terracotta) 82%, transparent); border-color: transparent; font-weight: 700; }
+.tm-btn--ghost { background: transparent; border-color: var(--line); color: var(--fg-soft); }
+.tm-btn--sm { padding: 7px 11px; font-size: 11px; letter-spacing: 0.06em; }
+.tm-btn--icon { padding: 9px; width: 38px; }
+.tm-btn--wide { width: 100%; }
+
+.tm-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: center;
+  margin-top: clamp(14px, 2.4vw, 22px);
+  padding-top: 16px;
+  border-top: 1px solid var(--line);
+}
+.tm-controls .grow { flex: 1 1 150px; }
+
+/* ── カード / パネル ─────────────────────────────────────────────────────── */
+
+.tm-card {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  padding: clamp(14px, 2.4vw, 22px);
+  backdrop-filter: blur(4px);
+}
+.tm[data-tm-theme='ivory'] .tm-card {
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.9) inset, 0 8px 22px -14px rgba(60, 46, 20, 0.5);
+}
+
+/* ── フォーム ────────────────────────────────────────────────────────────── */
+
+.tm-field { display: block; }
+/* ラベル用の span だけを対象にする（コピー欄など中身の span を巻き込まない） */
+.tm-field > span:not(.tm-copyfield) {
+  display: block;
+  font-size: 10.5px;
+  letter-spacing: 0.2em;
+  color: var(--fg-faint);
+  margin-bottom: 5px;
+  text-transform: uppercase;
+  font-family: 'Bodoni Moda', Georgia, serif;
+}
+.tm-input,
+.tm-select {
+  width: 100%;
+  font-family: 'Noto Sans JP', sans-serif;
+  font-size: 14px;
+  color: var(--fg);
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-bottom-width: 2px;
+  border-radius: 3px;
+  padding: 9px 11px;
+  transition: border-color 200ms ease, background 200ms ease;
+}
+.tm-input:focus,
+.tm-select:focus { outline: none; border-color: var(--accent); background: var(--surface); }
+.tm-input[data-num='true'] { font-family: 'Oswald', sans-serif; font-variant-numeric: tabular-nums; letter-spacing: 0.02em; }
+.tm-select option { color: #1b3d33; background: #fffbf2; }
+
+.tm-note {
+  font-size: 11.5px;
+  line-height: 1.7;
+  color: var(--fg-soft);
+}
+.tm-error {
+  font-size: 12px;
+  line-height: 1.6;
+  color: #fff0ea;
+  background: color-mix(in srgb, var(--terracotta) 22%, transparent);
+  border: 1px solid color-mix(in srgb, var(--terracotta) 55%, transparent);
+  border-radius: 3px;
+  padding: 9px 11px;
+}
+.tm[data-tm-theme='ivory'] .tm-error { color: #7a2412; }
+
+/* ── ストラクチャー表 ────────────────────────────────────────────────────── */
+
+.tm-table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+.tm-table th {
+  font-family: 'Bodoni Moda', Georgia, serif;
+  font-size: 9.5px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--fg-faint);
+  font-weight: 400;
+  text-align: right;
+  padding: 0 7px 7px;
+  border-bottom: 1px solid var(--line-strong);
+}
+.tm-table th:first-child, .tm-table td:first-child { text-align: left; }
+.tm-table td {
+  font-family: 'Oswald', sans-serif;
+  font-size: 14px;
+  padding: 7px;
+  border-bottom: 1px solid var(--line);
+  text-align: right;
+}
+.tm-table tr[data-break='true'] td { color: var(--amber); font-family: 'Noto Sans JP', sans-serif; font-size: 12px; letter-spacing: 0.14em; }
+.tm-table tr[data-now='true'] {
+  background: color-mix(in srgb, var(--accent) 13%, transparent);
+  box-shadow: inset 3px 0 0 var(--accent);
+}
+.tm-table tr[data-past='true'] td { color: var(--fg-faint); }
+.tm-table tbody tr { animation: tm-rise 420ms cubic-bezier(0.16, 1, 0.3, 1) backwards; }
+
+/* ── レベルアップ告知オーバーレイ ────────────────────────────────────────── */
+
+.tm-announce {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: grid;
+  place-items: center;
+  background: radial-gradient(60% 50% at 50% 50%, rgba(0, 0, 0, 0.34), rgba(0, 0, 0, 0.66));
+  animation: tm-fade-in 320ms ease;
+  padding: 20px;
+  /* 告知が出ている数秒間もディーラーが操作できるよう、クリックを透過させる */
+  pointer-events: none;
+}
+.tm-announce-card {
+  background: linear-gradient(165deg, var(--paper), var(--ivory));
+  color: var(--ink);
+  border-radius: 6px;
+  padding: clamp(26px, 5vw, 44px) clamp(30px, 7vw, 68px);
+  text-align: center;
+  box-shadow: 0 40px 90px -30px rgba(0, 0, 0, 0.7), 0 0 0 1px var(--gold-deep), 0 0 0 7px rgba(253, 248, 236, 0.1);
+  animation: tm-card-in 780ms cubic-bezier(0.16, 1, 0.3, 1);
+  transform-origin: 50% 50%;
+  position: relative;
+  overflow: hidden;
+}
+.tm-announce-card::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(100deg, transparent 34%, rgba(255, 255, 255, 0.85) 50%, transparent 66%);
+  animation: tm-foil 1500ms 380ms ease-out;
+  background-size: 250% 100%;
+  background-repeat: no-repeat;
+  pointer-events: none;
+}
+.tm-announce-card .lbl {
+  font-family: 'Bodoni Moda', Georgia, serif;
+  font-size: 11px;
+  letter-spacing: 0.5em;
+  text-transform: uppercase;
+  color: var(--bordeaux);
+}
+.tm-announce-card .big {
+  font-family: 'Oswald', sans-serif;
+  font-variant-numeric: tabular-nums;
+  font-size: clamp(38px, 9vw, 76px);
+  line-height: 1.06;
+  margin: 8px 0 2px;
+  color: var(--ink);
+}
+.tm-announce-card .sub { font-size: 12px; letter-spacing: 0.2em; color: rgba(27, 61, 51, 0.6); }
+
+/* 休憩中の大見出し */
+.tm-break-word {
+  font-family: 'Bodoni Moda', Georgia, serif;
+  font-size: clamp(34px, 9vw, 92px);
+  letter-spacing: 0.34em;
+  text-transform: uppercase;
+  animation: tm-breathe 4.2s ease-in-out infinite;
+  text-indent: 0.34em;
+}
+
+/* ── トーナメント表 ──────────────────────────────────────────────────────── */
+
+.tm-bracket {
+  display: flex;
+  gap: clamp(20px, 4vw, 52px);
+  align-items: stretch;
+  padding: 8px 2px 22px;
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+.tm-round {
+  display: flex;
+  flex-direction: column;
+  min-width: 208px;
+  flex: 1 0 208px;
+}
+/* 見出しを分配対象から外し、body だけを space-around で割る。
+   こうすると N 回戦の各マッチが、前ラウンドの2試合のちょうど中間に来る */
+.tm-round-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-around;
+}
+.tm-round-head {
+  font-family: 'Bodoni Moda', Georgia, serif;
+  font-size: 10px;
+  letter-spacing: 0.34em;
+  text-transform: uppercase;
+  color: var(--fg-faint);
+  text-align: center;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--line);
+  position: sticky;
+  top: 0;
+}
+
+.tm-seat {
+  position: relative;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: var(--surface);
+  overflow: hidden;
+  animation: tm-rise 520ms cubic-bezier(0.16, 1, 0.3, 1) backwards;
+}
+.tm-seat + .tm-seat { margin-top: 5px; }
+.tm-side {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 9px 10px;
+  transition: background 320ms ease, color 320ms ease;
+  min-height: 42px;
+}
+.tm-side + .tm-side { border-top: 1px solid var(--line); }
+.tm-side .seed {
+  font-family: 'Bodoni Moda', Georgia, serif;
+  font-size: 10px;
+  color: var(--fg-faint);
+  width: 15px;
+  flex: 0 0 15px;
+  text-align: center;
+}
+.tm-side .nm {
+  flex: 1;
+  min-width: 0;
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.tm-side .mem {
+  display: block;
+  font-size: 9.5px;
+  font-weight: 400;
+  letter-spacing: 0.04em;
+  color: var(--fg-faint);
+  margin-top: 1px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.tm-side .sc {
+  font-family: 'Oswald', sans-serif;
+  font-variant-numeric: tabular-nums;
+  font-size: 16px;
+  min-width: 16px;
+  text-align: center;
+  color: var(--fg-soft);
+}
+.tm-side[data-tbd='true'] .nm { color: var(--fg-faint); font-style: italic; font-weight: 400; }
+/* 勝者は「箔で刷った1行」に見せる。アクセント色そのままだと
+   アイボリー地でピンクに寄るため、ハイライトは常に金系で敷く */
+.tm-side[data-win='true'] {
+  background: linear-gradient(90deg, var(--win-bg), transparent 88%);
+  box-shadow: inset 3px 0 0 var(--win-bar);
+}
+.tm-side[data-win='true'] .nm { color: var(--fg); font-weight: 700; }
+.tm-side[data-win='true'] .sc { color: var(--win-bar); }
+.tm-side[data-lose='true'] { opacity: 0.44; }
+
+/* ラウンド間の接続線。SVG ではなく擬似要素で軽量に引く */
+.tm-seat[data-linked='true']::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  right: -1px;
+  width: 1px;
+  height: 1px;
+}
+.tm-link {
+  position: absolute;
+  pointer-events: none;
+  inset: 0;
+  overflow: visible;
+}
+.tm-link path {
+  fill: none;
+  stroke: var(--line-strong);
+  stroke-width: 1.2;
+  stroke-dasharray: var(--len, 400);
+  stroke-dashoffset: var(--len, 400);
+  animation: tm-draw 1100ms 180ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.tm-champ {
+  display: grid;
+  place-items: center;
+  gap: 6px;
+  max-width: 560px;
+  margin: 0 auto;
+  padding: clamp(18px, 3vw, 30px) 18px;
+  border: 1px solid var(--line-strong);
+  border-radius: 5px;
+  background: var(--surface);
+  position: relative;
+  overflow: hidden;
+}
+.tm-champ::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(100deg, transparent 38%, color-mix(in srgb, var(--accent) 34%, transparent) 50%, transparent 62%);
+  background-size: 260% 100%;
+  background-repeat: no-repeat;
+  animation: tm-foil 3.4s 0.3s ease-out infinite;
+  pointer-events: none;
+}
+.tm-champ .nm {
+  font-family: 'Bodoni Moda', Georgia, serif;
+  font-size: clamp(24px, 5vw, 44px);
+  letter-spacing: 0.05em;
+}
+
+/* ── 小物 ───────────────────────────────────────────────────────────────── */
+
+.tm-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 10px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  font-family: 'Bodoni Moda', Georgia, serif;
+  border: 1px solid var(--line-strong);
+  border-radius: 999px;
+  padding: 3px 10px;
+  color: var(--fg-soft);
+}
+.tm-chip[data-live='true'] { color: var(--accent); border-color: var(--accent); }
+.tm-chip[data-live='true'] b {
+  width: 5px; height: 5px; border-radius: 50%;
+  background: var(--accent);
+  animation: tm-blink 1.6s ease-in-out infinite;
+}
+
+.tm-grid { display: grid; gap: clamp(12px, 2vw, 18px); }
+.tm-grid[data-cols='2'] { grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); }
+.tm-grid[data-cols='3'] { grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); }
+.tm-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.tm-spread { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.tm-stack { display: grid; gap: 10px; }
+.tm-sec { padding: clamp(20px, 4vw, 38px) 0; }
+.tm-center { text-align: center; }
+
+.tm-link-a {
+  color: var(--accent);
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  text-decoration: none;
+  border-bottom: 1px solid color-mix(in srgb, var(--accent) 40%, transparent);
+  padding-bottom: 1px;
+  transition: border-color 200ms ease;
+}
+.tm-link-a:hover { border-color: var(--accent); }
+
+.tm-copyfield {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  padding: 6px 6px 6px 10px;
+}
+.tm-copyfield code {
+  flex: 1;
+  min-width: 0;
+  font-family: 'Oswald', monospace;
+  font-size: 11.5px;
+  letter-spacing: 0.02em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--fg-soft);
+}
+
+/* 4隅の飾り罫。生成AI的な「角丸カード + 影」だけの画面にしないための装飾 */
+.tm-frame { position: relative; }
+.tm-frame::before,
+.tm-frame::after {
+  content: '';
+  position: absolute;
+  width: 16px; height: 16px;
+  border: 1px solid var(--line-strong);
+  pointer-events: none;
+}
+.tm-frame::before { top: -1px; left: -1px; border-right: 0; border-bottom: 0; }
+.tm-frame::after { bottom: -1px; right: -1px; border-left: 0; border-top: 0; }
+
+/* ── キーフレーム ────────────────────────────────────────────────────────── */
+
+@keyframes tm-rise {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes tm-fade-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes tm-spin { to { transform: rotate(360deg); } }
+@keyframes tm-blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.25; } }
+@keyframes tm-draw { to { stroke-dashoffset: 0; } }
+
+/* 秒が動くたびに極わずかに息をする。近くで見ると生きているのが分かる程度に留める */
+@keyframes tm-tick {
+  0% { transform: scale(1); }
+  6% { transform: scale(1.009); }
+  40%, 100% { transform: scale(1); }
+}
+@keyframes tm-tick-hard {
+  0% { transform: scale(1); opacity: 1; }
+  7% { transform: scale(1.045); opacity: 1; }
+  50% { transform: scale(1); opacity: 0.9; }
+  100% { transform: scale(1); opacity: 1; }
+}
+@keyframes tm-fade-breathe {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.42; }
+}
+@keyframes tm-breathe {
+  0%, 100% { opacity: 0.62; letter-spacing: 0.3em; }
+  50% { opacity: 1; letter-spacing: 0.38em; }
+}
+@keyframes tm-foil { to { background-position: 250% 0; } }
+@keyframes tm-card-in {
+  0% { opacity: 0; transform: perspective(1200px) rotateX(-78deg) translateY(40px) scale(0.94); }
+  60% { opacity: 1; }
+  100% { opacity: 1; transform: perspective(1200px) rotateX(0) translateY(0) scale(1); }
+}
+
+/* ── 全画面（会場モニタ）モード ──────────────────────────────────────────── */
+
+.tm[data-tm-focus='true'] .tm-hide-on-focus { display: none; }
+.tm[data-tm-focus='true'] .tm-dial { width: min(64vw, 68vh, 620px); }
+.tm[data-tm-focus='true'] .tm-clock { font-size: min(17vw, 19vh, 210px); }
+.tm[data-tm-focus='true'] .tm-blinds { font-size: clamp(34px, 5.6vw, 88px); }
+
+/* 横向きの狭い画面では時計と情報を左右に並べる */
+@media (orientation: landscape) and (max-height: 560px) {
+  .tm-stage { grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: 22px; padding: 12px 0; }
+  .tm-dial { width: min(38vw, 74vh, 300px); }
+  .tm-clock { font-size: min(9vw, 22vh, 92px); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tm *,
+  .tm *::before,
+  .tm *::after {
+    animation-duration: 1ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 1ms !important;
+  }
+}
